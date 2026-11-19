@@ -11,7 +11,7 @@ This guide covers:
 
 ## What you need
 
-- A computer with a 64-bit Intel or AMD processor, or an Apple Silicon Mac or other arm64 computer. A Raspberry Pi is not supported as the server (D21). A Pi can still be a kiosk, a timer client, or a photo stand (see [the photo stand guide](photo-stand.md)).
+- A computer with a 64-bit Intel or AMD processor, or an Apple Silicon Mac or other arm64 computer. A Raspberry Pi is not supported as the server (D21). A Pi can still be a kiosk, a timer client, or a photo stand (see [Raspberry Pi timer and photo stand](pi-setup.md)).
 - Docker:
   - On a Mac or a Windows computer, install Docker Desktop from <https://www.docker.com/products/docker-desktop/>. On Windows, keep the default WSL 2 engine. You need no Docker account.
   - On Linux, install Docker Engine for your distribution from <https://docs.docker.com/engine/install/>, with its Compose plugin. Compose 2.23.1 or later reads the Compose file; `docker compose version` prints yours.
@@ -62,7 +62,7 @@ What each line of `.env` does:
 
 Compose starts two containers, `server` and `caddy`, and keeps their data in two volumes, `derbynet_data` and `derbynet_caddy`. Both restart after a reboot, until you stop them. Docker downloads the images the first time, which takes a minute or two. On Linux, put `sudo` in front of each `docker` command unless your user is in the `docker` group. Run the commands from your own user's shell, not a root shell: the shell fills in `$(id -u)` before `sudo` runs, so it is still your own id, but in a root shell it is 0, and the server refuses to run as root.
 
-The Compose file uses the published image's `latest` tag, which only a full release sets (D89). Until the first one, only test releases are published, so add a line naming the newest test release from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases) to `.env`, for example `DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc2`. If the image is not found, build it from a copy of the repository instead: from the folder that holds `compose.yaml` in a copy of the repository, run `docker compose up -d --build`.
+The Compose file uses the published image's `latest` tag, which only a full release sets (D89). Until the first one, only test releases are published, so add a line naming the newest test release from the project's [Releases page](https://github.com/PorkChopExpress86/derbynet/releases) to `.env`, for example `DERBYNET_IMAGE=ghcr.io/porkchopexpress86/derbynet_server:v0.1.0-rc3`. If the image is not found, build it from a copy of the repository instead: from the folder that holds `compose.yaml` in a copy of the repository, run `docker compose up -d --build`.
 
 When the computer's address changes, as on another network, put the new one in `.env` and run `docker compose up -d` again. Until then, phones see a certificate warning for the new address, which they can accept.
 

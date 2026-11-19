@@ -23,7 +23,7 @@ SERVER_DIR = GOLDEN_DIR.parents[1]
 QUIRK_DECISIONS = {
     "Q1": "fix",
     "Q2": "fix",
-    "Q3": "reproduce",
+    "Q3": "fix",  # #65
     "Q4": "fix",
     "Q5": "fix",
     "Q6": "reproduce",
@@ -37,7 +37,7 @@ QUIRK_DECISIONS = {
     "Q14": "fix",
     "Q15": "fix",
     "Q16": "fix",
-    "Q17": "reproduce",
+    "Q17": "fix",  # #65
     "Q18": "fix",
     "Q19": "fix",  # D30
     "Q20": "fix",

@@ -28,6 +28,13 @@
 set -e -o pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
+# Git sets GIT_DIR for a hook. Under it, a test's `git init` in a scratch
+# folder reinitializes this repository: pushed from a worktree, it set
+# core.bare=true in the main clone's .git/config and stopped every checkout
+# (#351 and #369 retro). The hook and its checks run in the working tree,
+# where git finds the repository without it, so it drops every variable that
+# names a repository (`git rev-parse --local-env-vars`).
+unset $(git rev-parse --local-env-vars)
 ZERO=0000000000000000000000000000000000000000
 
 # A push in the same shell command as a pytest run, or as a read of a run's
@@ -107,8 +114,10 @@ while read -r _ local_sha _ remote_sha; do
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
-  checked='^(server/|testing/|website/inc/generators/|plan/'
-  checked+='|\.github/workflows/image\.yml$)'
+  # The guides and the workflows that run their stages, which
+  # tests/test_guide_commands.py reads (#414).
+  checked='^(server/|testing/|website/inc/generators/|plan/|docs/[^/]+\.md$'
+  checked+='|\.github/workflows/(image|server|pi-images)\.yml$)'
   if [ -z "$base" ] || grep -qE "$checked" <<<"$names"; then
     changed=1
   fi

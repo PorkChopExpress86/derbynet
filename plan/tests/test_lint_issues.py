@@ -4,6 +4,7 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -357,6 +358,117 @@ class PhpCites(Lint):
         done = self.lint(ticket(php=D98_FIRST), '--labels', 'kind:epic')
         self.assertNotIn('says what a PHP file does', done.stdout)
         self.assertIn('0 findings', done.stdout, done.stdout)
+
+
+# #412's body as filed (2026-11-18), cut to the lines the check reads.
+PHP_412 = ("- In CI's `pytest (postgres)` job on PR #7's head it raised `StopIteration` "
+           "in `logged()`.")
+BOX_412 = ("- [ ] `test_detach.py` passes 25 counts under load. Evidence is the "
+           "`pytest-under-load.sh` output in the PR.")
+
+
+WORKFLOWS = PLAN.parent / '.github' / 'workflows'
+
+
+def postgres_job_names():
+    """Every CI job name that runs on Postgres, read from the workflows: each
+    top-level `name:` that has `matrix.database`, with the database `postgres`,
+    `${{ matrix.K && 'S' || '' }}` as each of S and nothing, and any other
+    `${{ matrix.K }}` as 2. A job form added to a workflow joins the list."""
+    names = set()
+    for path in sorted(WORKFLOWS.glob('*.yml')):
+        for line in path.read_text().splitlines():
+            m = re.match(r'^    name: (.*matrix\.database.*)$', line)
+            if not m:
+                continue
+            forms = [m.group(1).replace('${{ matrix.database }}', 'postgres')]
+            while any('${{' in f for f in forms):
+                forms = [g for f in forms for g in expand(f)]
+            names.update(forms)
+    return names
+
+
+def expand(form):
+    m = re.search(r"\$\{\{ matrix\.\w+ && '([^']*)' \|\| '' \}\}", form)
+    if m:
+        return [form[:m.start()] + m.group(1) + form[m.end():],
+                form[:m.start()] + form[m.end():]]
+    m = re.search(r'\$\{\{ matrix\.\w+ \}\}', form)
+    return [form[:m.start()] + '2' + form[m.end():]]
+
+
+def acceptance(php, box):
+    return ticket(php=php).replace('## Acceptance criteria\n\nText.',
+                                   f'## Acceptance criteria\n\n{box}')
+
+
+class LoadDatabase(Lint):
+    """An open ticket that names a CI Postgres job names the database in
+    each open box that asks for a run under load (#412 retro)."""
+
+    def test_412s_box_is_a_finding(self):
+        done = self.lint(acceptance(PHP_412, BOX_412))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#0:19: the body names CI\'s "pytest (postgres)" job while this box '
+                      'asks for a run under load and names no database; write "on Postgres" '
+                      '(or the database it should run on), since a flake repeats on the '
+                      'database it failed on', done.stdout)
+        self.assertIn('1 findings', done.stdout)
+
+    def test_a_box_that_names_a_database_passes(self):
+        for words in ('on Postgres', 'on SQLite', 'on PostgreSQL', 'on SQLite and Postgres'):
+            with self.subTest(words=words):
+                box = BOX_412.replace('under load', f'under load {words}')
+                done = self.lint(acceptance(PHP_412, box))
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_body_with_no_postgres_job_passes(self):
+        for php in ('- In CI\'s `pytest (sqlite)` job it failed.', '- It failed on Postgres.'):
+            with self.subTest(php=php):
+                done = self.lint(acceptance(php, BOX_412))
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_each_postgres_job_counts(self):
+        names = postgres_job_names()
+        for job in names:
+            with self.subTest(job=job):
+                done = self.lint(acceptance(PHP_412.replace('pytest (postgres)', job), BOX_412))
+                self.assertIn(f'names CI\'s "{job}" job', done.stdout)
+
+    def test_a_job_name_with_a_matrix_suffix_counts(self):
+        """server.yml names `pytest (postgres, test endpoints)` and `shell
+        (postgres, group 2)`; a name that does not match is a miss, not a pass."""
+        names = postgres_job_names()
+        for job in ('pytest (postgres, test endpoints)', 'shell (postgres, group 2)'):
+            self.assertIn(job, names)
+
+    def test_other_wordings_of_both_databases_pass(self):
+        for words in ('on both databases', 'on both engines', 'on each database',
+                      'on every database', 'on either database'):
+            with self.subTest(words=words):
+                box = BOX_412.replace('under load', f'under load {words}')
+                done = self.lint(acceptance(PHP_412, box))
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_each_spelling_of_a_load_run_counts(self):
+        for box in ('- [ ] `test_detach.py` passes 25 counts under-load.',
+                    '- [ ] `test_detach.py` passes 25 counts with `pytest-under-load.sh`.',
+                    '- [ ] `test_detach.py` passes 25 counts Under Load.'):
+            with self.subTest(box=box):
+                done = self.lint(acceptance(PHP_412, box))
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('names no database', done.stdout)
+
+    def test_a_ticked_box_or_a_box_with_no_load_run_passes(self):
+        for box in (BOX_412.replace('[ ]', '[x]'),
+                    '- [ ] `test_detach.py` passes. Evidence is the log in the PR.'):
+            with self.subTest(box=box):
+                done = self.lint(acceptance(PHP_412, box))
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_spec_is_not_checked(self):
+        done = self.lint(acceptance(PHP_412, BOX_412), '--labels', 'kind:spec')
+        self.assertNotIn('names no database', done.stdout)
 
 
 if __name__ == '__main__':

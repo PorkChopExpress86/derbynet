@@ -1,5 +1,6 @@
 #!/bin/bash
-# Merges PR <number> only if every check on its current head passed, pinning the
+# Merges PR <number> only if every check on its current head passed and GitHub
+# rejected no workflow file there (plan/bin/rejected-workflows), pinning the
 # merge to that head SHA so a push after the check can't slip in. Then prints
 # each issue the PR closes with its state, and exits 1 if one is still open.
 #
@@ -40,6 +41,14 @@
 # checked the combination by hand. It prints the overlapping paths and what
 # plan/bin/affected-tests maps the combined diff to. After that run on the
 # PR merged with origin/master, --base-checked merges anyway.
+#
+# It refuses a PR whose body cites a decision (D133) that
+# plan/owner-decisions.md has no row for on origin/master or on the PR's
+# head: #386 cited D133 and merged before #420, which records it (#378
+# retro). An id in backticks or a closed code fence is quoted, not cited, and
+# neither is one after a "/" (a URL). It checks before the source checks, which
+# take minutes, and again before the last fetch, since the body can change
+# during them.
 #
 # Last, it fetches origin/master again and refuses when it moved since the
 # checks read it: a PR merged during the run was never checked with this one
@@ -161,6 +170,16 @@ if [ -n "$not_passed" ]; then
   echo "$not_passed" >&2
   exit 1
 fi
+# A workflow GitHub rejected shows no check on the PR (#59 retro).
+if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
+  echo "not merging #$PR; could not read the workflow runs on $head" >&2
+  exit 1
+fi
+if [ -n "$rejected" ]; then
+  echo "not merging #$PR; GitHub rejected a workflow file on $head, so no check of it shows on the PR:" >&2
+  echo "$rejected" >&2
+  exit 1
+fi
 # The areas whose change on master since the merge base the PR's CI never saw:
 # each path printed as "<area>\t<path>".
 areas() {
@@ -244,6 +263,33 @@ source_checks_on_the_merge() {
   echo "$head $master" >>"$passed_file"
   echo "the source checks passed on #$PR merged with origin/master ${master:0:8} in $took" >&2
 }
+# A decision the PR body cites is a row of plan/owner-decisions.md on
+# origin/master ($master) or on the PR's head (#378 retro: #386 cited D133,
+# whose row was still in open PR #420). An id in a code span or a closed
+# fence is quoted; the lines of a fence that never closes are checked, so one
+# stray fence hides no later id. An id after a "/" is a URL's tail, not a
+# citation. The body is read at each call, since it can change during the
+# source checks (AGENT-BRIEF: a tool reads the state it acts on again).
+refuse_unrecorded_decisions() {
+  local body cited recorded unrecorded
+  if ! body=$("$GH" pr view "$PR" --repo "$REPO" --json body --jq .body); then
+    echo "not merging #$PR; could not read its body, whose cited decisions must be on origin/master or the PR's head" >&2
+    return 1
+  fi
+  cited=$(awk '/^[[:space:]]*```/ { if (fence) pending = ""; fence = !fence; next }
+               fence { pending = pending $0 "\n"; next }
+               { gsub(/`[^`]*`/, ""); print }
+               END { if (fence) { gsub(/`[^`]*`/, "", pending); printf "%s", pending } }' <<<"$body" |
+          { grep -oE '(^|[^[:alnum:]_/])D[0-9]+\b' || true; } | sed -E 's/^[^D]*//' | LC_ALL=C sort -u)
+  recorded=$({ git show "$master:plan/owner-decisions.md" 2>/dev/null || true
+               git show "$head:plan/owner-decisions.md" 2>/dev/null || true; } |
+             sed -nE 's/^\| (D[0-9]+) \|.*/\1/p' | LC_ALL=C sort -u)
+  unrecorded=$(LC_ALL=C comm -23 <(grep . <<<"$cited" || true) <(echo "$recorded") | tr '\n' ' ')
+  if [ -n "$unrecorded" ]; then
+    echo "not merging #$PR; its body cites ${unrecorded% }, which plan/owner-decisions.md has no row for on origin/master ${master:0:8} or on its head ${head:0:8}; merge the PR that records it first, or put the id in backticks if the body only quotes it" >&2
+    return 1
+  fi
+}
 if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
    ! git cat-file -e "$head^{commit}" 2>/dev/null ||
    ! base=$(git merge-base "$head" origin/master 2>/dev/null); then
@@ -251,6 +297,8 @@ if ! git fetch -q origin master "refs/pull/$PR/head" 2>/dev/null ||
   exit 1
 fi
 master=$(git rev-parse origin/master)
+# Before the source checks, which take minutes: a refusal here costs none.
+refuse_unrecorded_decisions || exit 1
 pr_paths=$(git diff --name-only "$base" "$head" | areas)
 master_paths=$(git diff --name-only "$base" "$master" | areas)
 # One collation for sort and comm: this host's comm (uutils) compares
@@ -324,6 +372,8 @@ if [ ${#held[@]} -gt 0 ]; then
   echo "not merging #$PR; it closes ${held[*]}, whose body has a \"## Still open\" section; write \"Part of #N\" in the PR body instead" >&2
   exit 1
 fi
+# The body may have changed during the checks.
+refuse_unrecorded_decisions || exit 1
 # The checks and the area rule read origin/master at $master. A PR that
 # merged since, during a 16-minute run say, was never checked with this one
 # (#333 review), so read it again just before the merge. GitHub still merges

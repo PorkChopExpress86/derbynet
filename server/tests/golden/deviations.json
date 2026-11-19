@@ -239,6 +239,15 @@
       "expected": "deviations/R3/two-lanes.http"
     },
     {
+      "quirk": "Q3",
+      "fixture": "http/reschedule/first-heat-bye.http",
+      "exchanges": [
+        "001 dry-run-with-a-bye-in-the-first-heat"
+      ],
+      "reason": "PHP's squeeze takes heat index 0 for no heat (!$relos[$lane]), so a bye in the round's first heat never takes a displaced racer; Django uses it and squeezes out one more heat (#65). The expected reply holds only the chart and timing keys the service computes; #31 records the rest.",
+      "expected": "deviations/Q3/first-heat-bye.http"
+    },
+    {
       "quirk": "Q4",
       "fixture": "http/suite/basic-racing.http",
       "exchanges": [
@@ -1783,6 +1792,28 @@
       ],
       "reason": "PHP stores a time of --- as text, shows it as 0 and places it first. Django gives the car a did-not-finish time, 9.999 s, so it places last (D42).",
       "expected": "deviations/Q16/partial-and-non-numeric-results.http"
+    },
+    {
+      "quirk": "Q17",
+      "fixture": "http/timer/zeroes-on-the-lanes-in-use.http",
+      "exchanges": [
+        "001 finished-zeroes-and-places-on-lanes-2-and-4",
+        "002 poll-after-zeroes-and-places",
+        "003 finished-zeroes-on-lanes-2-and-4",
+        "004 poll-after-zeroes"
+      ],
+      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count. Django reads only the lanes the heat schedules, or in a timer test the lanes its mask leaves in (#65, Q17). On lanes 2 and 4, the only lanes in use, PHP writes zero times as heat 1's result and stages heat 2; Django stops racing on heat 1 and writes nothing. That is new for zero times with places (001, 002); without places Django already stopped on master, through D42's false-start rule (003, 004). In a timer test that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2 as the test's result; Django stops the test. That poll's current-heat classid is \"\" in PHP and null in Django: C4, which Q2 fixes. After a timer-test result, PHP's advance_heat assigns in its condition (website/inc/autoadvance.inc:138), so it writes ClassID from round -100, which has no row, and stores \"\". Django writes ClassID only on next-up or a change of round (Q2), and here never advances, since Q17 stops the test (test_classid_through_a_timer_test, #406).",
+      "expected": "deviations/Q17/zeroes-on-the-lanes-in-use.http"
+    },
+    {
+      "quirk": "Q17",
+      "fixture": "http/timer/zeroes-in-a-timer-test.http",
+      "exchanges": [
+        "001 finished-zeroes-on-the-tested-lanes",
+        "002 timer-test-after-zeroes"
+      ],
+      "reason": "PHP's is_all_zeroes() wants a time on every lane up to the lane count. Django reads only the lanes the heat schedules, or in a timer test the lanes its mask leaves in (#65, Q17). On lanes 2 and 4, the only lanes in use, PHP writes zero times as heat 1's result and stages heat 2; Django stops racing on heat 1 and writes nothing. That is new for zero times with places (001, 002); without places Django already stopped on master, through D42's false-start rule (003, 004). In a timer test that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2 as the test's result; Django stops the test. That poll's current-heat classid is \"\" in PHP and null in Django: C4, which Q2 fixes. After a timer-test result, PHP's advance_heat assigns in its condition (website/inc/autoadvance.inc:138), so it writes ClassID from round -100, which has no row, and stores \"\". Django writes ClassID only on next-up or a change of round (Q2), and here never advances, since Q17 stops the test (test_classid_through_a_timer_test, #406).",
+      "expected": "deviations/Q17/zeroes-in-a-timer-test.http"
     },
     {
       "quirk": "Q18",

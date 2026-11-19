@@ -1,4 +1,4 @@
-"""Write the Q20, Q21 and Q25 deviation entries for the reschedule transcripts.
+"""Write the Q3, Q20, Q21 and Q25 deviation entries for the reschedule transcripts.
 
     uv run python tools/reschedule_deviations.py            # write them
     uv run python tools/reschedule_deviations.py --check    # fail if they differ
@@ -9,6 +9,8 @@ exchange whose chart differs from PHP's gets an expected exchange under
 `tests/golden/deviations/<quirk>/`, and `deviations.json` gets one entry per
 quirk and fixture:
 
+- Q3 (#65): a bye in heat index 0 takes a racer of a heat the squeeze
+  removes, so Django's chart has fewer heats than PHP's.
 - Q20 (D34): Django keeps the running heat and the staged heat.
 - Q21: PHP answers `nochart` where one more search with its last added heat
   fits the racer in.
@@ -45,6 +47,13 @@ from racing.engine.tests.reschedule_replay import (  # noqa: E402
 )
 
 REASONS = {
+    "Q3": (
+        "PHP's squeeze takes heat index 0 for no heat (!$relos[$lane]), so a"
+        " bye in the round's first heat never takes a displaced racer; Django"
+        " uses it and squeezes out one more heat (#65). The expected reply"
+        " holds only the chart and timing keys the service computes; #31"
+        " records the rest."
+    ),
     "Q20": (
         "D34: Django keeps the running heat and the staged heat as they are"
         " and fits the racer into later or added heats; PHP can change both."
@@ -73,6 +82,19 @@ def exchange_text(name: str, exchange: dict, reply: dict) -> str:
     return f"### {name}\n{request}length: {len(body.encode())}\nbody:\n{body}\n"
 
 
+def quirk_of(reply, php_chart: list[str | None] | None) -> str | None:
+    """The quirk that explains a reply that differs from PHP's, or None."""
+    if reply.failure == "notonroster":
+        return "Q25"
+    if php_chart is None:
+        return "Q21"
+    if php_changed_a_kept_heat(php_chart, reply.kept):
+        return "Q20"
+    if reply.chart is not None and len(reply.chart) < len(php_chart):
+        return "Q3"
+    return None
+
+
 def expected_files() -> tuple[dict[Path, str], list[dict]]:
     replies = [((SUITE_FIXTURE, name), r) for name, r in replay(engine(True))]
     replies += replay_quirks(engine(True))
@@ -88,16 +110,12 @@ def expected_files() -> tuple[dict[Path, str], list[dict]]:
         php_chart = body["chart"] if body["outcome"]["code"] == "success" else None
         if reply.failure is None and reply.chart == php_chart:
             continue
-        if reply.failure == "notonroster":
-            quirk = "Q25"
-        elif php_chart is None:
-            quirk = "Q21"
-        elif php_changed_a_kept_heat(php_chart, reply.kept):
-            quirk = "Q20"
-        else:
+        quirk = quirk_of(reply, php_chart)
+        if quirk is None:
             raise SystemExit(
                 f"{fixture} {name}: Django's chart differs from PHP's, and"
-                " PHP kept the running and staged heats, so D34 does not explain it"
+                " PHP kept the running and staged heats, so D34 does not explain it,"
+                " and it has no fewer heats, so Q3 does not either"
             )
         expected = reply.django()
         files.setdefault((quirk, fixture), []).append(

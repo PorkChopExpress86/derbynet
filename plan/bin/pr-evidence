@@ -2,7 +2,8 @@
 """Lists each open line of an issue that asks for evidence in the PR, and
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
-Usage: plan/bin/pr-evidence <issue> [--check BODY.md]
+Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket] [--closes N]...]
+       plan/bin/pr-evidence --check BODY.md [--closes N]...    (a body with no ticket, such as a retro's)
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -16,10 +17,72 @@ an earlier PR gave its evidence.
 
 #61's body draft left out the reviewer's checklist its timer-guide box asked
 for, though the checklist was drafted, until the lead found it (#61 retro).
-Exits 1 on a key the body gives no evidence for, or when the issue cannot be
+
+`--check` also refuses an unfilled placeholder outside inline code: a
+capitalised token joined by -, such as LOOP-OUTPUT, that ends in a word of
+SUFFIXES. #399's draft held LOOP-OUTPUT where its text said "all 25 pass",
+and this check passed it (#399 retro). A token joined by _ of that shape is
+one too unless a file under server/ or testing/ assigns it (`NAME = ...`,
+`NAME=...`, an enum member), since code names such as VIEW_RACE_RESULTS share
+the shape: #406's draft held HANDOFF_RUNS, as #399's had, and review found it
+(#406 retro). A mention in prose, a README, a comment, a string or plan/ does
+not excuse a token, since #406's review found LOG_TABLE, EXP_TABLE and
+NO_MORE_RESULTS passing on a vendored script and a timer profile, and a plan
+README row once passed HANDOFF_RUNS. The limit left: an assignment of the same
+name anywhere under server/ or testing/ excuses a placeholder written to look
+like it, and a name PHP, Java or JavaScript defines is refused until it is put
+in inline code.
+
+`--check` also refuses a closing keyword outside code that names an issue
+other than <issue> and each `--closes N` (#404 closed #65 and #64): GitHub's
+close, closes, closed, fix, fixes, fixed, resolve, resolves or resolved,
+with any colons, blanks or - between, before #N, GH-N, owner/repo#N or an
+issue URL. GitHub closes that issue on merge. `--closes` takes N or #N, a
+positive number, and refuses anything else. A reference into a repo other
+than PorkChopExpress86/derbynet (`$REPO`), by owner/repo#N or by URL, is
+refused whatever its number. GH-N is an autolinked reference form in GitHub's
+docs ("Autolinked references and URLs"); that closing keywords honour it is
+unverified, so it counts, and a PR that needs one quotes it in backticks.
+#421's body quoted a test fixture's
+"Closes #399." in prose, and pr-merge refused it at merge time only because
+#399 had a `## Still open` section; #411's retro body was the first (#415
+retro). Quoted text goes in a code span (a run of backticks and the next run
+of as many, so ``Closes #1`` is one) or a closed code fence, which GitHub
+does not read; a fence opens on a line of three or more backticks with no
+backtick after them, and closes on a bare line of as many or more. The lines
+of a fence that never closes are checked, as pr-merge reads cited decisions.
+A code span breaks a keyword it sits in or between ("Clo`x`ses #1", "Closes
+`x` #1" close nothing). The limits left: a keyword before a PR's number is
+refused too, though GitHub closes only issues; a code span that runs over a
+line end is not read as one.
+
+A list item `- CI load: <run URL>` cites a run of
+.github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
+run from GitHub and accepts it only when it ran master's workflow
+(workflow_dispatch, head_branch master: `--ref <branch>` runs that branch's
+copy), on its first attempt (a "Re-run failed jobs" turns a failed run green),
+at the PR's head with no trial input, and passed. The run's name is exactly
+`CI load at <SHA>`, or `CI load at <SHA> (flake ticket)` for a run with
+`-f flake_ticket=true`; the workflow names a run with a `base`, `files`,
+`count`, `loops_per_cpu` or `workers` input `CI load trial ...`. A flake
+ticket's whole-file 25 with `--flake-ticket` is the evidence D101 and D122
+ask of it, so with `--flake-ticket` the run must carry the `(flake ticket)`
+name, and a plain run is refused. The ticket's body and title do not say
+reliably that it is a flake ticket (#373 and #407 both name the flag), so
+the caller says it (plan/implement-all-tickets.md, step 3.2). The head is
+`--head SHA`, or PR N's head as GitHub reads it with `--pr N`; given both,
+they must match. It is labelled CI load: extra evidence until the owner
+amends D85, never a local load run. Other links to runs in the body are not
 read.
+
+Exits 1 on a key the body gives no evidence for, on a CI load item not
+accepted or given with no head, on a `--head` that is not PR N's head, on a
+placeholder, on a closing keyword for another issue, or when the issue, the
+PR or a run cannot be read.
 """
 
+import argparse
+import json
 import os
 import re
 import subprocess
@@ -34,6 +97,52 @@ ELSEWHERE = re.compile(r"\b(?:to|on|in) this issue\b", re.IGNORECASE)
 ITEM = re.compile(r"^\s*[-*] (?:\[( |x|X)\] )?(.*)$")
 SENTENCES = re.compile(r".*?[.!?](?=\s|$)")
 NO_EVIDENCE = re.compile(r"^(?:not done|todo)\b", re.IGNORECASE)
+# A draft's stand-in for output still to come, such as PROBE-PENDING or
+# LOOP-OUTPUT in #399's drafts. A shell or Python name has no -. A path
+# (path/X-OUTPUT, X-OUTPUT.txt) or a shell default (${X-OUTPUT}) passes.
+SUFFIXES = ("PENDING", "RESULT", "RESULTS", "OUTPUT", "RUNS", "TABLE", "TODO", "TBD")
+PLACEHOLDER = re.compile(
+    rf"(?<![A-Za-z0-9$/.-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-(?:{'|'.join(SUFFIXES)})"
+    r"(?![A-Za-z0-9/-]|\.\w)"
+)
+# The same shape joined by _, as #399's and #406's drafts wrote
+# HANDOFF_RUNS. It counts only when no file under CODE_DIRS assigns it
+# (defined_names).
+JOINED = re.compile(
+    rf"(?<![A-Za-z0-9$/._-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_(?:{'|'.join(SUFFIXES)})"
+    r"(?![A-Za-z0-9_/-]|\.\w)"
+)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+# CommonMark's code span: a run of backticks, then the next run of exactly as
+# many. A run with no such partner is literal text. Used by unquoted_lines;
+# `placeholders` still reads INLINE_CODE, which takes ``X`` as two empty spans.
+CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).+?(?<!`)\1(?!`)")
+# A code fence's line: three or more backticks, then an info string with no
+# backtick (CommonMark). "```code``` here" is inline code, not a fence.
+FENCE = re.compile(r"^\s*(`{3,})([^`]*)$")
+# GitHub's closing keywords before an issue reference (#N, GH-N,
+# owner/repo#N, or an issue URL). Checked against every PR body on the fork:
+# the issues it finds are GitHub's closingIssuesReferences but for one PR
+# number (#377's "closed #325").
+# What lies between the keyword and the reference is read wide (any run of
+# colons, blanks and -, none at all, a letter after the number), since a
+# miss closes an issue and a false refusal costs a pair of backticks.
+# GH-N is one of GitHub's autolinked reference forms
+# (docs.github.com, "Autolinked references and URLs": "GH-26"); that its
+# closing keywords honour it is unverified, so it is read as closing.
+CLOSING = re.compile(
+    r"(?<!\w)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[:\s-]*"
+    r"(?:(?:(?P<repo>[\w.-]+/[\w.-]+)#|#|GH-)(?P<number>\d+)"
+    r"|https://github\.com/(?P<url_repo>[\w.-]+/[\w.-]+)/issues/(?P<url_number>\d+))",
+    re.IGNORECASE,
+)
+CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
+RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
+CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Where a code name is assigned. plan/ is left out: it holds this tool, its
+# test and the README rows and notes that quote the drafts' placeholders.
+CODE_DIRS = ("server", "testing")
 
 
 def fold(text: str) -> str:
@@ -109,6 +218,146 @@ def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
     return any(item.startswith(k.rstrip(".!?")) for item in still_open)
 
 
+def defined_names(tokens: set[str]) -> set[str]:
+    """The tokens a file under CODE_DIRS of this checkout assigns: a line
+    that starts `NAME = x`, `NAME=x` or `export NAME=x`, with no second `=`
+    after it. Git runs without the GIT_* variables a hook sets."""
+    if not tokens:
+        return set()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    names = "|".join(sorted(tokens))
+    pattern = f"^[[:blank:]]*((export|readonly)[[:blank:]]+)?({names})[[:blank:]]*=([^=]|$)"
+    done = subprocess.run(
+        ["git", "-C", ROOT, "grep", "-ohE", pattern, "--", *CODE_DIRS],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if done.returncode not in (0, 1):
+        sys.exit(f"pr-evidence: git grep could not read the tree:\n{done.stderr.strip()}")
+    return {line.split("=")[0].split()[-1] for line in done.stdout.splitlines()}
+
+
+def placeholders(body: str, defined=defined_names) -> list[str]:
+    """Each unfilled placeholder, as `line N: TOKEN`: a token joined by -,
+    or one joined by _ that `defined` does not find assigned in the tree."""
+    found = []
+    for n, line in enumerate(body.splitlines(), 1):
+        bare = INLINE_CODE.sub("", line)
+        found += [(n, m.start(), m[0]) for m in PLACEHOLDER.finditer(bare)]
+        found += [(n, m.start(), m[0]) for m in JOINED.finditer(bare)]
+    code_names = defined({token for _n, _at, token in found if "_" in token})
+    return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
+
+
+def unquoted_lines(body: str) -> list[tuple[int, str]]:
+    """Each line GitHub reads as prose, as (its number, the line with each
+    code span replaced by a NUL, which breaks a keyword or reference it sits
+    in or between): a closed code fence is left out, and the lines of a fence
+    that never closes are kept, as pr-merge reads cited decisions. Only a
+    bare line of at least as many backticks as the opener closes a fence."""
+    kept, fence = [], None
+    for n, line in enumerate(body.splitlines(), 1):
+        edge = FENCE.match(line)
+        if fence is None:
+            if edge:
+                fence = (len(edge[1]), [])
+            else:
+                kept.append((n, CODE_SPAN.sub("\0", line)))
+        elif edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+            fence = None
+        else:
+            fence[1].append((n, line))
+    if fence:
+        kept += [(n, CODE_SPAN.sub("\0", line)) for n, line in fence[1]]
+    return sorted(kept)
+
+
+def foreign_closes(body: str, closes: set[str]) -> list[str]:
+    """Each closing keyword outside code for an issue not in `closes`, or in
+    a repo other than the fork, as `line N: <the words>`."""
+    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
+    found = []
+    for n, line in unquoted_lines(body):
+        for m in CLOSING.finditer(line):
+            repo = m["repo"] or m["url_repo"]
+            number = m["number"] or m["url_number"]
+            if number not in closes or (repo and repo.casefold() != fork):
+                found.append(f"line {n}: {m[0]}")
+    return found
+
+
+def ci_load_items(body: str) -> list[str]:
+    """The evidence text of each `CI load:` item outside `## Still open`."""
+    found, section, chunk = [], None, []
+    for line in [*body.splitlines(), "## "]:
+        if line.startswith("## "):
+            if section != "Still open":
+                texts = (" ".join(text.split()) for _mark, text in items("\n".join(chunk)))
+                found += [m[1] for m in map(CI_LOAD_ITEM.match, texts) if m]
+            section, chunk = line[3:].strip(), []
+        else:
+            chunk.append(line)
+    return found
+
+
+def ci_load_verdict(run: dict, head: str, flake_ticket: bool = False) -> str | None:
+    """None when a run, as GitHub's runs API answers, is a passed first
+    attempt of master's CI load workflow at head with no trial input, else
+    why not. For a flake ticket the run must be the `(flake ticket)` one."""
+    if run.get("path") != CI_LOAD_WORKFLOW:
+        return f"not a run of {CI_LOAD_WORKFLOW} but of {run.get('path')}"
+    if run.get("event") != "workflow_dispatch":
+        return f"started by {run.get('event')}, not workflow_dispatch"
+    if run.get("head_branch") != "master":
+        return f"ran the workflow of {run.get('head_branch')}, not master's"
+    if run.get("run_attempt") != 1:
+        return f"attempt {run.get('run_attempt')}, not the first"
+    title = run.get("display_title")
+    if title not in (f"CI load at {head}", f"CI load at {head} (flake ticket)"):
+        return f"{title!r} is not at the PR's head {head}"
+    if flake_ticket and title != f"CI load at {head} (flake ticket)":
+        return (f"{title!r} ran without flake_ticket, and this ticket is a flake ticket: "
+                "D101 asks its whole-file 25 with --flake-ticket (D122)")
+    if (run.get("status"), run.get("conclusion")) != ("completed", "success"):
+        return f"{run.get('status')}, {run.get('conclusion')}: not passed"
+    return None
+
+
+def check_ci_load(body: str, head: str | None, flake_ticket: bool = False) -> list[str]:
+    """A line for each `CI load:` item: accepted, or why not (the line then
+    starts "not load evidence")."""
+    lines = []
+    for text in ci_load_items(body):
+        url = RUN_URL.search(text)
+        if not url:
+            lines.append(f"not load evidence, no run URL: CI load: {text}")
+            continue
+        if not head:
+            lines.append(f"not load evidence, no --head or --pr to check it at: {url[0]}")
+            continue
+        repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+        if url[1].casefold() != repo.casefold():
+            lines.append(f"not load evidence, a run of {url[1]}, not {repo}: {url[0]}")
+            continue
+        run = gh_json(["api", f"repos/{repo}/actions/runs/{url[2]}"], url[0])
+        why = ci_load_verdict(run, head, flake_ticket)
+        if why:
+            lines.append(f"not load evidence, {why}: {url[0]}")
+        else:
+            lines.append(f"{run['display_title']}, passed: {url[0]} (extra evidence until "
+                         "the owner amends D85; it replaces no local load run)")
+    return lines
+
+
+def gh_json(args: list[str], what: str) -> dict:
+    gh = os.environ.get("GH", "gh")
+    done = subprocess.run([gh, *args], capture_output=True, text=True)
+    if done.returncode:
+        sys.exit(f"pr-evidence: gh could not read {what}:\n{done.stderr.strip()}")
+    return json.loads(done.stdout)
+
+
 def issue_body(number: str) -> str:
     gh = os.environ.get("GH", "gh")
     repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
@@ -122,25 +371,76 @@ def issue_body(number: str) -> str:
     return done.stdout.replace("\r", "")
 
 
+def issue_number(text: str) -> str:
+    """An issue number as --closes takes it: N or #N, positive, no zeros in front."""
+    found = re.fullmatch(r"#?([1-9]\d*)", text)
+    if not found:
+        raise argparse.ArgumentTypeError(
+            f"takes an issue number such as 64 or #64, not {text!r}")
+    return found[1]
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.exit(f"pr-evidence: {message}\n\n{__doc__}")
+
+
+def pr_head(number: str) -> str:
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    return gh_json(["pr", "view", number, "--repo", repo, "--json", "headRefOid"],
+                   f"PR #{number}")["headRefOid"]
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) not in (1, 3) or (len(argv) == 3 and argv[1] != "--check"):
-        sys.exit(__doc__)
-    asked = keys(issue_body(argv[0]))
-    if len(argv) == 1:
+    parser = Parser(prog="plan/bin/pr-evidence", allow_abbrev=False, add_help=False)
+    parser.add_argument("issue", nargs="?")
+    parser.add_argument("--check", metavar="BODY.md")
+    parser.add_argument("--head", metavar="SHA")
+    parser.add_argument("--pr", metavar="N")
+    parser.add_argument("--flake-ticket", action="store_true")
+    parser.add_argument("--closes", metavar="N", type=issue_number, action="append", default=[])
+    args = parser.parse_args(argv)
+    if (args.head or args.pr or args.flake_ticket or args.closes) and not args.check:
+        parser.error("--head, --pr, --flake-ticket and --closes go with --check")
+    if not (args.issue or args.check):
+        parser.error("give an issue, or --check BODY.md")
+    head = args.head
+    if args.pr:
+        real = pr_head(args.pr)
+        if head and head != real:
+            sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
+        head = real
+    asked = keys(issue_body(args.issue)) if args.issue else []
+    if not args.check:
         for key in asked:
             print(f"- {key.rstrip('.!?')}: ")
-        print(f"{len(asked)} open lines of #{argv[0]} ask for evidence in the PR")
+        print(f"{len(asked)} open lines of #{args.issue} ask for evidence in the PR")
         return 0
-    with open(argv[2], encoding="utf-8") as f:
-        outside, still_open = body_items(f.read())
+    with open(args.check, encoding="utf-8") as f:
+        body = f.read()
+    outside, still_open = body_items(body)
     missing = [key for key in asked if not has_evidence(key, outside, still_open)]
     for key in missing:
         print(f"no evidence in the body: {key}")
-    print(
-        f"{len(asked) - len(missing)} of {len(asked)} open lines of #{argv[0]} that ask "
-        "for evidence in the PR have it in the body"
-    )
-    return 1 if missing else 0
+    if args.issue:
+        print(
+            f"{len(asked) - len(missing)} of {len(asked)} open lines of #{args.issue} that ask "
+            "for evidence in the PR have it in the body"
+        )
+    else:
+        print("no issue given: no ticket's evidence lines were checked")
+    unfilled = placeholders(body)
+    for found in unfilled:
+        print(f"unfilled placeholder, {found}")
+    closes = foreign_closes(body, {args.issue, *args.closes} - {None})
+    for found in closes:
+        print(f"closes another issue, {found}: GitHub closes it on merge; put a quote in "
+              "backticks, or write \"Part of #N\"")
+    loads = check_ci_load(body, head, args.flake_ticket)
+    for line in loads:
+        print(line)
+    refused = [line for line in loads if line.startswith("not load evidence")]
+    return 1 if missing or unfilled or closes or refused else 0
 
 
 if __name__ == "__main__":

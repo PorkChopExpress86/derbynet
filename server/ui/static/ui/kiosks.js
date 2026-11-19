@@ -52,9 +52,25 @@ window.sceneSheet = kioskSheetOf('scenes', 'sceneSheet');
 // does an open sheet (`derbynet.pollable`), where a swap would detach the
 // sheet's opener: the board's signature (#kiosks-sig) is still the old one,
 // so the next poll brings the board again.
+//
+// D125 (#369): a Space key held on a focused board button holds the swap the
+// same way. Chromium clicks a button on Space's keyup only when the key
+// went down on that button, by its keydown or an auto-repeat (the PR's
+// stand-in probes): a swap under the key moved the focus to the page's body
+// and the keyup there sent no click
+// (`test_a_space_press_that_spans_a_board_swap_still_taps`). PHP's dashboard
+// loses the key on Reload the same way when a rename rebuilds its controls
+// with `.empty()` (kiosk-dashboard.js:99, the PR's probe). The key's press
+// starts on its first keydown, not an auto-repeat, and ends on the button's
+// click; when the focus leaves the button, since a keyup elsewhere clicks
+// nothing; or at the same bound from that keydown, for a keyup that never
+// comes.
 function holdBoardUnderPress(board, bound) {
   let pressed = null;
   let down = false;
+  // What holds the press: a pointer on the control, Space on it, or both.
+  let pointing = false;
+  let keyed = false;
   let timer = null;
   let held = null;
 
@@ -69,24 +85,56 @@ function holdBoardUnderPress(board, bound) {
 
   function release() {
     pressed = null;
+    pointing = false;
+    keyed = false;
     clearTimeout(timer);
     apply();
+  }
+
+  function hold(control) {
+    pressed = control;
+    clearTimeout(timer);
+    timer = setTimeout(release, bound());
   }
 
   document.addEventListener('pointerdown', (e) => {
     const control = e.target.closest('button, a[href]');
     // contains(null) is false: a press on no control holds nothing.
     if (!board.contains(control)) return;
-    pressed = control;
+    // Space already down on this control keeps holding it with the pointer.
+    if (control !== pressed) keyed = false;
+    hold(control);
     down = true;
-    clearTimeout(timer);
-    timer = setTimeout(release, bound());
+    pointing = true;
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== ' ' || e.repeat) return;
+    const control = e.target.closest('button');
+    if (!board.contains(control)) return;
+    if (control !== pressed) pointing = false;
+    hold(control);
+    keyed = true;
+  }, true);
+  // A key's press is on the focused button, so any focusout leaves it. The
+  // press ends once the focus has moved, a task later: a swap inside the
+  // focusout removed the control the focus was moving to, and D127 then
+  // gave the focus back to the one the crew left (#369 review). A pointer
+  // still down on the control keeps holding it.
+  document.addEventListener('focusout', () => {
+    if (!keyed) return;
+    keyed = false;
+    if (pointing) return;
+    const control = pressed;
+    setTimeout(() => { if (pressed === control) release(); });
   }, true);
   document.addEventListener('pointerup', () => { down = false; }, true);
   // Board controls hold text only (board.html), so a pointerout while the
-  // pointer is down leaves the pressed control.
+  // pointer is down leaves the pressed control. Space still down on it
+  // keeps holding it (#369 review).
   document.addEventListener('pointerout', () => {
-    if (down) release();
+    if (!down) return;
+    pointing = false;
+    if (!keyed) release();
   }, true);
   document.addEventListener('click', (e) => {
     if (pressed && pressed.contains(e.target)) setTimeout(release, 0);
@@ -125,6 +173,72 @@ function holdBoardUnderPress(board, bound) {
   });
 }
 
+// D126 (#369): a held Enter on a board button is one tap. Chromium clicks a
+// button on each Enter keydown, auto-repeats included, so a repeat is
+// cancelled before it clicks; D127 puts the focus back on the button the
+// first tap's reply swapped in, where the repeats would land otherwise.
+// D131 (#369): Space's auto-repeats are cancelled the same way. Chromium
+// clicks a button on Space's keyup when a repeat landed on it (the PR's
+// stand-in probes), so Space held on one button while the mouse clicked
+// another, whose reply's swap gave the focus back to it (D127), clicked
+// that one twice. A cancelled repeat arms nothing, and the button the key
+// went down on still clicks on the keyup; a Space held past D125's bound
+// taps nothing on release.
+function ignoreKeyRepeats(board) {
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.repeat
+        && board.contains(e.target.closest('button'))) {
+      e.preventDefault();
+    }
+  }, true);
+}
+
+// The board's controls that D127 gives the focus back to: its buttons and
+// each card's Preview link.
+const BOARD_FOCUS_CONTROLS = 'button, a[href]';
+
+// D127 (#369): after each swap of the board, a poll's, a change's reply out
+// of band or a held board applied (D102, D125), the focus goes back to the
+// swapped-in copy of the board control that had it, a button or a card's
+// Preview link. When a rename rebuilds PHP's controls, PHP leaves the focus
+// that was on Reload on the page's body (the PR's probe). "The same control"
+// is the same name, value, data-action and kiosk card (D127): Reload and
+// Identify share a name and value, and Page, Name, Configure and Preview
+// have neither. The focus is given back only when the control that had it
+// is gone and nothing else has taken the focus since, so a crew member who
+// moved it elsewhere keeps it there.
+function keepFocusAcrossSwaps(board) {
+  let focused = null;
+  const controlKey = (el) => {
+    const card = el.closest('[data-kiosk]');
+    return JSON.stringify([el.tagName, el.getAttribute('name'), el.getAttribute('value'),
+      el.dataset.action, card && card.dataset.kiosk]);
+  };
+  document.addEventListener('focusin', (e) => {
+    focused = board.contains(e.target) && e.target.matches(BOARD_FOCUS_CONTROLS)
+      ? e.target : null;
+  });
+  // A control that lost the focus and is still in the page once that task
+  // is over lost it to the crew, such as a tap on the page's background,
+  // not to a swap.
+  document.addEventListener('focusout', (e) => {
+    const el = e.target;
+    setTimeout(() => {
+      if (focused === el && el.isConnected) focused = null;
+    });
+  });
+  new MutationObserver(() => {
+    if (!focused || focused.isConnected) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const key = controlKey(focused);
+    focused = null;
+    const match = [...board.querySelectorAll(BOARD_FOCUS_CONTROLS)]
+      .find((el) => controlKey(el) === key);
+    if (match) match.focus({ preventScroll: true });
+  }).observe(board, { childList: true });
+}
+
 document.addEventListener('alpine:init', () => {
   Alpine.store('kioskSheet', { title: '' });
   Alpine.store('sceneSheet', { title: '' });
@@ -137,12 +251,15 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('kioskDashboard', (serverNow, quiet, pollSeconds) => ({
     offset: serverNow - Date.now() / 1000,
     // How long a press holds the board's swap at most: one poll interval
-    // from its pointerdown (D102, #344).
+    // from its pointerdown (D102, #344) or its Space keydown (D125, #369).
     pressBound: pollSeconds * 1000,
     init() {
       this.tick();
       setInterval(() => this.tick(), 1000);
-      holdBoardUnderPress(document.getElementById('kiosk-board'), () => this.pressBound);
+      const board = document.getElementById('kiosk-board');
+      holdBoardUnderPress(board, () => this.pressBound);
+      ignoreKeyRepeats(board);
+      keepFocusAcrossSwaps(board);
     },
     tick() {
       const now = Date.now() / 1000 + this.offset;

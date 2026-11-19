@@ -43,7 +43,7 @@ class Plan(unittest.TestCase):
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
-         local: str = 'head') -> subprocess.CompletedProcess:
+         local: str = 'head', git_dir: bool = False) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -103,8 +103,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         if shell:
             # Not the script's last command, so bash forks the hook as its child.
             hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
+        # Git runs a hook with GIT_DIR set to the pushing checkout's.
+        hook_env = {**env, 'GIT_DIR': str(repo / '.git')} if git_dir else env
         result = subprocess.run(
-            hook, cwd=repo, env=env,
+            hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
                   f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
@@ -131,7 +133,7 @@ class PrePush(unittest.TestCase):
         self.assertIn('pytest -q -p no:cacheprovider', result.ran)
 
     def test_a_push_outside_server_runs_plan_tests_once(self):
-        result = push('docs/x.md', PASSING)
+        result = push('notes/x.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
@@ -149,12 +151,12 @@ class PrePush(unittest.TestCase):
                 self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
 
     def test_a_failing_plan_test_stops_a_push_outside_server(self):
-        result = push('docs/x.md', FAILING)
+        result = push('notes/x.md', FAILING)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('the plan test failed', result.stderr)
 
     def test_passing_plan_tests_let_a_push_outside_server_through(self):
-        result = push('docs/x.md', PASSING)
+        result = push('notes/x.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
@@ -173,10 +175,32 @@ class ImageWorkflow(unittest.TestCase):
 
     def test_another_workflow_push_runs_only_plan_tests(self):
         """And the guides' check, which runs on every push (Guides)."""
-        result = push('.github/workflows/server.yml', PASSING)
+        result = push('.github/workflows/plan-checks.yml', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('pre-push: server/docs/adr/check-paths.sh\n', result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
+
+
+class GuideCommands(unittest.TestCase):
+    """server/tests/test_guide_commands.py reads docs/*.md and the workflows
+    that run guide-commands.sh's stages, so a push that changes only such a
+    file runs the source checks that hold it (#414 review: a push of a guide
+    and nothing else ran none)."""
+
+    def test_a_guide_or_a_stage_workflow_push_runs_the_source_checks(self):
+        for path in ('docs/pi-setup.md', '.github/workflows/server.yml',
+                     '.github/workflows/pi-images.yml'):
+            with self.subTest(path=path):
+                result = push(path, PASSING)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_a_guide_image_or_a_nested_page_runs_no_source_checks(self):
+        for path in ('docs/img/x.png', 'docs/tools/x.md'):
+            with self.subTest(path=path):
+                result = push(path, PASSING)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn('pre-push: tools/source-checks.sh', result.stderr)
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
@@ -264,26 +288,26 @@ class ChainedPush(unittest.TestCase):
         self.assertNotIn('pre-push: plan/tests', result.stderr)
 
     def test_a_push_after_a_pytest_run_in_one_command_is_refused(self):
-        self.refused(push('docs/x.md', PASSING, ': uv run pytest -q; : git push'))
+        self.refused(push('notes/x.md', PASSING, ': uv run pytest -q; : git push'))
 
     def test_a_push_with_options_before_push_is_refused(self):
-        self.refused(push('docs/x.md', PASSING,
+        self.refused(push('notes/x.md', PASSING,
                           ': uv run pytest -q; : git -c core.hooksPath=.githooks push'))
 
     def test_a_push_after_reading_a_background_runs_output_is_refused(self):
         """#282's push, from its session log, with the paths shortened: the
         `.output` file it printed held a red Postgres browser run."""
-        self.refused(push('docs/x.md', PASSING,
+        self.refused(push('notes/x.md', PASSING,
                           'cat /tmp/x/tasks/bcz7l8rxe.output; tail -2 /tmp/x/browser-pg.txt; '
                           'cd . && git status --short; : git push -q -u origin issue-282 2>&1 '
                           '| tail -3; git log --oneline -2'))
 
     def test_a_push_after_reading_a_junit_file_is_refused(self):
-        self.refused(push('docs/x.md', PASSING,
+        self.refused(push('notes/x.md', PASSING,
                           'grep -c failure var/load-runs/a/junit.xml; : git push'))
 
     def test_a_push_after_a_postgres_run_is_refused(self):
-        self.refused(push('docs/x.md', PASSING,
+        self.refused(push('notes/x.md', PASSING,
                           ': tools/pytest-postgres.sh -m browser ui && : git push'))
 
     def test_the_bash_tools_eval_wrapper_is_read(self):
@@ -291,7 +315,7 @@ class ChainedPush(unittest.TestCase):
         each quote in the command written `'"'"'`."""
         command = ": uv run pytest -k 'x'; : git push"
         wrapped = "eval '" + command.replace("'", "'\"'\"'") + "' && :"
-        self.refused(push('docs/x.md', PASSING, wrapped))
+        self.refused(push('notes/x.md', PASSING, wrapped))
 
     def test_pytest_in_a_message_a_comment_or_after_the_push_is_let_through(self):
         for shell in (': git commit -m "uv run pytest passed" && : git push',
@@ -303,7 +327,7 @@ class ChainedPush(unittest.TestCase):
                       # test that pushes to a scratch repository.
                       ': uv run pytest -q'):
             with self.subTest(shell=shell):
-                result = push('docs/x.md', PASSING, shell)
+                result = push('notes/x.md', PASSING, shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('pre-push: plan/tests', result.stderr)
 
@@ -323,7 +347,7 @@ class TreeChanged(unittest.TestCase):
             "log.write('plan/tests\\n')", f"log.write('plan/tests\\n')\n            {line}")
 
     def test_an_edit_of_a_tracked_file_fails_the_push(self):
-        for path in ('docs/x.md', 'server/tools/parity_gate.py'):
+        for path in ('notes/x.md', 'server/tools/parity_gate.py'):
             with self.subTest(path=path):
                 result = push(path, self.edit(
                     f"(REPO / '{path}').write_text('edited\\n')"))
@@ -333,13 +357,13 @@ class TreeChanged(unittest.TestCase):
                 self.assertNotIn('the plan test failed', result.stderr)
 
     def test_a_second_edit_of_a_changed_file_fails_the_push(self):
-        result = push('docs/x.md', self.edit(
-            "(REPO / 'docs/x.md').write_text('again\\n')"), shell='echo dirty > docs/x.md')
+        result = push('notes/x.md', self.edit(
+            "(REPO / 'notes/x.md').write_text('again\\n')"), shell='echo dirty > notes/x.md')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(self.CHANGED, result.stderr)
 
     def test_a_new_file_fails_the_push(self):
-        result = push('docs/x.md', self.edit("(REPO / 'server' / '--').write_text('x')"))
+        result = push('notes/x.md', self.edit("(REPO / 'server' / '--').write_text('x')"))
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('?? server/--', result.stderr)
         self.assertNotIn('the plan test failed', result.stderr)
@@ -348,26 +372,44 @@ class TreeChanged(unittest.TestCase):
         """`git diff HEAD` skips untracked files and `status` prints
         `?? path` before and after, so the hook compares their contents too
         (#390 review)."""
-        result = push('docs/x.md', self.edit(
-            "(REPO / 'docs/new.md').write_text('again\\n')"), shell='echo first > docs/new.md')
+        result = push('notes/x.md', self.edit(
+            "(REPO / 'notes/new.md').write_text('again\\n')"), shell='echo first > notes/new.md')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(self.CHANGED, result.stderr)
-        self.assertIn('?? docs/new.md', result.stderr)
+        self.assertIn('?? notes/new.md', result.stderr)
         self.assertNotIn('the plan test failed', result.stderr)
 
     def test_a_failing_check_keeps_its_status_and_names_the_change(self):
-        result = push('docs/x.md', self.edit(
-            "(REPO / 'docs/x.md').write_text('edited\\n')", passes=False))
+        result = push('notes/x.md', self.edit(
+            "(REPO / 'notes/x.md').write_text('edited\\n')", passes=False))
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('the plan test failed', result.stderr)
         self.assertIn(self.CHANGED, result.stderr)
 
     def test_a_tree_left_alone_passes_dirty_or_clean(self):
-        for shell in ('', 'echo dirty > docs/x.md', 'echo first > docs/new.md'):
+        for shell in ('', 'echo dirty > notes/x.md', 'echo first > notes/new.md'):
             with self.subTest(shell=shell):
-                result = push('docs/x.md', PASSING, shell=shell)
+                result = push('notes/x.md', PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn(self.CHANGED, result.stderr)
+
+
+class GitDirUnset(unittest.TestCase):
+    """Git runs the hook with GIT_DIR set to the pushing checkout's git
+    directory. Under it, a plan test's `git init` in a scratch folder
+    reinitializes that repository instead: pushed from a worktree, it set
+    core.bare=true in the main clone's .git/config, and every checkout
+    failed "must be run in a work tree" for about 3 min, from this retro's
+    own first test_pr_wait.py (#351 and #369 retro). The checks find the
+    repository from the working tree."""
+
+    def test_the_checks_run_with_no_git_dir(self):
+        result = push('notes/x.md', TreeChanged.edit(
+            None, "log.write(f'GIT_DIR={os.environ.get(\"GIT_DIR\")}\\n')"), git_dir=True,
+            shell='echo "before the hook: GIT_DIR=$GIT_DIR" >>"$STUB_LOG"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(result.ran, r'before the hook: GIT_DIR=/\S+/\.git\n')
+        self.assertIn('GIT_DIR=None\n', result.ran)
 
 
 if __name__ == '__main__':
