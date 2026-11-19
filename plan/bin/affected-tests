@@ -107,6 +107,7 @@ every changed browser test file keeps its count, of the whole file.
 """
 
 import ast
+import collections
 import io
 import re
 import subprocess
@@ -242,11 +243,23 @@ class Tree:
         self._importing = None  # module name: the files that import it
         self._graph = None
         self._website = None
+        self._names = None
         self._users = {}
         self._texts = {}
 
     def exists(self, rel):
         return (self.server / rel).exists()
+
+    def tracked_names(self):
+        """How many files git tracks under each file name. A root that is no
+        git repository, such as a test's stand-in, counts none, so no name
+        collides there."""
+        if self._names is None:
+            out = subprocess.run(['git', 'ls-files', '-z'], cwd=self.root,
+                                 capture_output=True, text=True)
+            self._names = collections.Counter(
+                Path(f).name for f in out.stdout.split('\0'))
+        return self._names
 
     def text(self, rel):
         if rel not in self._texts:
@@ -652,7 +665,7 @@ def match_testing(path):
 
 
 def cover_testing(plan, tree, path):
-    targets = tree.mentions([Path(path).name])
+    targets = tree.mentions(testing_cites(tree, path))
     note = ('a shell suite or its data: the tests that name it. CI runs the '
             'shell suites against Django; testing/README.md runs one locally')
     if not targets:
@@ -668,6 +681,19 @@ def cover_testing(plan, tree, path):
     for cases in cases_scripts(tree, path):
         plan.command(f'bash ../{cases} <base_url>  # a running server '
                      '(testing/README.md); before the first push')
+
+
+def testing_cites(tree, path):
+    """The words a test cites testing/`path` by: its bare name, which every
+    cite of the path holds too, when the name holds a `.` or a `-` and no
+    other tracked file has it, and the path itself otherwise. Tests say
+    `sleep` and `curl` as words, not as #399's stand-ins under
+    testing/timer-stand-in/, and README.md is the name of a file in several
+    folders: such a file maps through its path alone, and to the fallback
+    when no test cites the path (#431)."""
+    name = Path(path).name
+    distinct = ('.' in name or '-' in name) and tree.tracked_names()[name] <= 1
+    return [name] if distinct else [path]
 
 
 def cases_scripts(tree, path):
