@@ -148,8 +148,8 @@ def split_top(text: str, seps: list[str]) -> list[str]:
 
 
 # Operands that stand where a call stood with no parentheses added; any
-# other keeps its own. An int is no atom here: `max(1, 2).real` would make
-# `1.real`.
+# other keeps its own. An int is no atom here: with the call's `.real`
+# after it, it would read `1.real`.
 ATOMS = (ast.Name, ast.Attribute, ast.Subscript, ast.Call)
 
 

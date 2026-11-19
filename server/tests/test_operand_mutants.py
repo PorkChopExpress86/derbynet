@@ -80,12 +80,14 @@ def test_a_call_in_a_python_string_that_is_no_python_lists_each_operand():
     [
         ("a.js", "x = Math.max(a, key = f);", ["a", "key = f"]),
         ("a.css", ".t { width: max(1em, 2vw); }", ["1em", "2vw"]),
+        ("a.css", ".t { width: min(1em); }", []),
+        ("a.css", ".t { width: clamp(1em, 2vw); }", []),
     ],
 )
-def test_a_javascript_or_css_call_takes_no_named_argument(path, line, news):
+def test_a_javascript_or_css_call_lists_each_operand_of_two_or_more(path, line, news):
     """Neither language has a named argument, so each operand counts:
     JavaScript's `key = f` is an assignment, which stands where the call
-    stood (#449)."""
+    stood (#449). A clamp() with no three operands lists nothing."""
     diff = f"+++ b/{path}\n@@ -1 +1 @@\n+{line}\n"
     assert [m.new for m in om.mutants(diff)] == news
 
