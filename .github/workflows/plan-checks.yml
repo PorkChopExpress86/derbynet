@@ -84,6 +84,7 @@ jobs:
           tests/test_docker_checks.py
           tests/test_listing_order.py
           tests/test_pipefail_pipes.py
+          tests/test_subshell_state.py
 
       - name: Decide whether to lint the issues
         id: scope

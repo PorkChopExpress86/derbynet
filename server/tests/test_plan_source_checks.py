@@ -2,11 +2,13 @@
 that reads plan/ (D128). server.yml skips such a PR, and #346's push ran
 none of them; removing one decision row fails test_deviations.py (#346
 retro). A source check reads plan/ when it names the folder as a string
-literal or lists every tracked file with `git ls-files`: a new one fails
-here until the workflow runs it. This file is a source check too, and
+literal, lists every tracked file with `git ls-files`, or imports a
+tests/file_kinds.py function that lists them (#431): a new one fails here
+until the workflow runs it. This file is a source check too, and
 spells neither literal whole.
 """
 
+import ast
 import re
 
 from tests.workflow_steps import ROOT, WORKFLOWS, steps
@@ -29,8 +31,29 @@ def plan_checks() -> set[str]:
     return set(TEST_FILE.findall(found[0].script))
 
 
+def tracked_listers() -> set[str]:
+    """The functions of tests/file_kinds.py that call its tracked()."""
+    tree = ast.parse((SERVER / "tests" / "file_kinds.py").read_text())
+    return {
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and any(
+            isinstance(call, ast.Call) and getattr(call.func, "id", None) == "tracked"
+            for call in ast.walk(node)
+        )
+    }
+
+
 def reads_plan(name: str) -> bool:
-    return READS_PLAN.search((SERVER / name).read_text()) is not None
+    text = (SERVER / name).read_text()
+    imported = {
+        alias.name
+        for node in ast.walk(ast.parse(text))
+        if isinstance(node, ast.ImportFrom) and node.module == "tests.file_kinds"
+        for alias in node.names
+    }
+    return READS_PLAN.search(text) is not None or bool(imported & tracked_listers())
 
 
 def test_plan_checks_runs_each_source_check_that_reads_plan():
@@ -38,12 +61,15 @@ def test_plan_checks_runs_each_source_check_that_reads_plan():
     assert readers == plan_checks()
 
 
-def test_the_list_is_the_five_found_on_2026_11_16():
-    """A rule that found none would pass above with an empty step."""
+def test_the_list_is_the_five_found_on_2026_11_16_and_the_subshell_linter():
+    """A rule that found none would pass above with an empty step. #431
+    found test_subshell_state.py, which lints plan/'s scripts through
+    shell_files() and named no literal."""
     assert plan_checks() == {
         "legacy_api/tests/test_registry.py",
         "tests/test_deviations.py",
         "tests/test_docker_checks.py",
         "tests/test_listing_order.py",
         "tests/test_pipefail_pipes.py",
+        "tests/test_subshell_state.py",
     }
