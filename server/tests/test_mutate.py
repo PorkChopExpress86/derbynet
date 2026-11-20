@@ -947,7 +947,7 @@ def slow_unlock(self, *args):
 
 
 def slow_rmtree(path, *args, **kwargs):
-    mark("removing")
+    pathlib.Path("removing").write_text(str(path))
     time.sleep(2)
     return rmtree(path, *args, **kwargs)
 
@@ -1472,6 +1472,7 @@ def test_a_second_signal_while_the_guard_copy_is_removed_waits_for_it(
     tool.send_signal(signal.SIGTERM)
     _, err = tool.communicate(timeout=30)
     assert tool.returncode == 128 + signal.SIGTERM, err
+    assert Path((project / "removing").read_text()).parent == folder
     assert list(folder.iterdir()) == []
     assert (project / "mod.py").read_text() == MODULE
     assert no_lock(project)
