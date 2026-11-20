@@ -16,6 +16,8 @@ const puppeteer = require('puppeteer');
 const [base, file, codepage, fieldList, sheet = '0'] = process.argv.slice(2);
 const fields = fieldList.split(',');
 const TIMEOUT = 120000;
+const LAUNCH_TRIES = 3;
+const SIGNALLED = /^Failed to launch the browser process: +Code: null$/m;
 
 // A real drag, so jQuery UI's draggable and droppable run as they do for a user.
 // Both boxes are measured just before the drag; the page shows the file's
@@ -33,8 +35,25 @@ async function drag(page, from, to) {
   await page.mouse.up();
 }
 
+// Chrome now and then dies as it starts (#442); most of these crashes print
+// "Received signal 11" with a fault in glibc's getenv.  A launch whose browser
+// a signal ended (puppeteer's "Code: null") is tried again.  One crash in 63
+// printed no signal line, so the rule matches the exit code, not that line.
+// Each failed launch prints a line starting "launch failed", which
+// record_import_page copies to the job log.
+async function launch() {
+  for (let tries = 1; ; ++tries) {
+    try {
+      return await puppeteer.launch();
+    } catch (e) {
+      if (tries === LAUNCH_TRIES || !SIGNALLED.test(e.message)) throw e;
+      console.error(`launch failed, try ${tries} of ${LAUNCH_TRIES}: ${e.message}`);
+    }
+  }
+}
+
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await launch();
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(TIMEOUT);
