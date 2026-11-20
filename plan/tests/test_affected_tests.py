@@ -732,8 +732,9 @@ class OutsideTesting(unittest.TestCase):
 
     def test_a_testing_file_is_mapped_once(self):
         files = self.stand_in(*self.SCRIPT_TESTS)
+        files['testing/timer-stand-in/curl'] = '#!/bin/bash\n'
         got = mapped(files, 'testing/timer-stand-in/curl')
-        self.assertEqual([rule for rule, _targets in got], ['testing'])
+        self.assertEqual(got, [('testing', list(self.SCRIPT_TESTS))])
 
     def test_the_hand_off_lists_the_checks_the_source_checks_run(self):
         """test_docker_checks.py and the pipe linters are in
