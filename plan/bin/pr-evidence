@@ -56,6 +56,17 @@ A code span breaks a keyword it sits in or between ("Clo`x`ses #1", "Closes
 refused too, though GitHub closes only issues; a code span that runs over a
 line end is not read as one.
 
+Given <issue>, `--check` also refuses a body that names it in no closing
+keyword (as above, into this repo) and no "Part of #<issue>", outside code.
+#444's body named #434 only in prose, so its merge left #434 open, and the
+lead closed it by hand (#434 retro). A ticket the PR leaves open writes
+"Part of #N" beside its `## Still open` section, which pr-merge asks of it.
+Here "outside code" is stricter than for the check above: it leaves out
+whatever GitHub may draw as code or hide, so an HTML comment, <pre> and
+<code>, a ~~~ fence, a fence that never closes, a quoted fence and an
+indented line hold no link (`unquoted_lines(strict=True)`; the limit left and
+GitHub's rendering are in its docstring).
+
 A list item `- CI load: <run URL>` cites a run of
 .github/workflows/ci-load.yml as load evidence (#415). `--check` reads the
 run from GitHub and accepts it only when it ran master's workflow
@@ -77,7 +88,8 @@ read.
 
 Exits 1 on a key the body gives no evidence for, on a CI load item not
 accepted or given with no head, on a `--head` that is not PR N's head, on a
-placeholder, on a closing keyword for another issue, or when the issue, the
+placeholder, on a closing keyword for another issue, on a body that names
+<issue> in no closing keyword and no "Part of", or when the issue, the
 PR or a run cannot be read.
 """
 
@@ -120,6 +132,15 @@ CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).+?(?<!`)\1(?!`)")
 # A code fence's line: three or more backticks, then an info string with no
 # backtick (CommonMark). "```code``` here" is inline code, not a fence.
 FENCE = re.compile(r"^\s*(`{3,})([^`]*)$")
+# The same for a ~~~ fence, which `unquoted_lines` reads only strictly, an
+# indented code block's line (four spaces or a tab), a blockquote's marker,
+# and the HTML that GitHub's renderer draws as code or not at all: a comment,
+# <pre> and <code>, each with the tag that ends it.
+TILDE_FENCE = re.compile(r"^\s*(~{3,})(.*)$")
+INDENTED = re.compile(r"^(?: {4}|\t)")
+QUOTE = re.compile(r"^\s{0,3}(?:>\s?)+")
+RAW_OPEN = re.compile(r"<!--|<(pre|code)\b", re.IGNORECASE)
+RAW_CLOSE = {"<!--": "-->", "<pre": "</pre>", "<code": "</code>"}
 # GitHub's closing keywords before an issue reference (#N, GH-N,
 # owner/repo#N, or an issue URL). Checked against every PR body on the fork:
 # the issues it finds are GitHub's closingIssuesReferences but for one PR
@@ -250,41 +271,95 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
     return [f"line {n}: {token}" for n, _at, token in sorted(found) if token not in code_names]
 
 
-def unquoted_lines(body: str) -> list[tuple[int, str]]:
+def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
     """Each line GitHub reads as prose, as (its number, the line with each
     code span replaced by a NUL, which breaks a keyword or reference it sits
     in or between): a closed code fence is left out, and the lines of a fence
     that never closes are kept, as pr-merge reads cited decisions. Only a
-    bare line of at least as many backticks as the opener closes a fence."""
-    kept, fence = [], None
+    bare line of at least as many backticks as the opener closes a fence.
+
+    `strict` also leaves out whatever GitHub may read as code or hide: the
+    lines of a fence that never closes, a ~~~ fence, an HTML comment, <pre>
+    and <code> (each to its closing tag, or to the end), and a line indented
+    four spaces or a tab, after a blockquote's `>` markers are taken off. A
+    lazy continuation line, a nested list item and an unclosed comment that
+    starts mid-line are left out too, though GitHub links in them: a false
+    refusal costs a move of the line, a missed one costs an open ticket. A
+    refusal of a close reads the default, since it must see all GitHub may
+    act on; a check that a link is there reads `strict`, since it must accept
+    only what GitHub surely reads. The limit left: other raw HTML, such as a
+    table cell or a reference-link definition, is read as prose. `gh api
+    markdown` drew "Part of #61" as code or not at all in each form the
+    strict reading leaves out, and linked it in each it keeps (the #434
+    retro's PR body pastes the runs); that GitHub's closing keywords follow
+    the renderer is assumed, since they act on a merge and cannot be read
+    without one."""
+    kept, fence, raw_end = [], None, None
     for n, line in enumerate(body.splitlines(), 1):
+        if strict:
+            line = QUOTE.sub("", line)
+        if raw_end:
+            at = line.lower().find(raw_end)
+            if at < 0:
+                continue
+            raw_end, line = None, line[at + len(raw_end):]
         edge = FENCE.match(line)
+        tilde = TILDE_FENCE.match(line) if strict else None
         if fence is None:
             if edge:
-                fence = (len(edge[1]), [])
+                fence = (len(edge[1]), [], "`")
+            elif tilde:
+                fence = (len(tilde[1]), [], "~")
+            elif strict and INDENTED.match(line):
+                continue
             else:
-                kept.append((n, CODE_SPAN.sub("\0", line)))
-        elif edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+                text = CODE_SPAN.sub("\0", line)
+                while strict and (opener := RAW_OPEN.search(text)):
+                    end = RAW_CLOSE[opener[0].lower()]
+                    at = text.lower().find(end, opener.end())
+                    if at < 0:
+                        text, raw_end = text[: opener.start()], end
+                    else:
+                        text = text[: opener.start()] + "\0" + text[at + len(end):]
+                kept.append((n, text))
+        elif fence[2] == "`" and edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+            fence = None
+        elif fence[2] == "~" and tilde and not tilde[2].strip() and len(tilde[1]) >= fence[0]:
             fence = None
         else:
             fence[1].append((n, line))
-    if fence:
+    if fence and not strict:
         kept += [(n, CODE_SPAN.sub("\0", line)) for n, line in fence[1]]
     return sorted(kept)
+
+
+def closing_refs(body: str, strict: bool = False) -> list[tuple[int, str, str, bool]]:
+    """Each closing keyword outside code, as (its line number, the words, the
+    issue number, whether the reference is into this repo, the fork)."""
+    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
+    found = []
+    for n, line in unquoted_lines(body, strict):
+        for m in CLOSING.finditer(line):
+            repo = m["repo"] or m["url_repo"]
+            found.append((n, m[0], m["number"] or m["url_number"],
+                          not repo or repo.casefold() == fork))
+    return found
 
 
 def foreign_closes(body: str, closes: set[str]) -> list[str]:
     """Each closing keyword outside code for an issue not in `closes`, or in
     a repo other than the fork, as `line N: <the words>`."""
-    fork = os.environ.get("REPO", "PorkChopExpress86/derbynet").casefold()
-    found = []
-    for n, line in unquoted_lines(body):
-        for m in CLOSING.finditer(line):
-            repo = m["repo"] or m["url_repo"]
-            number = m["number"] or m["url_number"]
-            if number not in closes or (repo and repo.casefold() != fork):
-                found.append(f"line {n}: {m[0]}")
-    return found
+    return [f"line {n}: {words}" for n, words, number, in_fork in closing_refs(body)
+            if number not in closes or not in_fork]
+
+
+def links_ticket(body: str, issue: str) -> bool:
+    """Whether a line GitHub surely reads as prose (`unquoted_lines` strict)
+    closes `issue` in this repo or says "Part of #<issue>"."""
+    part_of = re.compile(rf"(?<!\w)part of #{issue}(?!\w)", re.IGNORECASE)
+    return (any(part_of.search(line) for _n, line in unquoted_lines(body, strict=True))
+            or any(number == issue and in_fork
+                   for _n, _words, number, in_fork in closing_refs(body, strict=True)))
 
 
 def ci_load_items(body: str) -> list[str]:
@@ -436,11 +511,16 @@ def main(argv: list[str]) -> int:
     for found in closes:
         print(f"closes another issue, {found}: GitHub closes it on merge; put a quote in "
               "backticks, or write \"Part of #N\"")
+    unlinked = bool(args.issue) and not links_ticket(body, args.issue)
+    if unlinked:
+        print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
+              f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
+              "<pre>, <code>, a ~~~ fence and an indented line count as code)")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if missing or unfilled or closes or refused else 0
+    return 1 if missing or unfilled or closes or unlinked or refused else 0
 
 
 if __name__ == "__main__":

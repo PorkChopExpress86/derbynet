@@ -41,11 +41,6 @@ def videos(event, tmp_path):
     return folder
 
 
-def desktop_only(page):
-    if page.size != "desktop":
-        pytest.skip("the replay station is a laptop")
-
-
 def stream_info(page):
     return page.locator("#recording-stream-size")
 
@@ -265,6 +260,7 @@ def timer(page, message, **fields):
     return post(page, action="timer-message", message=message, **fields)
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     """Acceptance (D18): with a post-roll of 2 s, a skipback of 4 s and a
     longest clip of 5 s, the clip runs 5 s and ends 2 s after the finish.
@@ -279,7 +275,6 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     )
     wolves = scheduled(race_setup(event, groups=(("Wolves", 4),))["Wolves"], race=False)
     page = login("RaceCoordinator")
-    desktop_only(page)
     page.context.add_init_script(RECORD_MESSAGES)
     open_replay(page)
     proceed(page)
@@ -323,6 +318,7 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     assert video.stat().st_size > 0
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 @pytest.mark.parametrize("hold_ms", [0, 900], ids=["no_hold", "held_900ms"])
 def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold_ms):
     """RACE_STARTS replays `skipback` ms after the gate opens, and a REPLAY
@@ -338,7 +334,6 @@ def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold
     hold under 1000 ms still ends before the timer is due."""
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     before, returned = page.evaluate(
         "(hold) => { handle_replay_message('START Wolves_Round1_Heat02');"
@@ -377,10 +372,10 @@ def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold
     ]
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_cancel_stops_the_race_starts_timeout(login, event):
     fast_replays(event, replay_skipback_ms=500, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     page.evaluate("handle_replay_message('RACE_STARTS 500 1 100')")
     page.evaluate("handle_replay_message('CANCEL')")
@@ -389,6 +384,7 @@ def test_cancel_stops_the_race_starts_timeout(login, event):
     assert page.evaluate("g_last_clip") is None
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_the_delay_right_click_and_resize(login, event, page_errors):
     """The operator's delay holds the playback after the finish; a
     right-click on the kiosk replays now; a click or a window resize
@@ -400,7 +396,6 @@ def test_the_delay_right_click_and_resize(login, event, page_errors):
     )
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     page.get_by_label("Delay playback by").fill("1.5")
     proceed(page)
@@ -430,9 +425,9 @@ def test_the_delay_right_click_and_resize(login, event, page_errors):
     expect(page.locator("[data-replay-setup]")).to_be_visible()
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_the_fullscreen_switch_does_not_bring_the_setup_back(login, event):
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     expect(page.get_by_label("Change to fullscreen")).to_be_checked()
     page.get_by_role("button", name="Proceed").click()
@@ -463,13 +458,13 @@ def test_the_camera_page(login, event):
     expect(page.locator("#device-picker option:checked")).to_have_text("fake_device_1")
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_the_remote_camera_streams_to_the_replay_page_with_no_ice_server(login, event):
     """With `replay_ice_servers` empty, host candidates connect the camera
     and the replay page, as on a LAN with no internet, and the camera asks
     for the size the replay page solicited."""
     RaceSettings.objects.filter(event=event).update(replay_ice_servers="")
     page = login("RaceCoordinator")
-    desktop_only(page)
     camera = page.context.new_page()
     camera.goto("/replay/camera/?debug")
     expect(camera.locator("[data-stream-size]")).to_have_text(re.compile(r" × "))
@@ -532,12 +527,12 @@ def test_the_remote_camera_streams_with_an_ice_url_chromium_refuses_stored(
     close_tab(page, camera)
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_closing_the_camera_tab_waits_for_its_post(login, event):
     """The camera tab's message poll is held, then answered as the tab is
     closed: plain camera.close() left the POST in flight at teardown, 3 runs
     in 3 (PR #205's ui (postgres) failure)."""
     page = login("RaceCoordinator")
-    desktop_only(page)
     camera = page.context.new_page()
     camera.goto("/replay/camera/")
     expect(camera.locator("[data-stream-size]")).to_have_text(re.compile(r" × "))
@@ -582,6 +577,7 @@ def test_a_message_sent_before_the_websocket_opens_is_sent_once_it_does(login, e
     ]
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 @pytest.mark.parametrize(
     ("skipback", "post_roll", "longest"),
     [(4000, 2000, 10000), (4000, 2000, 5000), (9000, 3000, 10000), (500, 0, 300)],
@@ -597,7 +593,6 @@ def test_the_page_cuts_a_clip_as_the_service_does(
         replay_max_clip_ms=longest,
     )
     page = login("RaceCoordinator")
-    desktop_only(page)
     page.goto("/replay/")
     settings = RaceSettings.objects.get(event=event)
     assert page.evaluate("clip_length_ms()") == replay.clip_length_ms(settings)
@@ -607,13 +602,13 @@ def test_the_page_cuts_a_clip_as_the_service_does(
     assert page.evaluate("clip_length_ms()") == replay.clip_length_ms(settings)
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_the_delay_counts_after_the_post_roll(login, event):
     """replay.php:300-307 waits the operator's delay after it stops
     recording; recording now stops at the end of the post-roll (D18), so a
     delay shorter than the post-roll still delays the playback."""
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     page.get_by_label("Delay playback by").fill("0.3")
     page.evaluate("handle_replay_message('TEST 1000 1 100')")
@@ -622,13 +617,13 @@ def test_the_delay_counts_after_the_post_roll(login, event):
     assert clip["played_at"] - clip["finish"] >= 800, clip
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_race_starts_names_the_clip_when_it_arrives(login, event):
     """replay.php:127 and :152-158: the RACE_STARTS timeout replays under the
     START name it heard with, and an earlier timeout still fires and clears
     the later one, as on_replay clears g_replay_timeout (replay.php:282-295)."""
     fast_replays(event, replay_skipback_ms=500, replay_post_roll_ms=200)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     sent = page.evaluate(
         "() => { handle_replay_message('START Wolves_Round1_Heat04');"
@@ -645,12 +640,12 @@ def test_race_starts_names_the_clip_when_it_arrives(login, event):
     assert page.evaluate("g_last_clip.finish") == clip["finish"]
 
 
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 def test_a_finish_during_a_clip_replays_again(login, event):
     """replay.php:282-310 has no guard: a second finish stops recording and
     plays again."""
     fast_replays(event, replay_skipback_ms=1000, replay_post_roll_ms=500)
     page = login("RaceCoordinator")
-    desktop_only(page)
     open_replay(page)
     page.evaluate("handle_replay_message('TEST 1000 1 100')")
     first = page.evaluate("g_last_clip.finish")

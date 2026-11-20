@@ -682,8 +682,9 @@ def test_a_run_under_a_holder_of_its_lock_is_refused(tmp_path, script, held):
     (tmp_path / "sub").mkdir()
     lock = str(tmp_path / "load.lock")
     result = subprocess.run(
-        # No such file, so a run that is not refused ends at once.
-        [str(script), "--loops", "0", "no_such_test.py"],
+        # No such file, so a run that is not refused ends at once; the
+        # hand-off's `true` ends at once too, and it takes no option.
+        [str(script), *(["true"] if script == HOLD_LOCK else ["--loops", "0", "x.py"])],
         # A file, not a pipe, as run_in_background gives it.
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -1887,6 +1888,7 @@ def test_another_failure_beside_a_network_change_starts_no_rerun(tmp_path):
         "1 of 2 failures and errors are not a changed network"
         " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
         " teardown naming one): no rerun, and the status stays pytest's.\n"
+        "  failure test_other::test_other: assert False\n"
     ) in out
     assert not (tmp_path / "run" / "rerun.log").exists()
     assert "Rerunning" not in out
@@ -2207,8 +2209,112 @@ def hold_with(tmp_path, args, env=None, stdin=None):
 def test_a_hand_off_with_no_command_is_refused(tmp_path):
     code, err = hold_with(tmp_path, [])
     assert code == 2
-    assert err == "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]\n"
+    assert err == usage_line(HOLD_LOCK) + "\n"
     assert not (tmp_path / "load.lock").exists()
+
+
+def usage_line(script):
+    """The `# Usage:` line at the top of `script`, which the script prints
+    for its usage."""
+    (line,) = [
+        x[2:] for x in script.read_text().splitlines() if x.startswith("# Usage: ")
+    ]
+    return line
+
+
+def run_for_help(tmp_path, script, args):
+    """`script` run with `args`, its lock in tmp_path: (exit code, stdout,
+    stderr). Its output goes to pipes, which pytest-under-load.sh refuses
+    only after it reads its options for -h and --help."""
+    folder = tmp_path / "work"
+    folder.mkdir(exist_ok=True)
+    result = subprocess.run(
+        [str(script), *args],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        timeout=60,
+        cwd=folder,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(tmp_path),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+        },
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+@pytest.mark.parametrize(
+    "script, args",
+    [
+        (HOLD_LOCK, ["--help"]),
+        (HOLD_LOCK, ["-h", "true"]),
+        (SCRIPT, ["--help"]),
+        (SCRIPT, ["-h"]),
+        (
+            SCRIPT,
+            ["--postgres", "--loops", "4", "--flake-ticket", "--help", "-m", "browser"],
+        ),
+    ],
+)
+def test_help_prints_the_usage_and_takes_no_lock(tmp_path, script, args):
+    """#434's `hold-load-lock.sh --help` waited in the lock's line to run a
+    command named --help (#434 retro)."""
+    code, out, err = run_for_help(tmp_path, script, args)
+    assert (code, err) == (0, ""), out + err
+    assert "[-h | --help]" in usage_line(script)
+    assert out == (
+        f"{usage_line(script)}\nThe comment at the top of {script} says more.\n"
+    ), out
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["work"]
+
+
+def test_help_after_the_first_pytest_argument_reaches_pytest(tmp_path):
+    """The Usage line says -h and --help are read among the script's own
+    options, which end at the first pytest argument: `-p no:cacheprovider`
+    does, so --help goes to pytest, under the lock. A stand-in `uv` records
+    what it is run with, and the script's output goes to a file, since the
+    script refuses a pipe once it has read its options."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    uv = bin_dir / "uv"
+    uv.write_text('#!/bin/sh\necho "$@" > "$UV_ARGS"\n')
+    uv.chmod(0o755)
+    result = subprocess.run(
+        ["bash", "-c", f"'{SCRIPT}' --loops 0 -p no:cacheprovider --help >out"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=tmp_path,
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "UV_ARGS": str(tmp_path / "uv-args"),
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+        },
+    )
+    summary = (tmp_path / "out").read_text()
+    assert result.returncode == 0, summary + result.stderr
+    assert usage_line(SCRIPT) not in summary, summary
+    argv = (tmp_path / "uv-args").read_text().split()
+    assert argv[:2] == ["run", "pytest"] and argv[-3:] == [
+        "-p",
+        "no:cacheprovider",
+        "--help",
+    ]
+    assert (tmp_path / "load.lock").exists()
+
+
+@pytest.mark.parametrize("option", ["-x", "--", "--help-me", "-hv"])
+def test_a_hand_off_whose_command_starts_with_a_dash_is_refused(tmp_path, option):
+    code, out, err = run_for_help(tmp_path, HOLD_LOCK, [option, "true"])
+    assert (code, out) == (2, ""), err
+    assert err == (
+        "hold-load-lock.sh: it takes no option, and no COMMAND starts with -: "
+        f"{option}\n{usage_line(HOLD_LOCK)}\n"
+    )
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["work"]
 
 
 def test_a_hand_off_with_no_flock_is_refused_with_how_to_install_it(tmp_path):
