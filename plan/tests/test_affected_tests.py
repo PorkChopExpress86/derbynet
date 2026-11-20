@@ -752,8 +752,9 @@ class OutsideTesting(unittest.TestCase):
         """A head from before server/tests/file_kinds.py, which a flake
         ticket's run reads with --stdin (ci-load.yml), has the pipe linter and
         no module listing its files. A file outside testing/ maps to the rest
-        and one line names the module; a testing/ file, alone or beside such a
-        file, still stops the tool with #431's message."""
+        and one line names the module. A tree that lacks the rows' tests too
+        prints no such line. A testing/ file, alone or beside such a file,
+        still stops the tool with #431's message."""
         tree = {**TREE, 'server/tests/test_pipefail_pipes.py': ''}
         out = run('server/racing/models.py', 'server/racing/services/heats.py', tree=tree)
         self.assertEqual([ln for ln in out.splitlines() if ln.startswith('This tree lacks')],
@@ -761,10 +762,13 @@ class OutsideTesting(unittest.TestCase):
                           'outside testing/ maps to none of the checks whose KIND_READERS '
                           'row lists its files with it (an older head, #471).'])
         self.assertNotIn('[kind-readers]', out)
+        self.assertNotIn('This tree lacks', run('server/racing/models.py', tree=TREE))
+        stopped = []
         for files in (('testing/notes',), ('server/racing/models.py', 'testing/notes')):
-            with self.assertRaises(AssertionError) as stopped:
+            with self.assertRaises(AssertionError) as refused:
                 run(*files, tree=tree)
-            self.assertIn('cannot load server/tests/file_kinds.py', str(stopped.exception))
+            stopped.append('cannot load server/tests/file_kinds.py' in str(refused.exception))
+        self.assertEqual(stopped, [True, True])
 
     def test_each_kind_of_file_a_row_lists_outside_testing_maps_to_its_test(self):
         """In the real tree, each row's function lists files outside testing/
