@@ -575,29 +575,26 @@ def _barrier(page):
     poll's last request out (#224 retro, 1 run in 50 under load;
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
     fetch sent after the stop, which Chromium fails at once: a URL block on
-    a CDP session of its own, closed after. A route for it turned
-    Playwright's interception on and off at each settle, and a document
-    that committed as it turned on sent its requests, the barrier's among
-    them, to the server with no `request` event (#347, gap 1:
-    `test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts`).
+    a CDP session of its own, open until the context closes. A route for it
+    turned Playwright's interception on and off at each settle, and a
+    document that committed as it turned on sent its requests, the
+    barrier's among them, to the server with no `request` event (#347,
+    gap 1: `test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts`).
     Blocked, its end is still reported after
     the earlier fetch's start (the same test). STOP_SENDING sends it, and
     then stops the main frame's fetch and XMLHttpRequest in the same task."""
     if not page.url.startswith("http"):
         return
-    blocker = page.context.new_cdp_session(page)
-    try:
-        blocker.send("Network.enable")
-        blocker.send("Network.setBlockedURLs", {"urls": [f"*{SETTLE_BARRIER}"]})
-        with page.expect_event(
-            "requestfailed",
-            lambda r: r.url.endswith(SETTLE_BARRIER),
-            timeout=InFlight.TIMEOUT_MS,
-        ):
-            page.barrier_sent = True
-            page.evaluate(STOP_SENDING, SETTLE_BARRIER)
-    finally:
-        blocker.detach()
+    session = page.context.new_cdp_session(page)
+    session.send("Network.enable")
+    session.send("Network.setBlockedURLs", {"urls": [f"*{SETTLE_BARRIER}"]})
+    with page.expect_event(
+        "requestfailed",
+        lambda r: r.url.endswith(SETTLE_BARRIER),
+        timeout=InFlight.TIMEOUT_MS,
+    ):
+        page.barrier_sent = True
+        page.evaluate(STOP_SENDING, SETTLE_BARRIER)
 
 
 # Playwright's failure texts for a request `block_sending` blocked: by its
