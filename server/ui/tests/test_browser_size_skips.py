@@ -39,11 +39,6 @@ from pathlib import Path
 
 TESTS = Path(__file__).resolve().parent
 
-# (path under ui/tests, function) of each skip left in place. The browser
-# test_kiosks.py keeps its `phone_only` until #394 moves its skips onto the
-# mark; remove the entry then, and add none.
-KNOWN = {("browser/test_kiosks.py", "phone_only")}
-
 SIZE_READS = {"size", "viewport_size", "is_mobile"}
 SKIPS = {"pytest.skip", "skip", "pytest.skip.Exception", "skip.Exception"}
 
@@ -520,10 +515,7 @@ def test_a_helper_beside_the_browser_tests_is_read(tmp_path):
 
 def test_no_browser_test_skips_on_the_size_in_its_body():
     skips = tree_skips(TESTS)
-    new = [skip for skip in skips if (skip[0], skip[2]) not in KNOWN]
-    assert new == [], (
+    assert skips == [], (
         "mark these @pytest.mark.sizes(..., reason=...), which deselects the "
-        f"other size at collection (#366): {new}"
+        f"other size at collection (#366): {skips}"
     )
-    gone = KNOWN - {(path, function) for path, _, function in skips}
-    assert gone == set(), f"no longer found; take it out of KNOWN: {gone}"
