@@ -792,11 +792,9 @@ def runners(tree, citing):
     testing/data/outlaw-class.csv through test_round_scenarios.py, which
     names it (#431). A browser test maps only through its own cite: the
     kiosk tests import open_kiosk from test_kiosk_pages.py, where one test
-    copies a headshot, and mapping every importer would add browser runs of
-    whole kiosk files, with a font run each, to many hand-offs. Some browser
-    importers do read the file, as test_dashboard.py reads outlaw-class.csv;
-    CI's full run covers them, and mapping them is a follow-up (#431
-    review)."""
+    copies a headshot. Some browser importers do read the file, as
+    test_dashboard.py reads outlaw-class.csv; CI's full run covers them,
+    and mapping them is a follow-up (#431 review, round 2)."""
     found = set()
     for rel in citing:
         tests, conftests = tree.importers(module_name(rel))
