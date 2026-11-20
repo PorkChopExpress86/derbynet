@@ -17,7 +17,10 @@
 # every push of a branch, about 3 s: #345's backticked `manage.py` passed the
 # hook and failed the hand-off, and a push that moves a path a guide cites
 # changes no guide (#345 retro, PR #364's review).  It refuses a push typed in the same
-# command after a pytest run or a read of its output (#282 retro).  Turn it on once per clone:
+# command after a pytest run or a read of its output (#282 retro).  It refuses
+# a closing keyword in the message of a commit it pushes, as pr-evidence does
+# in a PR body, before git sends the commit (plan/bin/commit-closes, #439).
+# Turn it on once per clone:
 #
 #   git config core.hooksPath .githooks
 #
@@ -89,9 +92,11 @@ EOF
 # ref it pushes.  A new branch has no remote sha; compare it with master.
 changed=
 pushed=
+shas=()
 while read -r _ local_sha _ remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
   pushed=1
+  shas+=("$local_sha")
   if [ "$remote_sha" = "$ZERO" ]; then
     base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
               || git merge-base "$local_sha" master 2>/dev/null || true)"
@@ -121,6 +126,31 @@ while read -r _ local_sha _ remote_sha; do
   if [ -z "$base" ] || grep -qE "$checked" <<<"$names"; then
     changed=1
   fi
+done
+# A closing keyword in a commit message closes its issue when the commit
+# reaches master, and the squash message lists each commit's message. It is
+# refused here, before git sends the commit and before the slow checks, where
+# pr-merge would run only once the commit is on GitHub; `pr-evidence --check`
+# reads the PR body only (#439, #415 retro). It reads `git log`, about a second.
+# DERBYNET_PUSH_CLOSES="64 65" names the issues the push closes on purpose.
+# With no origin/master, every commit no remote-tracking branch has is read.
+# The tool is the one beside this hook, not the pushed tree's: core.hooksPath
+# names the main clone's .githooks, so a push from a branch cut before the
+# tool existed runs this hook against a tree that lacks it. A missing tool
+# fails the push.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+base_args=()
+if git rev-parse -q --verify origin/master >/dev/null; then
+  base_args=(--base origin/master)
+fi
+closes_args=()
+for issue in ${DERBYNET_PUSH_CLOSES:-}; do
+  closes_args+=(--closes "$issue")
+done
+for sha in ${shas[@]+"${shas[@]}"}; do
+  echo "pre-push: plan/bin/commit-closes $sha" >&2
+  python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${base_args[@]+"${base_args[@]}"} \
+    ${closes_args[@]+"${closes_args[@]}"} --head "$sha"
 done
 # The checks read the working tree, so an edit while they run tests a tree
 # that is no commit: #373's implementer edited network_changed.py during the
