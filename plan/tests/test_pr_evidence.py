@@ -985,9 +985,17 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
                 f'[before run] again\n\n```\nHEAD {OLDER}\n```\n')
         self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
 
-    def test_a_longer_fence_holds_a_shorter_one_and_a_header_after_it_is_read(self):
-        body = f'````\n```\nHEAD {OLDER}\n```\n````\nHEAD {OLDER}\n'
-        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 3', 'line 6'])
+    def test_a_fence_ends_at_a_bare_line_of_as_many_backticks_and_a_header_after_it_is_read(self):
+        """The caption of the first fence reaches a header after a shorter
+        fence line and after one with an info string, both inside it; the
+        header after its close is outside and has no caption of its own."""
+        body = (f'[before run]\n````\n```\nHEAD {OLDER}\n```text\nHEAD {OLDER}\n```\n'
+                f'HEAD {OLDER}\n````\nHEAD {OLDER}\n')
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 10'])
+
+    def test_a_marker_inside_a_fence_does_not_caption_a_header_after_it(self):
+        body = f'x\n\n```\n[before run]\n```\nHEAD {OLDER}\n'
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
 
     def test_no_head_refuses_an_unmarked_header_and_passes_the_rest(self):
         found = self.stale(fenced(f'HEAD {CURRENT}'), head=None)
@@ -1050,6 +1058,26 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         self.assertEqual(TOOL.merge_chain(merge_one, root), [work])
         self.assertEqual(TOOL.merge_chain(work, root), [])
         self.assertEqual(TOOL.merge_chain('0' * 40, root), [])
+
+    def test_the_merge_chain_reads_the_checkout_without_a_hooks_git_dir(self):
+        """Under a pre-push hook GIT_DIR names another repository, as
+        `defined_names` is tested; the checkout's own commits are read."""
+        head = subprocess.run(['git', '-C', str(PR_EVIDENCE.parent), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True).stdout.strip()
+        with tempfile.TemporaryDirectory() as tmp, \
+                unittest.mock.patch.dict(os.environ, {'GIT_DIR': str(Path(tmp) / 'nowhere')}):
+            self.assertIsInstance(TOOL.merge_chain(head), list)
+            seen = []
+
+            def run(argv, **kwargs):
+                seen.append(kwargs['env'])
+                return subprocess.CompletedProcess(argv, 1, '', '')
+
+            with unittest.mock.patch.dict(os.environ, {'HOME': '/home/x'}), \
+                    unittest.mock.patch.object(TOOL.subprocess, 'run', run):
+                TOOL.merge_chain(head)
+        self.assertEqual(seen[0]['HOME'], '/home/x')
+        self.assertNotIn('GIT_DIR', seen[0])
 
     def test_the_command_line_refuses_and_names_the_line(self):
         body = evidence(KEYS) + '\n' + fenced(f'cwd /x HEAD {OLDER}', caption='Hand-off:')
