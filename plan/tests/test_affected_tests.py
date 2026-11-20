@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
@@ -436,9 +437,18 @@ class TestingNames(unittest.TestCase):
             for argv in (['init', '-q'], ['add', '-A']):
                 subprocess.run(['git', *argv], cwd=other, env=git_env(), check=True)
             files = {'server/notes.md': '', 'server/tests/test_cites.py': 'NAME = "notes.md"\n'}
-            from unittest import mock
             with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
                 self.assertEqual(testing_targets(files, 'notes.md'), TESTING_FALLBACK)
+
+    def test_no_git_vars_hides_only_git_variables_and_restores_them(self):
+        """git and the rows' functions still get the caller's other
+        variables (#431 review)."""
+        with mock.patch.dict(os.environ, GIT_DIR='/elsewhere', NOT_GIT='kept'):
+            with TOOL.no_git_vars():
+                self.assertNotIn('GIT_DIR', os.environ)
+                self.assertEqual(os.environ.get('NOT_GIT'), 'kept')
+            self.assertEqual((os.environ['GIT_DIR'], os.environ['NOT_GIT']),
+                             ('/elsewhere', 'kept'))
 
     def test_a_failed_ls_files_stops_the_tool_with_gits_message(self):
         """In a repository, a `git ls-files` that fails exits non-zero with
@@ -557,7 +567,6 @@ class TestingReaders(unittest.TestCase):
             files = {'server/tests/file_kinds.py': self.KINDS,
                      'server/tests/test_pipefail_pipes.py': '',
                      'testing/timer-stand-in/curl': '#!/bin/bash\n'}
-            from unittest import mock
             with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
                 self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
                                  ['tests/test_pipefail_pipes.py'])
@@ -567,6 +576,42 @@ class TestingReaders(unittest.TestCase):
         files = {'server/tests/file_kinds.py': self.KINDS,
                  'testing/timer-stand-in/curl': '#!/bin/bash\n'}
         self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
+
+    def test_a_rows_module_that_cant_run_stops_the_tool_with_the_reason(self):
+        """#431 review: a row whose test the tree has, and whose module is
+        missing, fails to parse, or lacks the function, exits with a message
+        naming the module and the row rather than a traceback."""
+        version = sys.version.split()[0]
+        row = 'which KIND_READERS row tests/test_pipefail_pipes.py lists files with'
+        kinds = 'server/tests/file_kinds.py'
+        cases = {
+            'missing': ({}, f'affected-tests: python {version} cannot load '
+                            f'server/tests/file_kinds.py, {row}: [Errno 2]'),
+            'unparsable': ({kinds: 'def (:\n'}, f'affected-tests: python {version} cannot '
+                           f'load server/tests/file_kinds.py, {row}: invalid syntax'),
+            'no function': ({kinds: ''}, 'affected-tests: server/tests/file_kinds.py has no '
+                                         f'function shell_files(), {row}'),
+        }
+        got = {}
+        for case, (module, message) in cases.items():
+            files = {'server/tests/test_pipefail_pipes.py': '',
+                     'testing/timer-stand-in/curl': '#!/bin/bash\n', **module}
+            with self.assertRaises(SystemExit) as stopped:
+                testing_targets(files, 'timer-stand-in/curl')
+            got[case] = str(stopped.exception.code)[:len(message)]
+        self.assertEqual(got, {case: message for case, (_module, message) in cases.items()})
+
+    def test_each_rows_module_parses_on_python_3_12(self):
+        """affected-tests loads each row's module with the host's python3,
+        which can be older than the server's 3.14 (plan-checks.yml): Ubuntu
+        24.04's is 3.12, where `except A, B:` is a SyntaxError (#431 review)."""
+        parsed = [module for module in sorted({row.module for row in TOOL.KIND_READERS})
+                  if ast.parse((REPO / 'server' / module).read_text(), module,
+                               feature_version=(3, 12))]
+        self.assertEqual(parsed, ['tests/file_kinds.py', 'tests/test_php_cite_lines.py',
+                                  'tools/golden_inputs.py'])
+        with self.assertRaises(SyntaxError):
+            ast.parse('try:\n    pass\nexcept A, B:\n    pass\n', feature_version=(3, 12))
 
     def test_a_listing_by_file_name_maps_each_path(self):
         # test_php_cite_lines.py's php_files() lists name -> [absolute paths];
@@ -3650,7 +3695,7 @@ class RealTree(unittest.TestCase):
         files = subprocess.run(['git', 'ls-files', 'testing/'], cwd=REPO, env=git_env(),
                                check=True, capture_output=True, text=True).stdout.split()
         tree, misses = TOOL.Tree(REPO), []
-        # Only the files a test cites by path: mapping every one is slow in the hook.
+        # Only the files a test cites by path, the ones a miss can be found for.
         texts = '\n'.join(tree.text(t) for t in tree.test_files())
         stand_ins = [f for f in files if f.startswith('testing/timer-stand-in/')]
         self.assertTrue(stand_ins)
@@ -3664,7 +3709,7 @@ class RealTree(unittest.TestCase):
                        and t not in targets]
             if path.startswith('testing/timer-stand-in/'):
                 rel = path[len('testing/'):]
-                readers = {test for test, _m, _s in TOOL.KIND_READERS}
+                readers = {row.test for row in TOOL.KIND_READERS}
                 self.assertEqual([t for t in sorted(targets) if t not in TESTING_FALLBACK
                                   and t not in readers and rel not in tree.text(t)], [], path)
         self.assertEqual(misses, [])
@@ -3711,20 +3756,20 @@ class RealTree(unittest.TestCase):
                         (node.module, a.name) for a in node.names)
                 elif isinstance(node, ast.FunctionDef):
                     imported.setdefault(test, set()).add((test, node.name))
-        for test, module, selector in TOOL.KIND_READERS:
-            dotted = module.removesuffix('.py').replace('/', '.')
+        for row in TOOL.KIND_READERS:
+            dotted = row.module.removesuffix('.py').replace('/', '.')
             package, _, base = dotted.rpartition('.')
-            with self.subTest(test=test, selector=selector):
-                self.assertTrue({(module, selector), (dotted, selector), (package, base)}
-                                & imported.get(test, set()))
+            with self.subTest(test=row.test, selector=row.selector):
+                self.assertTrue({(row.module, row.selector), (dotted, row.selector),
+                                 (package, base)} & imported.get(row.test, set()))
                 self.assertTrue(callable(getattr(
-                    TOOL.load_module(REPO / 'server' / module), selector, None)))
-        rows = {(test, selector) for test, _m, selector in TOOL.KIND_READERS}
+                    TOOL.load_module(REPO / 'server' / row.module), row.selector, None)))
+        rows = {(row.test, row.selector) for row in TOOL.KIND_READERS}
         kinds = {node.name for node in ast.parse(TestingReaders.KINDS).body
                  if isinstance(node, ast.FunctionDef)}
         self.assertEqual(sorted((test, name) for test, names in imported.items()
                                 for module, name in names
-                                if module != test and name in kinds and name != 'tracked'
+                                if module != test and name in kinds
                                 and (test, name) not in rows), [])
 
     def test_every_command_and_server_tool_maps(self):

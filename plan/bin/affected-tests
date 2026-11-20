@@ -108,6 +108,7 @@ every changed browser test file keeps its count, of the whole file.
 
 import ast
 import collections
+import contextlib
 import importlib.util
 import io
 import itertools
@@ -118,6 +119,7 @@ import sys
 import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 
 SERVER = 'server'
 
@@ -264,18 +266,28 @@ class Tree:
             self._names = collections.Counter(Path(f).name for f in listed if f)
         return self._names
 
-    def listed(self, rel, selector):
-        """The repository paths `selector()` of server/`rel` lists, once. The
-        module runs from the tree, so it lists the tree's files; it is loaded
-        by its path, so it imports no package of server/."""
+    def listed(self, row):
+        """The repository paths the function of a KIND_READERS `row` lists,
+        once. Its module runs from the tree, so it lists the tree's files;
+        it is loaded by its path, so it imports no package of server/. A
+        module this python can't load, or one without the function, stops
+        the tool with the reason (#431 review)."""
+        rel, selector = row.module, row.selector
         if (rel, selector) not in self._listed:
-            # The selectors run git themselves: a hook's GIT_DIR would point
-            # them at another repository, as git() keeps it from doing.
-            hidden = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith('GIT_')}
             try:
-                found = getattr(load_module(self.server / rel), selector)()
-            finally:
-                os.environ.update(hidden)
+                module = load_module(self.server / rel)
+            except (OSError, SyntaxError) as error:
+                sys.exit(f'affected-tests: python {sys.version.split()[0]} cannot load '
+                         f'{SERVER}/{rel}, which KIND_READERS row {row.test} '
+                         f'lists files with: {error}')
+            function = getattr(module, selector, None)
+            if not callable(function):
+                sys.exit(f'affected-tests: {SERVER}/{rel} has no function {selector}(), '
+                         f'which KIND_READERS row {row.test} lists files with')
+            # The selectors run git themselves: a hook's GIT_DIR would point
+            # them at another repository.
+            with no_git_vars():
+                found = function()
             if isinstance(found, dict):  # name -> [paths]
                 found = itertools.chain.from_iterable(found.values())
             self._listed[rel, selector] = {
@@ -701,25 +713,32 @@ def match_testing(path):
 # The tests that read every file of a kind, listed, rather than the files
 # they name: the test, and the module and function it takes its files from
 # (#431). A changed testing/ file the function lists maps to the test.
+class KindReader(NamedTuple):
+    test: str
+    module: str
+    selector: str
+
+
 KIND_READERS = (
-    ('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'suite_scripts'),
-    ('media/tests/test_faces.py', 'tests/file_kinds.py', 'headshots'),
-    ('tests/test_arithmetic_operands.py', 'tests/file_kinds.py', 'shell_files'),
-    ('tests/test_docker_checks.py', 'tests/file_kinds.py', 'exec_files'),
-    ('tests/test_golden_inputs.py', 'tools/golden_inputs.py', 'inputs'),
-    ('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'sources'),
-    ('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'php_files'),
-    ('tests/test_pipefail_pipes.py', 'tests/file_kinds.py', 'shell_files'),
-    ('tests/test_subshell_state.py', 'tests/file_kinds.py', 'shell_files'),
-    ('tests/test_transcript_diff_live.py', 'tests/file_kinds.py', 'top_of_testing'),
+    KindReader('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'suite_scripts'),
+    KindReader('media/tests/test_faces.py', 'tests/file_kinds.py', 'headshots'),
+    KindReader('tests/test_arithmetic_operands.py', 'tests/file_kinds.py', 'shell_files'),
+    KindReader('tests/test_docker_checks.py', 'tests/file_kinds.py', 'exec_files'),
+    KindReader('tests/test_golden_inputs.py', 'tools/golden_inputs.py', 'inputs'),
+    KindReader('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'sources'),
+    KindReader('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'php_files'),
+    KindReader('tests/test_pipefail_pipes.py', 'tests/file_kinds.py', 'shell_files'),
+    KindReader('tests/test_subshell_state.py', 'tests/file_kinds.py', 'shell_files'),
+    KindReader('tests/test_transcript_diff_live.py', 'tests/file_kinds.py', 'top_of_testing'),
 )
 
 
 def kind_readers(tree, path):
     """The tests of KIND_READERS in the tree whose function, the tree's own,
-    lists `path`."""
-    return sorted({test for test, rel, selector in KIND_READERS
-                   if tree.exists(test) and path in tree.listed(rel, selector)})
+    lists `path`. A row whose test the tree lacks maps nothing; one whose
+    module it lacks stops the tool (Tree.listed)."""
+    return sorted({row.test for row in KIND_READERS
+                   if tree.exists(row.test) and path in tree.listed(row)})
 
 
 def cover_testing(plan, tree, path):
@@ -773,8 +792,11 @@ def runners(tree, citing):
     testing/data/outlaw-class.csv through test_round_scenarios.py, which
     names it (#431). A browser test maps only through its own cite: the
     kiosk tests import open_kiosk from test_kiosk_pages.py, where one test
-    copies a headshot, and #431 is about browser reruns for files they never
-    read."""
+    copies a headshot, and mapping every importer would add browser runs of
+    whole kiosk files, with a font run each, to many hand-offs. Some browser
+    importers do read the file, as test_dashboard.py reads outlaw-class.csv;
+    CI's full run covers them, and mapping them is a follow-up (#431
+    review)."""
     found = set()
     for rel in citing:
         tests, conftests = tree.importers(module_name(rel))
@@ -1306,12 +1328,22 @@ def map_file(plan, tree, path):
 
 # --- git -------------------------------------------------------------------
 
+@contextlib.contextmanager
+def no_git_vars():
+    """os.environ without its GIT_* variables while the block runs: a hook's
+    or a caller's GIT_DIR names another repository than the tree (#431)."""
+    hidden = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith('GIT_')}
+    try:
+        yield
+    finally:
+        os.environ.update(hidden)
+
+
 def git(root, *argv):
-    """git's output in `root`, the repository `root` holds: no GIT_* variable
-    of a hook's or a caller's environment points it elsewhere (#431)."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-    return subprocess.run(['git', *argv], cwd=root, env=env, check=True,
-                          capture_output=True, text=True).stdout
+    """git's output in `root`, the repository `root` holds."""
+    with no_git_vars():
+        return subprocess.run(['git', *argv], cwd=root, check=True,
+                              capture_output=True, text=True).stdout
 
 
 def changed_files(plan):

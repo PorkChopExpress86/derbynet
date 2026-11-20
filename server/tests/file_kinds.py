@@ -1,9 +1,10 @@
 """The files a check reads by kind, by listing every file of the kind
-rather than naming one. Each check takes its files from here, and
-plan/bin/affected-tests lists them too (KIND_READERS), so a new shell script
-maps to the pipe linters without naming them (#431). Stdlib only and no
-import of the tests package: affected-tests loads this file by its path with
-the host's python3.
+rather than naming one, for the checks that import a package and so can't
+be loaded by their path. plan/bin/affected-tests lists the same files
+(KIND_READERS), so a new shell script maps to the pipe linters without
+naming them (#431). Stdlib only, no import of the tests package, and syntax
+python 3.12 parses: affected-tests loads this file by its path with the
+host's python3.
 """
 
 import re
@@ -15,6 +16,8 @@ SHEBANG = re.compile(r"^#!\s*\S*\b(?:ba)?sh\b|^#!\s*/usr/bin/env\s+(?:ba)?sh\b")
 # Where a command a reader or a script runs is written.  Python tests hold
 # stand-ins, test_docker_checks.py's own among them.
 EXEC_SUFFIXES = (".md", ".sh", ".yml", ".yaml", ".html", ".txt", ".py")
+# A name, since ruff formats `except (A, B):` for python 3.14 alone.
+UNREADABLE = (UnicodeDecodeError, OSError)
 
 
 def tracked() -> list[str]:
@@ -42,7 +45,7 @@ def shell_script(name: str) -> bool:
     try:
         with path.open(encoding="utf-8") as f:
             first = f.readline()
-    except UnicodeDecodeError, OSError:
+    except UNREADABLE:
         return False
     return bool(SHEBANG.match(first))
 
