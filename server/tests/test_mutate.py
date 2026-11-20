@@ -357,20 +357,28 @@ def test_a_stopped_run_restores_the_file(project, signum):
     assert (project / "mod.py").read_text() == MODULE
 
 
-def test_after_a_sigkill_the_next_run_is_refused(project):
+def test_after_a_sigkill_the_next_run_is_refused(project, tmp_path_factory):
     """A SIGKILL leaves the mutant in the file, and no run may take it as
-    the original."""
-    tool = mutate(project, "1 + 1", "2", "test_mod.py::test_waits", wait=True)
+    the original. The killed run's guard copy stays in its own TMPDIR, the
+    only folder this test leaves it in."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tmpdir = {"TMPDIR": str(folder)}
+    tool = mutate(
+        project, "1 + 1", "2", "test_mod.py::test_waits", wait=True, env=tmpdir
+    )
     started(project, tool)
     tool.kill()
     tool.wait(timeout=30)
     assert "return 2" in (project / "mod.py").read_text()
-    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    left = list(folder.iterdir())
+    assert [p.name.startswith("mutate-guard-") for p in left] == [True]
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound", env=tmpdir)
     assert run.returncode == 2
     assert "refused" in run.stderr
     (project / "started").unlink()
-    run = mutate(project, "1 + 1", "2", "test_mod.py::test_the_bound")
+    run = mutate(project, "1 + 1", "2", "test_mod.py::test_the_bound", env=tmpdir)
     assert run.returncode == 2, "the leftover lock or mutant, whichever it meets"
+    assert list(folder.iterdir()) == left, "a refused run removes its own copy"
 
 
 def test_a_file_that_differs_from_the_index_is_refused(project):
@@ -907,13 +915,13 @@ def test_a_run_past_its_bound_that_printed_nothing_is_an_error(project):
 # edit, for the #358 review's cases: a second signal while the file is put
 # back or the lock is taken, and an edit by someone else during the run.
 WRAPPER = """\
-import os, pathlib, shutil, sys, time
+import os, pathlib, shutil, sys, tempfile, time
 sys.path.insert(0, {tools!r})
 import mutate
 rmtree = shutil.rmtree
 ORIGINAL = pathlib.Path("mod.py").read_bytes()
 write_bytes, fdopen, result = pathlib.Path.write_bytes, os.fdopen, mutate._result
-unlink = pathlib.Path.unlink
+unlink, mkdtemp = pathlib.Path.unlink, tempfile.mkdtemp
 
 
 def mark(name):
@@ -944,6 +952,20 @@ def slow_unlock(self, *args):
         mark("unlocking")
         time.sleep(2)
     return unlink(self, *args)
+
+
+def held_mkdtemp(*args, **kwargs):
+    path = mkdtemp(*args, **kwargs)
+    pathlib.Path("making").write_text(path)
+    deadline = time.monotonic() + 30
+    while not os.path.exists("go"):
+        assert time.monotonic() < deadline, "no go"
+        time.sleep(0.02)
+    return path
+
+
+def failing_mkdtemp(*args, **kwargs):
+    raise OSError("no room for the guard")
 
 
 def slow_rmtree(path, *args, **kwargs):
@@ -1114,7 +1136,11 @@ def test_listed_stops_when_the_file_changes_between_mutants(project):
     assert no_lock(project)
 
 
-def test_after_a_sigkill_the_next_listed_run_is_refused(project):
+def test_after_a_sigkill_the_next_listed_run_is_refused(
+    project, tmp_path_factory, monkeypatch
+):
+    folder = tmp_path_factory.mktemp("tmp")
+    monkeypatch.setenv("TMPDIR", str(folder))
     commit(project, MODULE + PICK, PICK_TESTS)
     tool = listed(project, "test_mod.py::test_waits", wait=True)
     deadline = time.monotonic() + 30
@@ -1124,10 +1150,13 @@ def test_after_a_sigkill_the_next_listed_run_is_refused(project):
     tool.kill()
     tool.wait(timeout=30)
     assert "if True:" in (project / "mod.py").read_text(), "the mutant is left"
+    left = list(folder.iterdir())
+    assert [p.name.startswith("mutate-guard-") for p in left] == [True]
     run = listed(project, "test_mod.py::test_pick")
     assert run.returncode == 2
     assert "refused" in run.stderr
     assert "if True:" in (project / "mod.py").read_text(), "and left alone"
+    assert list(folder.iterdir()) == left, "a refused run removes its own copy"
 
 
 def test_listed_runs_a_crlf_files_mutants(project):
@@ -1453,6 +1482,45 @@ def test_the_guard_copy_is_removed_when_the_run_ends(project, tmp_path_factory):
     )
     assert run.returncode == 0, run.stdout + run.stderr
     assert list(folder.iterdir()) == []
+
+
+@pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGINT, signal.SIGHUP])
+def test_a_stop_while_the_guard_copy_is_made_removes_it(
+    project, tmp_path_factory, signum
+):
+    """The stop comes after mkdtemp made the folder and before main() has its
+    name: it is delivered once the name is kept, and the folder goes."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tool = wrapped(
+        project,
+        "mutate.tempfile.mkdtemp = held_mkdtemp",
+        "single",
+        "test_mod.py::test_the_bound",
+        env={"TMPDIR": str(folder)},
+    )
+    wait_for(project, "making", tool)
+    assert Path((project / "making").read_text()).parent == folder
+    tool.send_signal(signum)
+    (project / "go").touch()
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signum, err
+    assert list(folder.iterdir()) == []
+    assert (project / "mod.py").read_text() == MODULE
+    assert no_lock(project)
+
+
+def test_a_guard_copy_that_cannot_be_made_ends_the_run_on_that_error(project):
+    tool = wrapped(
+        project,
+        "mutate.tempfile.mkdtemp = failing_mkdtemp",
+        "single",
+        "test_mod.py::test_the_bound",
+    )
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 1, err
+    assert err.splitlines()[-1] == "OSError: no room for the guard"
+    assert "During handling" not in err
+    assert (project / "mod.py").read_text() == MODULE
 
 
 def test_a_second_signal_while_the_guard_copy_is_removed_waits_for_it(

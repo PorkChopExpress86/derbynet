@@ -565,18 +565,23 @@ def listed(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Runs the tool with a copy of the guard that is removed when it ends,
-    a stop or a second stop during the removal included; a SIGKILL leaves the
-    copy behind, as it leaves the mutant and the lock."""
+    a stop while it is made, a stop or a second stop during the removal
+    included; a SIGKILL leaves the copy behind, as it leaves the mutant and
+    the lock."""
     global _guard_folder
     for signum in STOPS:
         signal.signal(signum, _stop)
-    _guard_folder = tempfile.mkdtemp(prefix="mutate-guard-")
     try:
+        # The stops are held until the name is kept: a stop that lands inside
+        # mkdtemp, after it made the folder, has no name to remove it by.
+        with _held():
+            _guard_folder = tempfile.mkdtemp(prefix="mutate-guard-")
         shutil.copy(GUARD, Path(_guard_folder) / "kill_guard.py")
         return _main(argv)
     finally:
         with _held():
-            shutil.rmtree(_guard_folder, ignore_errors=True)
+            if _guard_folder:
+                shutil.rmtree(_guard_folder, ignore_errors=True)
         _guard_folder = None
 
 
