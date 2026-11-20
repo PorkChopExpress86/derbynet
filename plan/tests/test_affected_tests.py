@@ -348,7 +348,6 @@ class TestingCases(unittest.TestCase):
 
 
 TESTING_FALLBACK = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_golden_inputs.py']
-FILE_KINDS = (REPO / 'server' / 'tests' / 'file_kinds.py').read_text()
 
 
 @contextlib.contextmanager
@@ -526,8 +525,10 @@ class TestingReaders(unittest.TestCase):
     file it never names, and a test reads one through a module that names
     it."""
 
+    KINDS = (REPO / 'server' / 'tests' / 'file_kinds.py').read_text()
+
     def test_a_file_a_kind_readers_function_lists_maps_to_its_test(self):
-        files = {'server/tests/file_kinds.py': FILE_KINDS,
+        files = {'server/tests/file_kinds.py': self.KINDS,
                  'server/tests/test_pipefail_pipes.py': '',
                  'testing/timer-stand-in/curl': '#!/bin/bash\n'}
         self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
@@ -539,7 +540,7 @@ class TestingReaders(unittest.TestCase):
         """A top-level script maps only through the rows that list it, a
         `.sh` with no shebang included; a file no row lists and no test
         names maps to the fallback alone; no rule adds an empty entry."""
-        with git_repo({'server/tests/file_kinds.py': FILE_KINDS,
+        with git_repo({'server/tests/file_kinds.py': self.KINDS,
                        'server/tests/test_pipefail_pipes.py': '',
                        'server/legacy_api/tests/test_testing_scripts.py': '',
                        'testing/queryj': '#!/bin/bash\n',
@@ -561,7 +562,7 @@ class TestingReaders(unittest.TestCase):
         hook's GIT_DIR names (#431): there the stand-in is untracked."""
         with tempfile.TemporaryDirectory() as other:
             subprocess.run(['git', 'init', '-q'], cwd=other, env=git_env(), check=True)
-            files = {'server/tests/file_kinds.py': FILE_KINDS,
+            files = {'server/tests/file_kinds.py': self.KINDS,
                      'server/tests/test_pipefail_pipes.py': '',
                      'testing/timer-stand-in/curl': '#!/bin/bash\n'}
             with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
@@ -570,7 +571,7 @@ class TestingReaders(unittest.TestCase):
                 self.assertEqual(os.environ['GIT_DIR'], f'{other}/.git')
 
     def test_a_kind_reader_the_tree_lacks_maps_nothing(self):
-        files = {'server/tests/file_kinds.py': FILE_KINDS,
+        files = {'server/tests/file_kinds.py': self.KINDS,
                  'testing/timer-stand-in/curl': '#!/bin/bash\n'}
         self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
 
@@ -668,11 +669,12 @@ class OutsideTesting(unittest.TestCase):
     """#471: a check that lists every file of a kind reads those files
     outside testing/ too, and #462 mapped only testing/ paths to it."""
 
+    KINDS = (REPO / 'server' / 'tests' / 'file_kinds.py').read_text()
     SCRIPT_TESTS = ('tests/test_arithmetic_operands.py', 'tests/test_pipefail_pipes.py',
                     'tests/test_subshell_state.py')
 
     def stand_in(self, *tests):
-        return {'server/tests/file_kinds.py': FILE_KINDS,
+        return {'server/tests/file_kinds.py': self.KINDS,
                 **{f'server/{t}': '' for t in tests}}
 
     def test_a_script_outside_testing_maps_to_the_checks_that_list_shell_files(self):
@@ -3807,7 +3809,7 @@ class RealTree(unittest.TestCase):
         self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
 
     def test_a_test_file_passes_on_what_it_imports(self):
-        """#371 retro: the six kiosk files that import open_kiosk from
+        """#371 retro: the kiosk files that import open_kiosk from
         test_kiosk_pages.py ran nothing when it changed, and
         test_database_check.py, which imports SERVICE_VIOLATIONS from
         test_invariants.py, nothing when core/tests/db.py changed."""
@@ -3897,7 +3899,7 @@ class RealTree(unittest.TestCase):
                 self.assertTrue(callable(getattr(
                     TOOL.load_module(REPO / 'server' / row.module), row.selector, None)))
         rows = {(row.test, row.selector) for row in TOOL.KIND_READERS}
-        kinds = {node.name for node in ast.parse(FILE_KINDS).body
+        kinds = {node.name for node in ast.parse(TestingReaders.KINDS).body
                  if isinstance(node, ast.FunctionDef)}
         self.assertEqual(sorted((test, name) for test, names in imported.items()
                                 for module, name in names
