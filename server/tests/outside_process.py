@@ -38,13 +38,11 @@ def alive(pid):
         return False
 
 
-def start(folder, mark=None):
+def start(folder, mark=""):
     """The pid of a sleeper started in `folder`, in a session of its own; its
-    pid is also in `folder/outside.pid`. Its environment holds no guard
-    token, unless `mark` gives one."""
-    env = {k: v for k, v in os.environ.items() if k != kill_guard.MARK}
-    if mark is not None:
-        env[kill_guard.MARK] = mark
+    pid is also in `folder/outside.pid`. Its environment holds `mark` for the
+    guard's token, none by default."""
+    env = {**os.environ, kill_guard.MARK: mark}
     subprocess.run(
         ["setsid", "-f", "sh", "-c", SCRIPT], cwd=folder, env=env, check=True
     )

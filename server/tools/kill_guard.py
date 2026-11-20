@@ -123,11 +123,9 @@ def is_ours(pid: int, me: int) -> bool:
     OSError when a process on the way is gone: that reads as not provable,
     and the caller says so."""
     leader = pid
-    seen = set()
-    while pid > 0 and pid not in seen:
+    while pid > 0:
         if pid == me:
             return True
-        seen.add(pid)
         pid = stat(pid)[1]
     return carries_mark(leader)
 

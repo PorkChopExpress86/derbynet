@@ -24,7 +24,7 @@ import pytest
 from tests import outside_process
 from tests.outside_process import alive, pid_in, until
 from tools import kill_guard
-from tools.kill_guard import KillRefused
+from tools.kill_guard import KillRefused, comm_of
 
 TOOLS = Path(kill_guard.__file__).resolve().parent
 # The real call, which the `unsent` fixture replaces.
@@ -83,7 +83,7 @@ def test_a_session_parted_from_its_parents_carries_the_runs_token(guard, tmp_pat
         outside_process.stop(pid, tmp_path)
 
 
-def test_a_token_of_another_run_is_refused(guard, tmp_path):
+def test_a_token_of_another_run_is_refused(unsent, tmp_path):
     pid = outside_process.start(tmp_path, mark="another run's")
     try:
         with pytest.raises(KillRefused):
@@ -165,7 +165,7 @@ def test_a_grandchild_is_a_descendant(guard, tmp_path):
 
 @pytest.mark.parametrize("call", ["kill", "killpg", "negative"])
 def test_a_signal_to_a_process_outside_the_tree_is_refused_and_it_lives(
-    guard, outside, call
+    unsent, outside, call
 ):
     """The `negative` form, `os.kill(-pgid, ...)`, is a group's kill by
     another spelling."""
@@ -183,7 +183,7 @@ def test_a_signal_to_a_process_outside_the_tree_is_refused_and_it_lives(
     assert alive(outside)
 
 
-def test_the_refusal_is_no_oserror_for_a_cleanup_to_swallow(guard, outside):
+def test_the_refusal_is_no_oserror_for_a_cleanup_to_swallow(unsent, outside):
     with pytest.raises(KillRefused) as refused:
         os.kill(outside, signal.SIGTERM)
     assert not isinstance(refused.value, Exception)
@@ -210,12 +210,29 @@ def never(*args):
 
 @pytest.fixture
 def unsent(guard):
-    """Every call the guard signals by fails the test instead."""
+    """Every call the guard signals by fails the test instead. A test that
+    expects a refusal or a gone pid takes it: under `mutate.py` the guard
+    passes a call on to the plugin's copy, whose refusal would stand in for
+    a mutant's missing one."""
     with pytest.MonkeyPatch.context() as patched:
         patched.setattr(kill_guard.State, "real_kill", never)
         patched.setattr(kill_guard.State, "real_killpg", never)
         patched.setattr(signal, "pidfd_send_signal", never)
         yield patched
+
+
+def test_a_pid_that_is_gone_reads_as_gone_and_nothing_is_sent(unsent):
+    gone = subprocess.Popen(["true"])
+    gone.wait(timeout=10)
+    with pytest.raises(ProcessLookupError, match=f"pid {gone.pid} is gone; nothing"):
+        os.kill(gone.pid, signal.SIGTERM)
+
+
+def test_a_group_with_no_process_left_reads_as_gone_and_nothing_is_sent(unsent):
+    gone = subprocess.Popen(["true"], start_new_session=True)
+    gone.wait(timeout=10)
+    with pytest.raises(ProcessLookupError, match="group .* has no process left"):
+        os.killpg(gone.pid, signal.SIGTERM)
 
 
 def test_a_kill_of_every_process_is_refused(unsent):
@@ -238,6 +255,23 @@ def test_a_process_with_no_handle_to_hold_it_by_is_refused(child, unsent, call):
         send(child.pid, signal.SIGTERM)
 
 
+def test_a_second_install_is_refused_and_leaves_the_first(guard):
+    token = guard.State.token
+    with pytest.raises(RuntimeError, match="already installed"):
+        kill_guard.install()
+    assert guard.State.token == token == os.environ[kill_guard.MARK]
+
+
+def test_a_second_uninstall_changes_nothing(monkeypatch):
+    kill_guard.install()
+    kill_guard.uninstall()
+    monkeypatch.setattr(os, "kill", stand_in := lambda *args: None)
+    monkeypatch.setenv(kill_guard.MARK, "after")
+    kill_guard.uninstall()
+    assert os.kill is stand_in
+    assert os.environ[kill_guard.MARK] == "after"
+
+
 def test_pid_0_names_the_callers_own_group_and_negative_pids_a_leader():
     assert kill_guard.leader_of(0) == os.getpgrp()
     assert kill_guard.leader_of(-1) is None
@@ -246,7 +280,7 @@ def test_pid_0_names_the_callers_own_group_and_negative_pids_a_leader():
 
 
 def test_a_process_that_exits_before_the_check_reads_as_gone_and_is_not_signalled(
-    guard, monkeypatch, child
+    child, unsent, monkeypatch
 ):
     read = kill_guard.stat
 
@@ -297,27 +331,29 @@ def test_no_descendant_set_outlives_a_call(guard, tmp_path):
 class Group:
     """A shell that leads a session and group of its own, in `tmp_path`, and
     starts a sleeper in its group for each item of `members`: a command
-    prefix, `env -u` to drop the run's token. The leader then sleeps, or
-    exits and is reaped when `leader_stays` is False, which leaves the
-    sleepers to the subreaper."""
+    prefix, `env -u` to drop the run's token. The leader then sleeps."""
 
-    def __init__(self, tmp_path, members=("",), leader_stays=True):
+    def __init__(self, tmp_path, members=("",)):
         self.folder = tmp_path
         starts = "".join(
             f"{prefix} sleep 120 & echo $! >> m.part\n" for prefix in members
         )
-        last = "exec sleep 120" if leader_stays else "exit 0"
         self.leader = subprocess.Popen(
-            ["sh", "-c", f": > m.part\n{starts}mv m.part members\n{last}"],
+            ["sh", "-c", f": > m.part\n{starts}mv m.part members\nexec sleep 120"],
             cwd=tmp_path,
             start_new_session=True,
         )
         until(lambda: (tmp_path / "members").exists())
         self.members = [int(x) for x in (tmp_path / "members").read_text().split()]
+        # Each sleeper's pid is written before its `sleep` runs.
         for pid in self.members:
             until(lambda pid=pid: Path(f"/proc/{pid}/comm").read_text() == "sleep\n")
-        if not leader_stays:
-            self.leader.wait(timeout=10)
+
+    def part(self):
+        """Kills the leader, by the command, and reaps it: the sleepers are
+        left to the subreaper, in a group whose leader is gone."""
+        subprocess.run(["kill", "-KILL", str(self.leader.pid)], check=True)
+        self.leader.wait(timeout=10)
 
     def stop(self):
         for pid in self.members:
@@ -327,7 +363,8 @@ class Group:
 
 
 @pytest.fixture
-def group(tmp_path):
+def group(guard, tmp_path):
+    """A group started under the guard, so its sleeper carries the token."""
     held = Group(tmp_path)
     yield held
     held.stop()
@@ -385,31 +422,34 @@ def test_any_other_error_from_the_group_s_handle_is_raised_and_nothing_sent(
 
 
 def test_a_group_whose_leader_is_gone_reaches_its_processes_that_are_the_run_s(
-    guard, tmp_path
+    guard, group
 ):
     """A cleanup of the test's own group after its leader was reaped."""
-    held = Group(tmp_path, leader_stays=False)
-    try:
-        assert not alive(held.leader.pid)
-        os.killpg(held.leader.pid, signal.SIGTERM)
-        until(lambda: not alive(held.members[0]))
-    finally:
-        held.stop()
+    group.part()
+    assert not alive(group.leader.pid)
+    os.killpg(group.leader.pid, signal.SIGTERM)
+    until(lambda: not alive(group.members[0]))
+
+
+@pytest.fixture
+def mixed(guard, tmp_path):
+    """A group started under the guard whose second sleeper has no token:
+    once its leader is gone, no parent in the run leads to it."""
+    held = Group(tmp_path, ("", f"env -u {kill_guard.MARK}"))
+    yield held
+    held.stop()
 
 
 def test_a_group_whose_leader_is_gone_is_refused_for_one_process_not_the_run_s(
-    guard, tmp_path
+    mixed, unsent
 ):
-    """The second sleeper has no token and no parent in the run: the group is
-    refused, and the first, which is the run's, is not signalled either."""
-    held = Group(tmp_path, ("", f"env -u {kill_guard.MARK}"), leader_stays=False)
-    try:
-        with pytest.raises(KillRefused) as refused:
-            os.killpg(held.leader.pid, signal.SIGTERM)
-        assert f"(pid {held.members[1]}, comm 'sleep')" in str(refused.value)
-        assert alive(held.members[0]) and alive(held.members[1])
-    finally:
-        held.stop()
+    """The group is refused, and the first sleeper, which is the run's, is
+    not signalled either."""
+    mixed.part()
+    with pytest.raises(KillRefused) as refused:
+        os.killpg(mixed.leader.pid, signal.SIGTERM)
+    assert f"(pid {mixed.members[1]}, comm 'sleep')" in str(refused.value)
+    assert alive(mixed.members[0]) and alive(mixed.members[1])
 
 
 def test_a_leader_that_exits_after_its_handle_is_held_leaves_its_group_checked(
@@ -428,6 +468,24 @@ def test_a_leader_that_exits_after_its_handle_is_held_leaves_its_group_checked(
     monkeypatch.setattr(kill_guard, "stat", exits_first)
     os.killpg(group.leader.pid, signal.SIGTERM)
     until(lambda: not alive(group.members[0]))
+
+
+def test_a_leader_that_exits_after_its_handle_is_held_leaves_its_group_refused(
+    mixed, unsent
+):
+    """The same exit, in a group with a sleeper not the run's."""
+    read = kill_guard.stat
+
+    def exits_first(pid):
+        unsent.setattr(kill_guard, "stat", read)
+        mixed.part()
+        return read(pid)
+
+    unsent.setattr(kill_guard, "stat", exits_first)
+    with pytest.raises(KillRefused) as refused:
+        os.killpg(mixed.leader.pid, signal.SIGTERM)
+    assert f"(pid {mixed.members[1]}, comm 'sleep')" in str(refused.value)
+    assert alive(mixed.members[0]) and alive(mixed.members[1])
 
 
 def inner_python(tmp_path, body, *args, **popen):
@@ -504,8 +562,8 @@ def inner_pytest(tmp_path, *args, only):
     `only`: a name, or a tuple of them."""
     names = [only] if isinstance(only, str) else only
     (tmp_path / "test_inner.py").write_text(INNER_TESTS)
-    env = {k: v for k, v in os.environ.items() if k != "DJANGO_SETTINGS_MODULE"}
-    env["PYTHONPATH"] = str(TOOLS)
+    # No DJANGO_SETTINGS_MODULE, and no guard token of this run.
+    env = {"PATH": os.environ["PATH"], "PYTHONPATH": str(TOOLS)}
     return subprocess.run(
         [
             sys.executable,
@@ -536,6 +594,7 @@ def test_a_test_that_swallows_the_refusal_still_fails_with_its_message(
     assert "kill_guard: os.kill and os.killpg raises for a pid" in run.stdout
     lines = [x for x in run.stdout.splitlines() if x.startswith("kill_guard refused ")]
     assert len(lines) == 1 and f"(pid {outside}, comm 'sleep')" in lines[0], run.stdout
+    assert f"\n  {lines[0]}\n" in run.stdout, "the failure's own report names it"
     assert alive(outside)
 
 
@@ -583,6 +642,24 @@ def test_the_test_after_one_that_took_a_refusal_passes(tmp_path, outside):
     assert run.returncode == 1, run.stdout
     assert "1 failed, 1 passed" in run.stdout
     assert alive(outside)
+
+
+@pytest.mark.parametrize("cwd", ["here", "elsewhere"])
+def test_the_helper_stops_only_the_sleeper_started_in_its_folder(tmp_path, cwd):
+    """`outside_process.stop` sends by the `kill` command, which no guard
+    wraps, so it checks the pid's `comm` and folder first."""
+    command = {"here": ["sh", "-c", "exec cat"], "elsewhere": ["sleep", "120"]}[cwd]
+    folder = {"here": tmp_path, "elsewhere": tmp_path / "elsewhere"}[cwd]
+    folder.mkdir(exist_ok=True)
+    held = subprocess.Popen(command, cwd=folder, stdin=subprocess.PIPE)
+    try:
+        until(lambda: comm_of(held.pid) in ("cat", "sleep"))
+        with pytest.raises(AssertionError):
+            outside_process.stop(held.pid, tmp_path)
+        assert held.poll() is None
+    finally:
+        held.kill()
+        held.wait(timeout=10)
 
 
 @pytest.mark.parametrize("call", ["kill", "killpg"])
