@@ -883,7 +883,8 @@ def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
     def hold(sender, environ, **kwargs):
         if environ.get("QUERY_STRING") == "held":
             held.append(environ["PATH_INFO"])
-            gate.wait(InFlight.TIMEOUT_MS / 1000)
+            # Past the settle's waits, so only the release lets it go.
+            gate.wait(3 * InFlight.TIMEOUT_MS / 1000)
         elif gate.is_set():
             after.append(environ["PATH_INFO"])
 
