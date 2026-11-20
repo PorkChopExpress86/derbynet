@@ -6,6 +6,7 @@ slideshow Configure sheet showing what was saved (C20), the parity boxes of
 
 import json
 import re
+from contextlib import nullcontext
 from datetime import timedelta
 
 import pytest
@@ -24,7 +25,7 @@ from ui.tests.browser.conftest import (
     htmx_settled,
     shoot,
 )
-from ui.tests.browser.helpers import bound, ready
+from ui.tests.browser.helpers import MAX_SWAPS, bound, ready
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
@@ -488,6 +489,165 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     expect(scene_button(page, welcome)).to_have_attribute("aria-pressed", "true")
 
 
+def test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits(login, event):
+    """A poll's reply swaps the board just after `bound()` first resolves a
+    card's Page button to an element (#425). htmx's cleanup of the
+    swapped-out button deletes its `initHash`, so a wait on that element
+    alone never ends; `tap()` follows the button to the card swapped in,
+    clicks it only once htmx has bound it, and opens its Page sheet, under
+    the new name.
+
+    The control stands in for the locator and lets the held poll through
+    the first time `bound()` asks it for an element, so the swap lands
+    inside the real `tap()` on every run. htmx binds a swapped-in button
+    at once (`defaultSettleDelay` 0), so the test unbinds the new one, has
+    htmx bind it again only when `bound()` asks for the button again, and
+    records whether the click found it bound."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    page_button = card(page, "tv").locator('[data-action="page"]')
+    unbind_and_watch_the_click = """() => {
+      const button = document.querySelector(
+        '#kiosk-board [data-kiosk="tv"] [data-action="page"]');
+      delete button['htmx-internal-data'].initHash;
+      document.addEventListener('click', (e) => {
+        const control = e.target.closest('[hx-get]');
+        window.clickedBound = !!(control['htmx-internal-data'] || {}).initHash;
+      }, {capture: true, once: true});
+    }"""
+
+    class SwapThenRebind:
+        resolves = 0
+
+        def __getattr__(self, name):
+            return getattr(page_button, name)
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = page_button.element_handle()
+            if self.resolves == 1:
+                polls = hold_the_polls(page, stretch=False)
+                Kiosk.objects.filter(address="tv").update(name="Lobby")
+                polls.wait_for(1)
+                polls.answer(0)
+                polls.end()
+                assert not handle.evaluate("e => e.isConnected"), "no swap"
+                page.evaluate(unbind_and_watch_the_click)
+            elif self.resolves == 2:
+                handle.evaluate("e => htmx.process(e)")
+            return handle
+
+    control = SwapThenRebind()
+    tap(page, control)
+    assert page.evaluate("window.clickedBound") is True, "clicked before the bind"
+    assert control.resolves == 2, "bound() took the button before and after the swap"
+    expect(page.locator("#sheet-kiosks-title")).to_have_text("Page for Lobby")
+    ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
+
+
+# A control outside the board, so no poll swaps it; htmx binds it only when
+# a test asks.
+STAND_IN = """() => {
+  const control = document.createElement('button');
+  control.id = 'stand-in';
+  control.setAttribute('hx-get', '/');
+  document.body.append(control);
+}"""
+
+
+@pytest.mark.parametrize(
+    ("swaps", "outcome"),
+    [
+        (MAX_SWAPS, nullcontext()),
+        (
+            MAX_SWAPS + 1,
+            pytest.raises(
+                AssertionError,
+                match=f"swapped out {MAX_SWAPS + 1} times and never bound",
+            ),
+        ),
+    ],
+    ids=["at-the-cap", "past-the-cap"],
+)
+def test_bound_follows_swaps_up_to_its_cap(login, event, swaps, outcome):
+    """`bound()` takes a control's element again after each swap, up to
+    MAX_SWAPS swaps, and past them fails naming the swaps (#466 review).
+    The control swaps the stand-in out each time `bound()` takes its
+    element, `swaps` times, and then has htmx bind the element it gives."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapEachResolve:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            handle.evaluate(
+                "e => e.replaceWith(e.cloneNode(true))"
+                if self.resolves <= swaps
+                else "e => htmx.process(e)"
+            )
+            return handle
+
+    control = SwapEachResolve()
+    with outcome:
+        bound(page, control)
+    assert control.resolves == MAX_SWAPS + 1, "bound() stopped taking elements"
+
+
+def test_bound_waits_on_the_element_swapped_in(login, event):
+    """After a swap, `bound()` waits on the element swapped in, and a
+    timeout there names the swap (#466 review). The control swaps the
+    stand-in out the first time `bound()` takes its element and shortens
+    Playwright's timeout the next time; htmx never binds the element
+    swapped in, so the outcome does not depend on the timeout's length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapOnce:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            if self.resolves == 1:
+                handle.evaluate("e => e.replaceWith(e.cloneNode(true))")
+            else:
+                page.set_default_timeout(1_000)
+            return handle
+
+    with pytest.raises(
+        AssertionError,
+        match="showed no element htmx bound within Playwright's timeout, after 1 swaps",
+    ):
+        bound(page, SwapOnce())
+    page.set_default_timeout(30_000)  # Playwright's default
+
+
+@pytest.mark.parametrize(
+    "selector", ["#stand-in", "#no-such-control"], ids=["never-bound", "never-shown"]
+)
+def test_bound_names_the_control_it_timed_out_on(login, event, selector):
+    """A control htmx never binds, or a control the page never shows, fails
+    `bound()` with a message naming the control once Playwright's timeout
+    passes, not Playwright's own (#466 review). Nothing here binds later,
+    so the test shortens Playwright's timeout and the outcome does not
+    depend on its length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    page.set_default_timeout(1_000)
+    with pytest.raises(
+        AssertionError,
+        match=rf"bound\(\): .*'{selector}'.* showed no element htmx bound "
+        "within Playwright's timeout, after 0 swaps",
+    ):
+        bound(page, page.locator(selector))
+    page.set_default_timeout(30_000)  # Playwright's default
+
+
 # ----- a press that spans a board swap (D102, #344) --------------------------
 
 # The page's own record of a press, in the order the page saw it: each
@@ -891,24 +1051,69 @@ def move_off(page):
     page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
 
 
+# The timers a click's listeners set wait until the next pointerdown has been
+# handled, then run: the order a click's timer that runs late gives (#455).
+# Once only: later clicks' timers run as usual, and so does a timer set
+# outside a click, such as the board poll's. `window.lateTimers` counts those
+# parked, records when each ran, and the pointerdown that let them go: its
+# timeStamp and its button's scene.
+LATE_CLICK_TIMERS = """() => {
+  const real = window.setTimeout;
+  const late = window.lateTimers = {parked: 0, ran: [], down: null};
+  const parked = [];
+  window.setTimeout = function (fn, ms, ...rest) {
+    if (window.event?.type === 'click') {
+      parked.push(() => fn(...rest));
+      late.parked += 1;
+      return 0;
+    }
+    return real.call(window, fn, ms, ...rest);
+  };
+  window.addEventListener('pointerdown', (e) => {
+    window.setTimeout = real;
+    late.down = {at: e.timeStamp, scene: e.target.closest('button')?.dataset.scene};
+    for (const run of parked) real(() => { late.ran.push(performance.now()); run(); });
+  }, {once: true});
+}"""
+
+
 def test_a_press_during_a_taps_request_still_taps(login, event):
     """The mouse taps Identify while a poll's reply is held, so the held
     board waits for Identify's POST, which its route holds. While that POST
     is out, the mouse goes down on Welcome, and Identify's reply then comes:
     its board waits under the new press, and so does the board held before
-    (D102). Welcome's POST still goes out."""
+    (D102). Welcome's POST still goes out. The release Identify's click
+    defers runs only after Welcome's pointerdown (`LATE_CLICK_TIMERS`), and
+    leaves Welcome's press holding: before #455 it ended that press, and
+    Identify's board swapped in under it. The test sets a timer of its own
+    outside a click, which the forcing must leave alone, as it leaves the
+    board poll's."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
-    welcome = scene_button(page, scene(event, "Welcome"))
+    welcomed = scene(event, "Welcome")
+    welcome = scene_button(page, welcomed)
     posts = held_at_route(page, "**/kiosks/identify/**")
     polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
+    page.evaluate(LATE_CLICK_TIMERS)
+    page.evaluate("setTimeout(() => {})")
     page.mouse.up()
     wait_for_held(page, posts, "Identify POST")
     press(page, welcome)
+    # one read: mouse.down() returns once the page has handled its pointerdown.
+    log = board_log(page)
+    second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    late = page.evaluate("window.lateTimers")
+    assert late["down"] == {"at": log[second]["at"], "scene": str(welcomed.pk)}, (
+        late,
+        log,
+    )
+    assert late["parked"] == 1, late
     posts[0].continue_()
     wait_for_done(page, "/kiosks/identify/")
     log = board_log(page)
-    second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    late = page.evaluate("window.lateTimers")
+    assert len(late["ran"]) == 1, late
+    assert late["ran"][0] > log[second]["at"], (late, log)
     assert swaps_since(log, second) == [], log
     with htmx_post(page, "/kiosks/scene/"):
         page.mouse.up()
