@@ -1491,7 +1491,9 @@ def test_after_a_sigkill_the_guard_copy_is_left_and_the_next_run_goes_on(
     tool.kill()
     tool.wait(timeout=30)
     left = list(folder.iterdir())
-    assert [x.name for x in left[0].iterdir()] == ["kill_guard.py"]
+    # Beside it a __pycache__, unless PYTHONDONTWRITEBYTECODE is set.
+    copy = (left[0] / "kill_guard.py").read_bytes()
+    assert copy == (TOOL.parent / "kill_guard.py").read_bytes()
     assert len(left) == 1
     subprocess.run([*GIT, "checkout", "mod.py"], cwd=project, check=True)
     for lock in (project / ".git").glob("mutate-*.lock"):
