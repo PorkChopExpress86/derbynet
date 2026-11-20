@@ -8,19 +8,22 @@ mutation round deliberately makes a parsed pid wrong, so every pytest run
 `tools/mutate.py` starts loads this plugin (`-p kill_guard`, with this
 folder on the child's PYTHONPATH):
 
-- a signal sent to a pid, or a process group's leader, that is not this
-  pytest process or one it started raises KillRefused. A process is the
-  run's when this one is among its parents (the chain read from
-  `/proc/<pid>/stat`, afresh at each call), or when it carries the run's
-  token in its environment (`MARK`). The token covers a process `setsid -f`
-  or a killed parent left to the subreaper, which no parent chain reaches:
+- a signal sent to a pid, or to a process group, that is not this pytest
+  process or one it started raises KillRefused. A process is the run's when
+  this one is among its parents (the chain read from `/proc/<pid>/stat`,
+  afresh at each call), or when it carries the run's token in its
+  environment (`MARK`). The token covers a process `setsid -f` or a killed
+  parent left to the subreaper, which no parent chain reaches:
   `--kill-guard-print` over the tests that signal such processes showed
   tests/test_detach.py's `stop()`, `test_pytest_under_load.py`'s
   `kill_all()`, `test_mutate.py`'s `project` fixture and
-  `test_ubuntu_mirror.py`'s dpkg-lock test refused by the chain alone. The
-  error is a BaseException, so a cleanup's `except Exception` or `suppress(OSError)`
-  does not take it for "already gone". The message names the pid, its
-  `comm` and the call site. Signal 0, an existence check, passes through;
+  `test_ubuntu_mirror.py`'s dpkg-lock test refused by the chain alone. A
+  guard installed over another in the same process, as test_kill_guard.py
+  installs one under mutate.py's, shares its token: one run, one token. The
+  error is a BaseException, so a cleanup's `except Exception` or
+  `suppress(OSError)` does not take it for "already gone". The message
+  names the pid, its `comm` and the call site. Signal 0, an existence
+  check, passes through;
 - the run records each refusal, and the test that took one fails even when
   it swallowed the exception, so a mutant that reaches the guard reads
   KILLED, never SURVIVED (`pytest_runtest_makereport`). The terminal summary
@@ -29,12 +32,19 @@ folder on the child's PYTHONPATH):
   recorded and listed, so a run shows what the guard would refuse before
   anything signals a real process (memory note `killpg-checks-target.md`).
 
-A pid that exits before the check reads as ProcessLookupError, with
-nothing signalled. For `os.kill` of one pid the signal goes through a handle
-opened before the check (`pidfd_send_signal`), so a pid reused after the check
-is never the target. A process group has no such handle: the leader is checked and the
-group is signalled after, so a group that is reused in between is a
-residual race this does not close.
+A group is the run's when its leader is. When the leader is gone the group
+may live on, so each of its live processes must be the run's instead; a
+group with no process left reads as ProcessLookupError, with nothing
+signalled.
+
+The signal goes through a handle opened before the check, the target's
+`/proc/<pid>` directory, which `pidfd_send_signal` takes for a pidfd: only
+the process the check read, or the group it leads, can receive it, and one
+that exited and whose pid was reused is never the target. A group goes
+through its leader's handle with `PIDFD_SIGNAL_PROCESS_GROUP`. Two paths
+still check and then signal by number, so a group reused in between is a
+residual race on them: a kernel older than 6.9, which refuses that flag
+(EINVAL), and a group whose leader was gone before its handle was opened.
 
 What it does not cover: a `kill` command a test or a script under test runs
 (`subprocess.run(["kill", ...])`), `signal.pthread_kill` and
@@ -44,11 +54,13 @@ What it does not cover: a `kill` command a test or a script under test runs
 from __future__ import annotations
 
 import errno
+import functools
 import os
 import signal
 import traceback
 import uuid
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
 
@@ -56,6 +68,8 @@ OPTION = "kill_guard_print"
 # Set in the run's environment to a token of its own: a process the run
 # started carries it through `setsid -f`, which leaves it no parent in the run.
 MARK = "DERBYNET_KILL_GUARD"
+# include/uapi/linux/pidfd.h, Linux 6.9.
+PIDFD_SIGNAL_PROCESS_GROUP = 4
 
 
 class KillRefused(BaseException):
@@ -63,17 +77,16 @@ class KillRefused(BaseException):
 
 
 class State:
-    """What `install()` changed, and what the run has refused."""
+    """What `install()` changed, and what the run has refused since."""
 
-    original: tuple = ()
     token = ""
     earlier_mark = None
     real_kill = None
     real_killpg = None
     installed = False
     print_only = False
-    refusals: list[str] = []
-    pending: list[str] = []
+    refusals: list[str]
+    pending: list[str]
 
 
 def stat(pid: int) -> tuple[str, int, int]:
@@ -120,9 +133,9 @@ def is_ours(pid: int, me: int) -> bool:
 
 
 def leader_of(pid: int) -> int | None:
-    """The pid whose ownership a `kill(pid, ...)` depends on: the pid, the
-    leader of the group `-pid` names, or the caller's own group for 0. None
-    for -1, which names every process the caller may signal."""
+    """The group a `kill(pid, ...)` with `pid` <= 0 names, by its leader's
+    pid: the group `-pid` names, or the caller's own for 0. None for -1,
+    which names every process the caller may signal."""
     if pid == -1:
         return None
     if pid == 0:
@@ -137,42 +150,114 @@ def call_site() -> str:
     return "?"
 
 
-def refuse(call: str, pid: int, why: str) -> None:
-    """Records the refusal, and raises KillRefused unless the run only
-    prints."""
+def refuse(call: str, pid: int, why: str) -> NoReturn:
+    """Records the refusal and raises KillRefused."""
     message = (
         f"kill_guard refused {call} at {call_site()}: {why}"
         f" (pid {pid}, comm {comm_of(pid)!r})"
     )
     State.refusals.append(message)
     State.pending.append(message)
-    if not State.print_only:
-        raise KillRefused(message)
+    raise KillRefused(message)
 
 
-def check(call: str, target: int) -> bool:
-    """Whether the signal may go on: True, or False for a refusal printed
-    only. Raises KillRefused for a process not this run's, and
-    ProcessLookupError for one that is gone."""
-    leader = leader_of(target)
-    if leader is None:
-        refuse(call, target, "it names every process, not one of this run's")
-        return False
+def check(call: str, pid: int) -> None:
+    """Returns when `pid` is this run's; raises KillRefused for a process
+    not this run's, and ProcessLookupError for one that is gone. Sends
+    nothing."""
     try:
-        if is_ours(leader, os.getpid()):
-            return True
+        ours = is_ours(pid, os.getpid())
     except OSError as error:
         raise ProcessLookupError(
             errno.ESRCH,
-            f"kill_guard: pid {leader} is gone ({error}); nothing was signalled",
+            f"kill_guard: pid {pid} is gone ({error}); nothing was signalled",
         ) from None
-    refuse(
-        call,
-        leader,
-        f"it is neither this pytest run (pid {os.getpid()}) nor a process"
-        f" it started (a child, or one that carries its {MARK})",
-    )
-    return False
+    if not ours:
+        refuse(
+            call,
+            pid,
+            f"it is neither this pytest run (pid {os.getpid()}) nor a process"
+            f" it started (a child, or one that carries its {MARK})",
+        )
+
+
+def members(pgid: int) -> list[int]:
+    """The live processes of group `pgid`, from /proc."""
+    found = []
+    for entry in os.scandir("/proc"):
+        if entry.name.isdigit():
+            try:
+                if stat(int(entry.name))[2] == pgid:
+                    found.append(int(entry.name))
+            except OSError:
+                pass
+    return found
+
+
+def check_members(call: str, pgid: int) -> None:
+    """`check()` of each live process of group `pgid`, whose leader is gone:
+    returns when each is this run's, raises KillRefused at the first that is
+    not, and ProcessLookupError when none is left. Sends nothing."""
+    left = members(pgid)
+    if not left:
+        raise ProcessLookupError(
+            errno.ESRCH,
+            f"kill_guard: group {pgid} has no process left; nothing was signalled",
+        )
+    for pid in left:
+        try:
+            check(call, pid)
+        except ProcessLookupError:
+            pass
+
+
+def hold(call: str, pid: int) -> int | None:
+    """A handle on the process `pid`, opened before its check: its /proc
+    directory, which `pidfd_send_signal` takes for a pidfd. None when it is
+    gone."""
+    try:
+        return os.open(f"/proc/{pid}", os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        refuse(call, pid, f"no handle to hold it by ({error}); not signalled")
+
+
+def signal_one(call: str, pid: int, sig) -> None:
+    handle = hold(call, pid)
+    if handle is None:
+        raise ProcessLookupError(
+            errno.ESRCH, f"kill_guard: pid {pid} is gone; nothing was signalled"
+        )
+    try:
+        check(call, pid)
+        signal.pidfd_send_signal(handle, sig)
+    finally:
+        os.close(handle)
+
+
+def signal_group(call: str, pgid: int, sig, by_number) -> None:
+    """Signals group `pgid` through its leader's handle. `by_number`, the
+    real call, signals it instead on a kernel that refuses the flag, or when
+    the leader was gone before its handle was opened."""
+    handle = hold(call, pgid)
+    if handle is None:
+        check_members(call, pgid)
+        by_number()
+        return
+    try:
+        try:
+            check(call, pgid)
+        except ProcessLookupError:
+            check_members(call, pgid)
+        try:
+            signal.pidfd_send_signal(handle, sig, None, PIDFD_SIGNAL_PROCESS_GROUP)
+        except OSError as error:
+            if error.errno != errno.EINVAL:
+                raise
+            by_number()
+    finally:
+        os.close(handle)
 
 
 def signame(sig) -> str:
@@ -182,65 +267,68 @@ def signame(sig) -> str:
         return str(int(sig))
 
 
-def guarded_killpg(pgid, sig):
-    if int(sig) == 0 or check(f"os.killpg({pgid}, {signame(sig)})", int(pgid)):
-        return State.real_killpg(pgid, sig)
+def printed_only(guarded):
+    """`guarded` as `os.kill` or `os.killpg`: it takes the target as an int
+    and returns None; in print mode a refusal returns too, unsent."""
+
+    @functools.wraps(guarded)
+    def call(target, sig):
+        try:
+            guarded(int(target), sig)
+        except KillRefused:
+            if not State.print_only:
+                raise
+
+    return call
 
 
-def guarded_kill(pid, sig):
-    """`os.kill`. A single pid is held through a handle opened before the
-    check, the pid's /proc directory, which `pidfd_send_signal` takes for a
-    pidfd (the conda Python here has no `os.pidfd_open`): only the process
-    the check read can receive the signal, and one that exited and whose pid
-    was reused gives ESRCH."""
-    pid = int(pid)
+@printed_only
+def guarded_killpg(pgid: int, sig) -> None:
     if int(sig) == 0:
-        return State.real_kill(pid, sig)
+        State.real_killpg(pgid, sig)
+        return
+    call = f"os.killpg({pgid}, {signame(sig)})"
+    signal_group(call, pgid, sig, lambda: State.real_killpg(pgid, sig))
+
+
+@printed_only
+def guarded_kill(pid: int, sig) -> None:
+    if int(sig) == 0:
+        State.real_kill(pid, sig)
+        return
     call = f"os.kill({pid}, {signame(sig)})"
-    if pid <= 0:
-        if check(call, pid):
-            return State.real_kill(pid, sig)
-        return None
-    try:
-        handle = os.open(f"/proc/{pid}", os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
-    except FileNotFoundError:
-        raise ProcessLookupError(
-            errno.ESRCH, f"kill_guard: pid {pid} is gone; nothing was signalled"
-        ) from None
-    except OSError as error:
-        refuse(call, pid, f"no handle to hold it by ({error}); not signalled")
-        return None
-    try:
-        if check(call, pid):
-            signal.pidfd_send_signal(handle, sig)
-    finally:
-        os.close(handle)
-    return None
+    if pid > 0:
+        signal_one(call, pid, sig)
+        return
+    pgid = leader_of(pid)
+    if pgid is None:
+        refuse(call, pid, "it names every process, not one of this run's")
+    signal_group(call, pgid, sig, lambda: State.real_kill(pid, sig))
 
 
 def install(print_only: bool = False) -> None:
     if State.installed:
         raise RuntimeError("kill_guard is already installed")
-    State.original = os.kill, os.killpg
-    State.real_kill, State.real_killpg = State.original
+    # A guard installed earlier in this process left its token on os.kill.
+    State.token = getattr(os.kill, "run_token", None) or uuid.uuid4().hex
+    State.real_kill, State.real_killpg = os.kill, os.killpg
     State.print_only = print_only
-    State.token = uuid.uuid4().hex
+    State.refusals, State.pending = [], []
     State.earlier_mark = os.environ.get(MARK)
     os.environ[MARK] = State.token
+    guarded_kill.run_token = State.token
     os.kill, os.killpg = guarded_kill, guarded_killpg
     State.installed = True
 
 
 def uninstall() -> None:
     if State.installed:
-        os.kill, os.killpg = State.original
+        os.kill, os.killpg = State.real_kill, State.real_killpg
         State.installed = False
         if State.earlier_mark is None:
             os.environ.pop(MARK, None)
         else:
             os.environ[MARK] = State.earlier_mark
-    State.refusals.clear()
-    State.pending.clear()
 
 
 def pytest_addoption(parser):

@@ -84,12 +84,18 @@ def mutate(
     tool=(),
     file="mod.py",
     unset=(),
+    env=None,
+    program=TOOL,
 ):
-    command = [sys.executable, str(TOOL), "--file", file, "--old", old]
+    """The tool's run of a mutant, with `env` added to its environment and
+    the names in `unset` taken out."""
+    command = [sys.executable, str(program), "--file", file, "--old", old]
     command += ["--new", new, "--expect", expect, *tool]
     command += ["--", "-p", "no:cacheprovider", *pytest_args]
     # The project has no ini file, so no `addopts` and no Django settings.
-    env = {k: v for k, v in os.environ.items() if k not in (*TOOL_UNSET, *unset)}
+    env = {k: v for k, v in os.environ.items() if k not in (*TOOL_UNSET, *unset)} | (
+        env or {}
+    )
     if wait:
         return subprocess.Popen(command, cwd=project, env=env, text=True)
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
@@ -901,9 +907,10 @@ def test_a_run_past_its_bound_that_printed_nothing_is_an_error(project):
 # edit, for the #358 review's cases: a second signal while the file is put
 # back or the lock is taken, and an edit by someone else during the run.
 WRAPPER = """\
-import os, pathlib, sys, time
+import os, pathlib, shutil, sys, time
 sys.path.insert(0, {tools!r})
 import mutate
+rmtree = shutil.rmtree
 ORIGINAL = pathlib.Path("mod.py").read_bytes()
 write_bytes, fdopen, result = pathlib.Path.write_bytes, os.fdopen, mutate._result
 unlink = pathlib.Path.unlink
@@ -939,6 +946,12 @@ def slow_unlock(self, *args):
     return unlink(self, *args)
 
 
+def slow_rmtree(path, *args, **kwargs):
+    mark("removing")
+    time.sleep(2)
+    return rmtree(path, *args, **kwargs)
+
+
 def edit_after_first(*args):
     mutate._result = result
     with open("mod.py", "a") as f:
@@ -951,8 +964,9 @@ sys.exit(mutate.main(sys.argv[1:]))
 """
 
 
-def wrapped(project, patch, mode, *pytest_args, tool=()):
-    """The tool, under `patch`, in `mode` (single: `1 + 1` -> `2`)."""
+def wrapped(project, patch, mode, *pytest_args, tool=(), env=None):
+    """The tool, under `patch`, in `mode` (single: `1 + 1` -> `2`), with
+    `env` added to its environment."""
     (project / "wrap.py").write_text(
         WRAPPER.format(tools=str(TOOL.parent), patch=patch)
     )
@@ -961,7 +975,7 @@ def wrapped(project, patch, mode, *pytest_args, tool=()):
         ["--listed", "--base", "HEAD~1"] if mode == "listed" else first
     )
     command += [*tool, "--", "-p", "no:cacheprovider", *pytest_args]
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET} | (env or {})
     return subprocess.Popen(
         command,
         cwd=project,
@@ -1268,11 +1282,8 @@ def test_stops_in_teardown(stops_in_teardown):
 OUTSIDE_BRANCH = ('if Path("own").exists():', "if False:")
 
 
-@pytest.fixture
-def outside(project):
-    pid = outside_process.start(project)
-    yield pid
-    outside_process.stop(pid, project)
+# The sleeper is started in `tmp_path`, which is the project.
+outside = outside_process.outside
 
 
 def with_victim(project):
@@ -1344,16 +1355,13 @@ def test_a_pythonpath_of_the_caller_is_kept_beside_the_guard(project, tmp_path_f
     (project / "test_path.py").write_text(
         "import sentinel\n\n\ndef test_it():\n    assert sentinel.VALUE == 1\n"
     )
-    command = [sys.executable, str(TOOL), "--file", "mod.py", "--old", "1 + 1"]
-    command += ["--new", "2", "--expect", "pass", "--", "-p", "no:cacheprovider"]
-    command += ["test_path.py::test_it"]
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
-    run = subprocess.run(
-        command,
-        cwd=project,
-        env=env | {"PYTHONPATH": str(folder)},
-        text=True,
-        capture_output=True,
+    run = mutate(
+        project,
+        "1 + 1",
+        "2",
+        "test_path.py::test_it",
+        expect="pass",
+        env={"PYTHONPATH": str(folder)},
     )
     assert run.returncode == 0, run.stdout + run.stderr
 
@@ -1374,11 +1382,15 @@ def test_a_mutant_of_the_guard_itself_is_run_under_the_guard_as_it_was_before_it
             tools=str(TOOL.parent), patch='mutate.GUARD = pathlib.Path("plugin.py")'
         )
     )
-    command = [sys.executable, "wrap.py", "--file", "plugin.py", "--old", "ORIGINAL"]
-    command += ["--new", "MUTANT", "--expect", "pass", "--", "-p", "no:cacheprovider"]
-    command += ["test_mod.py::test_other"]
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
-    run = subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
+    run = mutate(
+        project,
+        "ORIGINAL",
+        "MUTANT",
+        "test_mod.py::test_other",
+        expect="pass",
+        file="plugin.py",
+        program="wrap.py",
+    )
     assert run.returncode == 0, run.stdout + run.stderr
     assert "plugin says ORIGINAL" in run.stdout
     assert "MUTANT" not in run.stdout.replace("-> 'MUTANT'", "")
@@ -1431,16 +1443,60 @@ def test_a_should_pass_mutant_that_signals_a_process_outside_the_tree_breaks(
 
 def test_the_guard_copy_is_removed_when_the_run_ends(project, tmp_path_factory):
     folder = tmp_path_factory.mktemp("tmp")
-    command = [sys.executable, str(TOOL), "--file", "mod.py", "--old", "1 + 1"]
-    command += ["--new", "2", "--expect", "pass", "--", "-p", "no:cacheprovider"]
-    command += ["test_mod.py::test_other"]
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
-    run = subprocess.run(
-        command,
-        cwd=project,
-        env=env | {"TMPDIR": str(folder)},
-        text=True,
-        capture_output=True,
+    run = mutate(
+        project,
+        "1 + 1",
+        "2",
+        "test_mod.py::test_other",
+        expect="pass",
+        env={"TMPDIR": str(folder)},
     )
     assert run.returncode == 0, run.stdout + run.stderr
     assert list(folder.iterdir()) == []
+
+
+def test_a_second_signal_while_the_guard_copy_is_removed_waits_for_it(
+    project, tmp_path_factory
+):
+    folder = tmp_path_factory.mktemp("tmp")
+    tool = wrapped(
+        project,
+        "mutate.shutil.rmtree = slow_rmtree",
+        "single",
+        "test_mod.py::test_waits",
+        env={"TMPDIR": str(folder)},
+    )
+    wait_for(project, "started", tool)
+    tool.send_signal(signal.SIGTERM)
+    wait_for(project, "removing", tool)
+    tool.send_signal(signal.SIGTERM)
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signal.SIGTERM, err
+    assert list(folder.iterdir()) == []
+    assert (project / "mod.py").read_text() == MODULE
+    assert no_lock(project)
+
+
+def test_after_a_sigkill_the_guard_copy_is_left_and_the_next_run_goes_on(
+    project, tmp_path_factory
+):
+    """As the mutant and the lock are left; the next run makes a copy of its
+    own, and removes only that."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tmpdir = {"TMPDIR": str(folder)}
+    tool = mutate(
+        project, "1 + 1", "2", "test_mod.py::test_waits", wait=True, env=tmpdir
+    )
+    started(project, tool)
+    tool.kill()
+    tool.wait(timeout=30)
+    left = list(folder.iterdir())
+    assert [x.name for x in left[0].iterdir()] == ["kill_guard.py"]
+    assert len(left) == 1
+    subprocess.run([*GIT, "checkout", "mod.py"], cwd=project, check=True)
+    for lock in (project / ".git").glob("mutate-*.lock"):
+        lock.unlink()
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound", env=tmpdir)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
+    assert list(folder.iterdir()) == left

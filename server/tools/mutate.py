@@ -564,13 +564,19 @@ def listed(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Runs the tool with a copy of the guard that is removed when it ends,
+    a stop or a second stop during the removal included; a SIGKILL leaves the
+    copy behind, as it leaves the mutant and the lock."""
     global _guard_folder
+    for signum in STOPS:
+        signal.signal(signum, _stop)
     _guard_folder = tempfile.mkdtemp(prefix="mutate-guard-")
     try:
         shutil.copy(GUARD, Path(_guard_folder) / "kill_guard.py")
         return _main(argv)
     finally:
-        shutil.rmtree(_guard_folder, ignore_errors=True)
+        with _held():
+            shutil.rmtree(_guard_folder, ignore_errors=True)
         _guard_folder = None
 
 
@@ -599,8 +605,6 @@ def _main(argv: list[str] | None) -> int:
             parser.error("--listed takes no --old, --new or --expect")
     elif args.old is None or args.new is None or not args.file or len(args.file) > 1:
         parser.error("give one --file, --old and --new, or --listed")
-    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(signum, _stop)
     if any(XDIST.match(arg) for arg in args.pytest_args):
         print(
             "mutate.py: refused: xdist leaves the deselected count out of its"

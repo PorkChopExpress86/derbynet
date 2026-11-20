@@ -3,13 +3,17 @@ test run did not start (#448).
 
 Each process this file signals is a stand-in it started itself, so a mutant
 of the guard that lets a call through kills a stand-in and nothing else.
-`check()` classifies and never signals, so the calls a mutant would turn on
-every process the user may signal, on init or on the test's own parent are
-made to it, never to `os.kill`. No test here sends a signal to a pid it did
-not start (the `systemd --user` kill of retro-391, memory note
+`check()` classifies and never signals, so the checks of init and of the
+test's own parent are made to it, and the kill of every process the user may
+signal goes to the guard with each call it signals by replaced (`unsent`),
+never to `os.kill`. No test here sends a signal to a pid it did not start
+(the `systemd --user` kill of retro-391, memory note
 `killpg-checks-target.md`)."""
 
+import errno
+import importlib.util
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -23,6 +27,8 @@ from tools import kill_guard
 from tools.kill_guard import KillRefused
 
 TOOLS = Path(kill_guard.__file__).resolve().parent
+# The real call, which the `unsent` fixture replaces.
+SEND = signal.pidfd_send_signal
 
 
 @pytest.fixture
@@ -34,11 +40,7 @@ def guard():
     kill_guard.uninstall()
 
 
-@pytest.fixture
-def outside(tmp_path):
-    pid = outside_process.start(tmp_path)
-    yield pid
-    outside_process.stop(pid, tmp_path)
+outside = outside_process.outside
 
 
 @pytest.fixture
@@ -91,14 +93,60 @@ def test_a_token_of_another_run_is_refused(guard, tmp_path):
         outside_process.stop(pid, tmp_path)
 
 
-def test_the_environment_holds_the_token_only_while_the_guard_is_installed():
-    earlier = os.environ.get(kill_guard.MARK)
-    kill_guard.install()
+@pytest.mark.parametrize(
+    "earlier", [{}, {kill_guard.MARK: "another run's"}], ids=["none", "inherited"]
+)
+def test_a_guard_in_a_process_of_its_own_takes_a_token_of_its_own(tmp_path, earlier):
+    """A pytest that mutate.py starts inherits the token of the run that
+    started it, and takes none of that run's processes for its own. The
+    environment holds the token only while the guard is installed."""
+    body = (
+        "print(kill_guard.State.token, os.environ[kill_guard.MARK])\n"
+        "kill_guard.uninstall()\n"
+        "print(os.environ.get(kill_guard.MARK))"
+    )
+    env = {k: v for k, v in os.environ.items() if k != kill_guard.MARK} | earlier
+    run = subprocess.run(
+        inner_python(tmp_path, body),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    during, after = run.stdout.splitlines()
+    token, environ = during.split(" ", 1)
+    assert re.fullmatch("[0-9a-f]{32}", token) and environ == token, run.stdout
+    assert after == str(earlier.get(kill_guard.MARK))
+
+
+def einval(*args):
+    raise OSError(errno.EINVAL, "a stand-in for a kernel older than 6.9")
+
+
+def test_a_guard_installed_over_another_in_the_process_shares_its_token(
+    guard, tmp_path, monkeypatch
+):
+    """mutate.py's run loads the plugin, and this file installs the guard
+    again over it: a sleeper with the token is the run's for both. The
+    group's handle refuses its flag here, so each guard checks the sleeper
+    and passes the call on to the guard beneath it."""
+    spec = importlib.util.spec_from_file_location("again", kill_guard.__file__)
+    again = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(again)
+    again.install()
     try:
-        assert os.environ[kill_guard.MARK] == kill_guard.State.token != earlier
+        assert again.State.token == guard.State.token
+        pid = outside_process.start(tmp_path, mark=guard.State.token)
+        try:
+            with pytest.MonkeyPatch.context() as patched:
+                patched.setattr(signal, "pidfd_send_signal", einval)
+                os.killpg(pid, signal.SIGTERM)
+            until(lambda: not alive(pid))
+        finally:
+            outside_process.stop(pid, tmp_path)
     finally:
-        kill_guard.uninstall()
-    assert os.environ.get(kill_guard.MARK) == earlier
+        again.uninstall()
 
 
 def test_a_grandchild_is_a_descendant(guard, tmp_path):
@@ -150,10 +198,44 @@ def test_signal_0_is_an_existence_check_for_any_pid(guard, outside):
         os.kill(child.pid, 0)
 
 
-def test_every_process_init_and_the_test_s_parent_are_not_the_test_s(guard):
-    for target in (-1, 1, os.getppid()):
+def test_init_and_the_test_s_parent_are_not_the_test_s(guard):
+    for target in (1, os.getppid()):
         with pytest.raises(KillRefused):
             guard.check("os.kill(...)", target)
+
+
+def never(*args):
+    pytest.fail(f"a signal sent: {args}")
+
+
+@pytest.fixture
+def unsent(guard):
+    """Every call the guard signals by fails the test instead."""
+    with pytest.MonkeyPatch.context() as patched:
+        patched.setattr(kill_guard.State, "real_kill", never)
+        patched.setattr(kill_guard.State, "real_killpg", never)
+        patched.setattr(signal, "pidfd_send_signal", never)
+        yield patched
+
+
+def test_a_kill_of_every_process_is_refused(unsent):
+    with pytest.raises(KillRefused, match="it names every process"):
+        kill_guard.guarded_kill(-1, signal.SIGTERM)
+
+
+@pytest.mark.parametrize("call", ["kill", "killpg"])
+def test_a_process_with_no_handle_to_hold_it_by_is_refused(child, unsent, call):
+    opened = os.open
+
+    def denied(path, *args, **kwargs):
+        if path == f"/proc/{child.pid}":
+            raise PermissionError(errno.EACCES, "a stand-in")
+        return opened(path, *args, **kwargs)
+
+    unsent.setattr(os, "open", denied)
+    send = {"kill": os.kill, "killpg": os.killpg}[call]
+    with pytest.raises(KillRefused, match="no handle to hold it by"):
+        send(child.pid, signal.SIGTERM)
 
 
 def test_pid_0_names_the_callers_own_group_and_negative_pids_a_leader():
@@ -180,23 +262,17 @@ def test_a_process_that_exits_before_the_check_reads_as_gone_and_is_not_signalle
 
 
 def test_a_process_that_exits_after_the_check_is_not_signalled_by_its_pid(
-    guard, monkeypatch, child
+    child, unsent
 ):
     """The signal goes through the pidfd the check's pid was held by, so the
     exit, and a reuse of the pid after it, reach no other process."""
 
-    def never(pid, sig):
-        pytest.fail(f"a kill by pid {pid} after the check")
-
-    monkeypatch.setattr(kill_guard.State, "real_kill", never)
-    send = signal.pidfd_send_signal
-
     def exits_first(handle, sig):
         subprocess.run(["kill", "-KILL", str(child.pid)], check=True)
         child.wait(timeout=10)
-        return send(handle, sig)
+        return SEND(handle, sig)
 
-    monkeypatch.setattr(signal, "pidfd_send_signal", exits_first)
+    unsent.setattr(signal, "pidfd_send_signal", exits_first)
     with pytest.raises(ProcessLookupError):
         os.kill(child.pid, signal.SIGTERM)
 
@@ -214,8 +290,144 @@ def test_no_descendant_set_outlives_a_call(guard, tmp_path):
     finally:
         second.kill()
         second.wait(timeout=10)
-    with pytest.raises(ProcessLookupError):
+    with pytest.raises(ProcessLookupError, match="group .* has no process left"):
         os.killpg(first.pid, signal.SIGTERM)
+
+
+class Group:
+    """A shell that leads a session and group of its own, in `tmp_path`, and
+    starts a sleeper in its group for each item of `members`: a command
+    prefix, `env -u` to drop the run's token. The leader then sleeps, or
+    exits and is reaped when `leader_stays` is False, which leaves the
+    sleepers to the subreaper."""
+
+    def __init__(self, tmp_path, members=("",), leader_stays=True):
+        self.folder = tmp_path
+        starts = "".join(
+            f"{prefix} sleep 120 & echo $! >> m.part\n" for prefix in members
+        )
+        last = "exec sleep 120" if leader_stays else "exit 0"
+        self.leader = subprocess.Popen(
+            ["sh", "-c", f": > m.part\n{starts}mv m.part members\n{last}"],
+            cwd=tmp_path,
+            start_new_session=True,
+        )
+        until(lambda: (tmp_path / "members").exists())
+        self.members = [int(x) for x in (tmp_path / "members").read_text().split()]
+        for pid in self.members:
+            until(lambda pid=pid: Path(f"/proc/{pid}/comm").read_text() == "sleep\n")
+        if not leader_stays:
+            self.leader.wait(timeout=10)
+
+    def stop(self):
+        for pid in self.members:
+            outside_process.stop(pid, self.folder)
+        self.leader.kill()
+        self.leader.wait(timeout=10)
+
+
+@pytest.fixture
+def group(tmp_path):
+    held = Group(tmp_path)
+    yield held
+    held.stop()
+
+
+GROUP_CALLS = {
+    "killpg": lambda pgid: os.killpg(pgid, signal.SIGTERM),
+    "negative": lambda pgid: os.kill(-pgid, signal.SIGTERM),
+}
+
+
+@pytest.mark.parametrize("call", GROUP_CALLS)
+def test_a_signal_to_the_test_s_own_group_reaches_each_process_in_it(
+    guard, group, call
+):
+    GROUP_CALLS[call](group.leader.pid)
+    assert group.leader.wait(timeout=10) == -signal.SIGTERM
+    until(lambda: not alive(group.members[0]))
+
+
+@pytest.mark.parametrize("call", GROUP_CALLS)
+def test_a_group_goes_through_its_leader_s_handle(group, unsent, call):
+    sent = []
+
+    def record(handle, sig, siginfo, flags):
+        sent.append((os.readlink(f"/proc/self/fd/{handle}"), sig, siginfo, flags))
+
+    unsent.setattr(signal, "pidfd_send_signal", record)
+    GROUP_CALLS[call](group.leader.pid)
+    flag = kill_guard.PIDFD_SIGNAL_PROCESS_GROUP
+    assert sent == [(f"/proc/{group.leader.pid}", signal.SIGTERM, None, flag)]
+    assert flag == 4, "PIDFD_SIGNAL_PROCESS_GROUP in include/uapi/linux/pidfd.h"
+
+
+@pytest.mark.parametrize("call", GROUP_CALLS)
+def test_a_kernel_that_refuses_the_group_flag_gets_the_call_by_number(
+    guard, group, monkeypatch, call
+):
+    monkeypatch.setattr(signal, "pidfd_send_signal", einval)
+    GROUP_CALLS[call](group.leader.pid)
+    assert group.leader.wait(timeout=10) == -signal.SIGTERM
+    until(lambda: not alive(group.members[0]))
+
+
+def test_any_other_error_from_the_group_s_handle_is_raised_and_nothing_sent(
+    group, unsent
+):
+    def refused(*args):
+        raise PermissionError(errno.EPERM, "a stand-in")
+
+    unsent.setattr(signal, "pidfd_send_signal", refused)
+    with pytest.raises(PermissionError, match="a stand-in"):
+        os.killpg(group.leader.pid, signal.SIGTERM)
+    assert alive(group.leader.pid) and alive(group.members[0])
+
+
+def test_a_group_whose_leader_is_gone_reaches_its_processes_that_are_the_run_s(
+    guard, tmp_path
+):
+    """A cleanup of the test's own group after its leader was reaped."""
+    held = Group(tmp_path, leader_stays=False)
+    try:
+        assert not alive(held.leader.pid)
+        os.killpg(held.leader.pid, signal.SIGTERM)
+        until(lambda: not alive(held.members[0]))
+    finally:
+        held.stop()
+
+
+def test_a_group_whose_leader_is_gone_is_refused_for_one_process_not_the_run_s(
+    guard, tmp_path
+):
+    """The second sleeper has no token and no parent in the run: the group is
+    refused, and the first, which is the run's, is not signalled either."""
+    held = Group(tmp_path, ("", f"env -u {kill_guard.MARK}"), leader_stays=False)
+    try:
+        with pytest.raises(KillRefused) as refused:
+            os.killpg(held.leader.pid, signal.SIGTERM)
+        assert f"(pid {held.members[1]}, comm 'sleep')" in str(refused.value)
+        assert alive(held.members[0]) and alive(held.members[1])
+    finally:
+        held.stop()
+
+
+def test_a_leader_that_exits_after_its_handle_is_held_leaves_its_group_checked(
+    guard, group, monkeypatch
+):
+    """The leader's check finds it gone, so its sleeper is checked, and the
+    group is still signalled."""
+    read = kill_guard.stat
+
+    def exits_first(pid):
+        monkeypatch.setattr(kill_guard, "stat", read)
+        subprocess.run(["kill", "-KILL", str(group.leader.pid)], check=True)
+        group.leader.wait(timeout=10)
+        return read(pid)
+
+    monkeypatch.setattr(kill_guard, "stat", exits_first)
+    os.killpg(group.leader.pid, signal.SIGTERM)
+    until(lambda: not alive(group.members[0]))
 
 
 def inner_python(tmp_path, body, *args, **popen):
@@ -373,7 +585,9 @@ def test_the_test_after_one_that_took_a_refusal_passes(tmp_path, outside):
     assert alive(outside)
 
 
-def test_a_signal_leaves_no_descriptor_open(guard, child):
+@pytest.mark.parametrize("call", ["kill", "killpg"])
+def test_a_signal_leaves_no_descriptor_open(guard, child, call):
+    send = {"kill": os.kill, "killpg": os.killpg}[call]
     before = len(os.listdir("/proc/self/fd"))
-    os.kill(child.pid, signal.SIGTERM)
+    send(child.pid, signal.SIGTERM)
     assert len(os.listdir("/proc/self/fd")) == before

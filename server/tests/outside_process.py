@@ -8,6 +8,8 @@ import subprocess
 import time
 from pathlib import Path
 
+import pytest
+
 from tools import kill_guard
 
 # `setsid -f` forks and returns at once, so the sleeper's parent is gone and
@@ -62,3 +64,11 @@ def stop(pid, folder):
         return
     assert comm == "sleep" and cwd == os.path.realpath(folder), (pid, comm, cwd)
     subprocess.run(["kill", "-KILL", str(pid)], check=True)
+
+
+@pytest.fixture
+def outside(tmp_path):
+    """A sleeper outside the test's tree, started in `tmp_path`."""
+    pid = start(tmp_path)
+    yield pid
+    stop(pid, tmp_path)
