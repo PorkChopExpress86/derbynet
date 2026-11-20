@@ -753,12 +753,13 @@ class OutsideTesting(unittest.TestCase):
                     self.assertIn(test, line)
 
     def test_each_kind_of_file_a_row_lists_outside_testing_maps_to_its_test(self):
-        """In the real tree, one file of each top-level folder that each row's
-        function lists, outside testing/, maps to the row's test."""
+        """In the real tree, each row's function lists files outside testing/
+        in several folders: one file of each folder, a top-level file alone,
+        maps to the row's test."""
         tree, misses, seen = TOOL.Tree(REPO), [], set()
         for row in TOOL.KIND_READERS:
             for path in sorted(tree.listed(row)):
-                folder = path.split('/')[0] if '/' in path else '.'
+                folder = Path(path).parts[0]
                 if path.startswith('testing/') or not tree.exists(row.test) \
                         or (row.test, row.selector, folder) in seen:
                     continue
