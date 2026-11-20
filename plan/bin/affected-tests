@@ -269,7 +269,13 @@ class Tree:
         module runs from the tree, so it lists the tree's files; it is loaded
         by its path, so it imports no package of server/."""
         if (rel, selector) not in self._listed:
-            found = getattr(load_module(self.server / rel), selector)()
+            # The selectors run git themselves: a hook's GIT_DIR would point
+            # them at another repository, as git() keeps it from doing.
+            hidden = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith('GIT_')}
+            try:
+                found = getattr(load_module(self.server / rel), selector)()
+            finally:
+                os.environ.update(hidden)
             if isinstance(found, dict):  # name -> [paths]
                 found = itertools.chain.from_iterable(found.values())
             self._listed[rel, selector] = {
@@ -698,6 +704,7 @@ def match_testing(path):
 KIND_READERS = (
     ('legacy_api/tests/test_testing_scripts.py', 'tests/file_kinds.py', 'suite_scripts'),
     ('media/tests/test_faces.py', 'tests/file_kinds.py', 'headshots'),
+    ('tests/test_arithmetic_operands.py', 'tests/file_kinds.py', 'shell_files'),
     ('tests/test_docker_checks.py', 'tests/file_kinds.py', 'exec_files'),
     ('tests/test_golden_inputs.py', 'tools/golden_inputs.py', 'inputs'),
     ('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'sources'),

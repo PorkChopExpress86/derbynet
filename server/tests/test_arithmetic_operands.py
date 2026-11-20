@@ -35,7 +35,8 @@ import re
 
 import pytest
 
-from tests.test_pipefail_pipes import ROOT, shell_files
+from tests.file_kinds import shell_files
+from tests.test_pipefail_pipes import ROOT
 
 SCOPE = (
     ".githooks/",

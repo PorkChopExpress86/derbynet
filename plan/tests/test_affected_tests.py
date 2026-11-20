@@ -549,6 +549,20 @@ class TestingReaders(unittest.TestCase):
         self.assertEqual(got, {'queryj': [(reader, scripts)], 'steps.sh': [(reader, scripts)],
                                'notes': [('no test names it', TESTING_FALLBACK)]})
 
+    def test_a_git_dir_from_the_environment_reaches_no_rows_function(self):
+        """The rows' functions run git in the tree, not in the repository a
+        hook's GIT_DIR names (#431): there the stand-in is untracked."""
+        with tempfile.TemporaryDirectory() as other:
+            subprocess.run(['git', 'init', '-q'], cwd=other, env=git_env(), check=True)
+            files = {'server/tests/file_kinds.py': self.KINDS,
+                     'server/tests/test_pipefail_pipes.py': '',
+                     'testing/timer-stand-in/curl': '#!/bin/bash\n'}
+            from unittest import mock
+            with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
+                self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
+                                 ['tests/test_pipefail_pipes.py'])
+                self.assertEqual(os.environ['GIT_DIR'], f'{other}/.git')
+
     def test_a_kind_reader_the_tree_lacks_maps_nothing(self):
         files = {'server/tests/file_kinds.py': self.KINDS,
                  'testing/timer-stand-in/curl': '#!/bin/bash\n'}
@@ -3686,7 +3700,9 @@ class RealTree(unittest.TestCase):
     def test_each_kind_reader_takes_its_files_from_its_row(self):
         """A row names the function its test lists files with: the test
         defines it, or imports it or its module, so a row can't go stale. A
-        test that imports a function of tests/file_kinds.py has its row."""
+        test that imports a function of tests/file_kinds.py has its row,
+        from whatever module it imports it: test_arithmetic_operands.py took
+        shell_files from test_pipefail_pipes.py."""
         imported = {}
         for test in TOOL.Tree(REPO).test_files():
             for node in ast.walk(ast.parse((REPO / 'server' / test).read_text())):
@@ -3704,8 +3720,11 @@ class RealTree(unittest.TestCase):
                 self.assertTrue(callable(getattr(
                     TOOL.load_module(REPO / 'server' / module), selector, None)))
         rows = {(test, selector) for test, _m, selector in TOOL.KIND_READERS}
+        kinds = {node.name for node in ast.parse(TestingReaders.KINDS).body
+                 if isinstance(node, ast.FunctionDef)}
         self.assertEqual(sorted((test, name) for test, names in imported.items()
-                                for module, name in names if module == 'tests.file_kinds'
+                                for module, name in names
+                                if module != test and name in kinds and name != 'tracked'
                                 and (test, name) not in rows), [])
 
     def test_every_command_and_server_tool_maps(self):

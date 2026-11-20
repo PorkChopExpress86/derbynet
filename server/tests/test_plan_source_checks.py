@@ -3,7 +3,8 @@ that reads plan/ (D128). server.yml skips such a PR, and #346's push ran
 none of them; removing one decision row fails test_deviations.py (#346
 retro). A source check reads plan/ when it names the folder as a string
 literal, lists every tracked file with `git ls-files`, or imports a
-tests/file_kinds.py function that lists them (#431): a new one fails here
+tests/file_kinds.py function that lists them, from any module (#431): a new
+one fails here
 until the workflow runs it. This file is a source check too, and
 spells neither literal whole.
 """
@@ -50,7 +51,7 @@ def reads_plan(name: str) -> bool:
     imported = {
         alias.name
         for node in ast.walk(ast.parse(text))
-        if isinstance(node, ast.ImportFrom) and node.module == "tests.file_kinds"
+        if isinstance(node, ast.ImportFrom)
         for alias in node.names
     }
     return READS_PLAN.search(text) is not None or bool(imported & tracked_listers())
@@ -61,10 +62,10 @@ def test_plan_checks_runs_each_source_check_that_reads_plan():
     assert readers == plan_checks()
 
 
-def test_the_list_is_the_five_found_on_2026_11_16_and_the_subshell_linter():
+def test_the_list_is_the_five_found_on_2026_11_16_and_two_script_linters():
     """A rule that found none would pass above with an empty step. #431
-    found test_subshell_state.py, which lints plan/'s scripts through
-    shell_files() and named no literal."""
+    found test_subshell_state.py and test_arithmetic_operands.py, which lint
+    plan/'s scripts through shell_files() and name no literal."""
     assert plan_checks() == {
         "legacy_api/tests/test_registry.py",
         "tests/test_deviations.py",
@@ -72,4 +73,5 @@ def test_the_list_is_the_five_found_on_2026_11_16_and_the_subshell_linter():
         "tests/test_listing_order.py",
         "tests/test_pipefail_pipes.py",
         "tests/test_subshell_state.py",
+        "tests/test_arithmetic_operands.py",
     }
