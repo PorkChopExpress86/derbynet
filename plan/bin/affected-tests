@@ -225,6 +225,9 @@ class Plan:
     changed_helpers: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
     merge_base: str = None
+    # KIND_READERS modules the tree lacks, which skipped a row for a file
+    # outside testing/ (#471).
+    no_kind_modules: list = field(default_factory=list)
 
     def add(self, path, rule, note, targets=()):
         self.covers.setdefault(path, []).append((rule, note, list(targets)))
@@ -734,19 +737,34 @@ KIND_READERS = (
 )
 
 
+KIND_RULE = 'kind-readers'
 KIND_NOTE = 'a source check that reads every file of its kind (KIND_READERS)'
 
 
-def kind_readers(tree, path):
-    """The tests of KIND_READERS in the tree whose function, the tree's own,
-    lists `path`. A row whose test the tree lacks maps nothing; one whose
-    module it lacks stops the tool (Tree.listed)."""
-    return sorted({row.test for row in KIND_READERS
-                   if tree.exists(row.test) and path in tree.listed(row)})
+def cover_kind_readers(plan, tree, path):
+    """Map `path` to the tests of KIND_READERS in the tree whose function,
+    the tree's own, lists it, and return them. A row whose test the tree
+    lacks maps nothing. A row whose module the tree lacks stops the tool for
+    a testing/ path (Tree.listed, #431) and is skipped for any other, with a
+    note: a head from before file_kinds.py, which a flake ticket's run reads
+    by --stdin, has test files outside testing/ and none of testing/ in its
+    list (#471)."""
+    readers = set()
+    for row in KIND_READERS:
+        if not tree.exists(row.test):
+            continue
+        if not match_testing(path) and not tree.exists(row.module):
+            plan.no_kind_modules.append(row.module)
+        elif path in tree.listed(row):
+            readers.add(row.test)
+    readers = sorted(readers)
+    if readers:
+        plan.add(path, KIND_RULE, KIND_NOTE, readers)
+    return readers
 
 
 def cover_testing(plan, tree, path):
-    citers, readers = testing_citers(tree, path), kind_readers(tree, path)
+    citers = testing_citers(tree, path)
     if '.' in citers:
         plan.everything.append(f'{path}: the root conftest names it, or imports '
                                'what names it')
@@ -755,8 +773,7 @@ def cover_testing(plan, tree, path):
         plan.add(path, 'testing', 'a shell suite or its data: the tests that name '
                  'it. CI runs the shell suites against Django; testing/README.md '
                  'runs one locally', citers)
-    if readers:
-        plan.add(path, 'testing', KIND_NOTE, readers)
+    readers = cover_kind_readers(plan, tree, path)
     if not citers + readers:
         plan.add(path, 'testing', 'no test names it: the tests that read testing/ '
                  'as a whole. CI runs the shell suites against Django',
@@ -1320,13 +1337,11 @@ def map_file(plan, tree, path):
         if matches(path):
             cover(plan, tree, path)
     # A check that lists the file reads it for its kind and says nothing of
-    # what the file does, so its entry leaves the fallback as it was. A
-    # testing/ file's readers are cover_testing's (#431).
+    # what the file does, so its entry stays out of what the fallback judges.
+    # A testing/ file's readers are cover_testing's (#431).
+    entries = list(plan.covers.get(path, []))
     if not match_testing(path):
-        readers = kind_readers(tree, path)
-        if readers:
-            plan.add(path, 'kind-readers', KIND_NOTE, readers)
-    entries = [e for e in plan.covers.get(path, []) if e[0] != 'kind-readers']
+        cover_kind_readers(plan, tree, path)
     if not any(targets or rule in ('everything', 'docs', 'website', 'plan-tools', 'docker')
                or note.startswith('a server tool no test')
                or note.startswith('deleted')
@@ -2470,6 +2485,13 @@ def report(plan, tree):
                 say(f'      {t}')
             all_targets += targets
     say('')
+
+    if plan.no_kind_modules:
+        say('This tree lacks '
+            + ', '.join(f'server/{m}' for m in sorted(set(plan.no_kind_modules)))
+            + ', so a changed file outside testing/ maps to none of the checks '
+            'whose KIND_READERS row lists its files with it (an older head, #471).')
+        say('')
 
     if plan.everything:
         say('CI runs the full suites on both databases (D85): push and let its run '
