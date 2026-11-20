@@ -27,11 +27,11 @@ import re
 import subprocess
 from pathlib import Path
 
+from tests.file_kinds import shell_files
 from tests.workflow_steps import WORKFLOWS, Step, steps
 
 ROOT = Path(__file__).resolve().parents[2]
 PIPEFAIL = re.compile(r"^\s*set\s+(?:-\w+\s+)*-\w*o\s+pipefail\b", re.M)
-SHEBANG = re.compile(r"^#!\s*\S*\b(?:ba)?sh\b|^#!\s*/usr/bin/env\s+(?:ba)?sh\b")
 # A reader that stops before its input ends.
 EARLY = re.compile(r"^(?:head\b|grep\s+(?:-\S+\s+)*(?:-\w*q\w*|--quiet)\b)")
 # What may come before a pipeline's first command.
@@ -45,30 +45,6 @@ EXEMPT = {
         "each ends in `|| true`"
     ),
 }
-
-
-def shell_files() -> list[Path]:
-    names = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout.split("\0")
-    files = []
-    for name in names:
-        if not name or name.startswith("website/"):
-            continue
-        path = ROOT / name
-        if not path.is_file():
-            continue
-        if name.endswith(".sh"):
-            files.append(path)
-            continue
-        try:
-            with path.open(encoding="utf-8") as f:
-                first = f.readline()
-        except UnicodeDecodeError, OSError:
-            continue
-        if SHEBANG.match(first):
-            files.append(path)
-    return files
 
 
 def logical_lines(text: str):

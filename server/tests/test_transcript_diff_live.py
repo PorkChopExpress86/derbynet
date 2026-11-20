@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.file_kinds import top_of_testing
 from tools import transcript_diff as td
 
 SERVER_DIR = Path(__file__).resolve().parent.parent
@@ -77,9 +78,8 @@ def copy_of_testing(where: Path) -> Path:
     """A directory holding a copy of the suite's scripts in `testing/`, where
     `common.sh` keeps its own `output.curl` and `cookies.curl`."""
     (where / "testing").mkdir(parents=True)
-    for path in TESTING.iterdir():
-        if path.is_file() and not path.name.endswith(".curl"):
-            shutil.copy2(path, where / "testing" / path.name)
+    for path in top_of_testing():
+        shutil.copy2(path, where / "testing" / path.name)
     return where
 
 

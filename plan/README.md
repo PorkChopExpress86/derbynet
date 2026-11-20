@@ -14,6 +14,7 @@ The plan lives in GitHub issues on PorkChopExpress86/derbynet, labeled `django-m
 | `bin/pr-evidence` | Lists each open line of an issue that asks for evidence in the PR, as a `- <key>: ` line to fill in, and with `--check BODY.md` names each one the PR body gives no evidence for or leaves out of `## Still open`, and an unfilled placeholder such as `LOOP-OUTPUT` (#399 retro), or the same shape joined by `_` when no file under `server/` or `testing/` assigns it (#406 retro); a `- CI load: <run URL>` item counts only as a passed first attempt of master's `ci-load.yml`, dispatched with no trial input at the PR's head (`--head SHA`, or `--pr N` to read it from GitHub), named `CI load at <SHA>` or, for a flake ticket, `CI load at <SHA> (flake ticket)` (`--flake-ticket` refuses the plain one), and is labelled extra evidence until the owner amends D85 (#415); a closing keyword outside code for an issue other than N and each `--closes N`, which GitHub would close on merge, is refused, and `--check BODY.md` with no issue checks a retro's body, refusing any (#415 retro); given N, a body that names N in no closing keyword and no `Part of #N` outside code is refused (there an HTML comment, `<pre>`, `<code>`, a `~~~` fence, an unclosed fence, a quoted fence and an indented line count as code, though the refusal of another issue's close still reads them), since #444's merge left #434 open (#434 retro) |
 | `bin/affected-tests` | Maps a branch's changed files (`BASE...HEAD` and the working tree, or a list on `--stdin`) to the tests that cover them, and prints the commands to run before a push: the targeted tests, Postgres when the diff touches database code, the repeats under load at the D85/D97/D101 count, the source checks and ruff (owner, 2026-11-11) |
 | `bin/ci-load` | Checks the inputs of `.github/workflows/ci-load.yml`, splits each load command `affected-tests` prints into shards of at most 5 counts, checks a shard's font, samples its load average, and sums the shards into the run's summary (#415; `server/README.md`, "Load runs on CI") |
+| `bin/pr-overlap` | Names each other open PR that changes a file a PR changes, each shared file, and whether git merges the two once each is merged with origin/master; exits 1 when one overlaps (#347 retro) |
 | `bin/rejected-workflows` | Prints each workflow GitHub rejected on a commit (a failed run with no job, which no PR check shows); `pr-wait` and `pr-merge` fail on any line it prints (#59 retro) |
 | `bin/issue` | Prints an issue's title, body, and comments, because `gh issue view --comments` prints nothing on some gh versions |
 | `bin/ci-suites` | Lists each `testing/` suite an issue names and whether `.github/workflows/server.yml` runs it; exits 1 when one is missing |
@@ -50,6 +51,6 @@ A row that cites another decision names which part of it applies (D130). D123's 
 ## Ship a PR
 
 ```bash
-plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed
+plan/bin/pr-wait 82     # exits 1 if any check pr-merge counts failed; 2 head moved, 3 timed out, 4 a bad bound
 plan/bin/pr-merge 82     # squashes and deletes the branch unless given a method
 ```

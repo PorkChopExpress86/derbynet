@@ -16,6 +16,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from tests.file_kinds import exec_files
 from tests.workflow_steps import steps
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -237,9 +238,6 @@ def test_script_files_with_no_match_prints_nothing(tmp_path):
 # message; checks.sh's root check runs it on purpose, each line marked with
 # ROOT_ON_PURPOSE.
 
-# Where a command a reader or a script runs is written.  Python tests hold
-# stand-ins, this file's own among them.
-EXEC_SUFFIXES = (".md", ".sh", ".yml", ".yaml", ".html", ".txt", ".py")
 # `docker exec`, `docker compose exec`, a `compose` shell function, or a
 # compose command held in "$@" or "${compose[@]}", with any options before
 # `exec` (`--profile postgres`, `-f FILE`), then manage.py later in the same
@@ -321,21 +319,6 @@ def root_execs(name: str, text: str) -> tuple[list[int], list[int]]:
         else:
             root.append(line)
     return root, on_purpose
-
-
-def exec_files() -> list[str]:
-    names = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout.split("\0")
-    return [
-        name
-        for name in names
-        if name
-        and not name.startswith("website/")
-        and name.endswith(EXEC_SUFFIXES)
-        and not (name.endswith(".py") and "/tests/" in name)
-        and (ROOT / name).is_file()
-    ]
 
 
 def test_every_execd_manage_py_runs_as_derbynet():

@@ -12,11 +12,13 @@ import io
 import itertools
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
@@ -343,6 +345,317 @@ class TestingCases(unittest.TestCase):
                      'testing/r.ce.sh'):
             with self.subTest(path=path):
                 self.assertEqual(self.commands_for(path), [])
+
+
+TESTING_FALLBACK = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_golden_inputs.py']
+
+
+def testing_targets(files, path):
+    """What cover_testing maps testing/`path` to in a git repository of
+    `files`, repository path -> text, and testing/`path`."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for rel, text in {f'testing/{path}': '', **files}.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        for argv in (['init', '-q'], ['add', '-A']):
+            subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+        TOOL.cover_testing(plan, TOOL.Tree(root), f'testing/{path}')
+        return [t for _rule, _note, targets in plan.covers[f'testing/{path}']
+                for t in targets]
+
+
+class TestingNames(unittest.TestCase):
+    """#431: #399's stand-ins testing/timer-stand-in/curl and sleep mapped to
+    the test files that say `curl` or `sleep` as words."""
+
+    def test_a_name_that_is_a_word_maps_to_the_tests_that_read_testing(self):
+        files = {'server/tests/test_detach.py': 'subprocess.run(["sleep", "5"])\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/sleep'), TESTING_FALLBACK)
+
+    def test_a_name_that_is_a_word_maps_through_its_path(self):
+        files = {'server/tests/test_detach.py': 'subprocess.run(["sleep", "5"])\n',
+                 'server/tests/test_stand_in.py': 'STAND_IN = "testing/timer-stand-in/sleep"\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/sleep'),
+                         ['tests/test_stand_in.py'])
+
+    def test_a_nested_word_maps_through_its_path_relative_to_testing(self):
+        # As race-with-derby-timer-cases.sh writes its stand-ins (#431's scope).
+        files = {'server/tests/test_curl.py': 'subprocess.run(["curl", URL])\n',
+                 'server/tests/test_stand_in.py': 'STAND_IN = "timer-stand-in/curl"\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
+                         ['tests/test_stand_in.py'])
+
+    def test_a_relative_path_after_a_slash_is_no_cite(self):
+        files = {'server/tests/test_other.py': 'OTHER = "server/timer-stand-in/curl"\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
+
+    def test_a_word_at_the_top_of_testing_maps_through_its_path_alone(self):
+        files = {'server/tests/test_query.py': 'QUERY = "queryj"\n'}
+        self.assertEqual(testing_targets(files, 'queryj'), TESTING_FALLBACK)
+
+    def test_a_name_with_a_dot_or_a_dash_maps_by_itself(self):
+        # The scenario replays cite their suites by name (#431's scope).
+        for path, cite in (('test-groups.sh', 'SCRIPT = "test-groups.sh"\n'),
+                           ('data/roster.csv', 'ROSTER = TESTING / "data" / "roster.csv"\n'),
+                           ('timer-stand-in/run-it', 'subprocess.run(["run-it"])\n')):
+            with self.subTest(path=path):
+                files = {'server/roster/tests/test_scenarios.py': cite}
+                self.assertEqual(testing_targets(files, path),
+                                 ['roster/tests/test_scenarios.py'])
+
+    def test_a_name_another_tracked_file_has_maps_through_its_path_alone(self):
+        """A colliding bare name maps only through `testing/<rel>`, and to the
+        fallback when no test cites that: README.md names a file in several
+        folders (#431). A longer path that holds `docker/Dockerfile`
+        is no cite of testing/docker/Dockerfile."""
+        files = {'README.md': '', 'server/README.md': '',
+                 'server/tests/test_readme.py': 'README = ROOT / "README.md"\n',
+                 'server/tests/test_cites.py': 'CITE = "testing/README.md"\n'}
+        self.assertEqual(testing_targets(files, 'README.md'), ['tests/test_cites.py'])
+        del files['server/tests/test_cites.py']
+        self.assertEqual(testing_targets(files, 'README.md'), TESTING_FALLBACK)
+        files = {'server/docker/Dockerfile': '',
+                 'server/tests/test_image.py': 'dockerfile: server/docker/Dockerfile\n'}
+        self.assertEqual(testing_targets(files, 'docker/Dockerfile'), TESTING_FALLBACK)
+
+    def test_a_name_counts_once_for_its_own_file(self):
+        # A name git tracks once, at testing/ itself, is no collision.
+        files = {'server/tests/test_cites.py': 'NAME = "notes.md"\n'}
+        self.assertEqual(testing_targets(files, 'notes.md'), ['tests/test_cites.py'])
+        files['server/notes.md'] = ''
+        self.assertEqual(testing_targets(files, 'notes.md'), TESTING_FALLBACK)
+
+    def test_a_git_dir_from_the_environment_counts_no_other_repository(self):
+        """A hook's GIT_DIR names the repository it runs for, not the root
+        the tool reads (#431 review): with GIT_DIR on another repository
+        that tracks notes.md once, the root's two notes.md still collide."""
+        with tempfile.TemporaryDirectory() as other:
+            (Path(other) / 'testing').mkdir()
+            (Path(other) / 'testing' / 'notes.md').write_text('')
+            for argv in (['init', '-q'], ['add', '-A']):
+                subprocess.run(['git', *argv], cwd=other, env=git_env(), check=True)
+            files = {'server/notes.md': '', 'server/tests/test_cites.py': 'NAME = "notes.md"\n'}
+            with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
+                self.assertEqual(testing_targets(files, 'notes.md'), TESTING_FALLBACK)
+
+    def test_no_git_vars_hides_only_git_variables_and_restores_them(self):
+        """git and the rows' functions still get the caller's other
+        variables (#431 review)."""
+        with mock.patch.dict(os.environ, GIT_DIR='/elsewhere', NOT_GIT='kept'):
+            with TOOL.no_git_vars():
+                self.assertNotIn('GIT_DIR', os.environ)
+                self.assertEqual(os.environ.get('NOT_GIT'), 'kept')
+            self.assertEqual((os.environ['GIT_DIR'], os.environ['NOT_GIT']),
+                             ('/elsewhere', 'kept'))
+
+    def test_a_failed_ls_files_stops_the_tool_with_gits_message(self):
+        """In a repository, a `git ls-files` that fails exits non-zero with
+        git's stderr rather than counting no collision (#431 review, the
+        AGENT-BRIEF's rule for a tool that can't do what it is asked)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'testing').mkdir()
+            (root / 'testing' / 'notes.md').write_text('')
+            for argv in (['init', '-q'], ['add', '-A']):
+                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+            (root / '.git' / 'index').write_bytes(b'not an index')
+            with self.assertRaises(AssertionError) as failed:
+                run('testing/notes.md', root=root)
+        self.assertIn('affected-tests: git ls-files -z failed in', str(failed.exception))
+        self.assertIn('index file', str(failed.exception))
+
+    def test_each_kind_of_name_against_each_style_of_cite(self):
+        """Every kind of testing/ name against five ways a test can write
+        it (the path, the bare name, the path relative to testing/, a longer
+        path, a longer name), in one repository: a word, nested or at the top
+        of testing/, a dotted or dashed name, a nested one, and a name
+        another tracked file has. The expected styles are #431's words: the path always; the bare
+        name, however it is prefixed, only when it holds a `.` or a `-` and
+        is unique; and otherwise the path relative to testing/ when that
+        holds a folder and no `/` comes before it."""
+        kinds = {
+            'word': ('timer-stand-in/sleep', ()),
+            'top-word': ('queryj', ()),
+            'dotted': ('steps.sh', ()),
+            'dashed': ('demo-multi', ()),
+            'nested': ('data/sample-names.csv', ()),
+            'shared': ('README.md', ('server/README.md',)),
+            'shared-nested': ('docker/Dockerfile', ('server/docker/Dockerfile',)),
+        }
+        styles = {
+            'path': lambda rel: f'testing/{rel}',
+            'bare': lambda rel: Path(rel).name,
+            'relative': lambda rel: rel,
+            'longer-path': lambda rel: f'server/{rel}',
+            'longer-name': lambda rel: f'pre-{Path(rel).name}x',
+        }
+        unique = {'path', 'bare', 'relative', 'longer-path'}
+        expected = {'word': {'path', 'relative'}, 'top-word': {'path'}, 'dotted': unique,
+                    'dashed': unique, 'nested': unique, 'shared': {'path'},
+                    'shared-nested': {'path', 'relative'}}
+        files = {f'server/tests/test_{kind}_{style}.py'.replace('-', '_'): f'X = "{cite(rel)}"\n'
+                 for kind, (rel, _) in kinds.items() for style, cite in styles.items()}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel in [*files, *(f'testing/{r}' for r, _ in kinds.values()),
+                        *(o for _, others in kinds.values() for o in others)]:
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(files.get(rel, ''))
+            for argv in (['init', '-q'], ['add', '-A']):
+                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+            tree, got = TOOL.Tree(root), {}
+            for kind, (rel, _) in kinds.items():
+                plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+                TOOL.cover_testing(plan, tree, f'testing/{rel}')
+                targets = {t for _r, _n, ts in plan.covers[f'testing/{rel}'] for t in ts}
+                got[kind] = {style for style in styles
+                             if f'tests/test_{kind}_{style}.py'.replace('-', '_') in targets}
+        self.assertEqual(got, expected)
+        self.assertEqual((len(kinds), len(styles)), (7, 5))
+
+
+class TestingReaders(unittest.TestCase):
+    """#431 review: a check that lists every file of a kind reads a testing/
+    file it never names, and a test reads one through a module that names
+    it."""
+
+    KINDS = (REPO / 'server' / 'tests' / 'file_kinds.py').read_text()
+
+    def test_a_file_a_kind_readers_function_lists_maps_to_its_test(self):
+        files = {'server/tests/file_kinds.py': self.KINDS,
+                 'server/tests/test_pipefail_pipes.py': '',
+                 'testing/timer-stand-in/curl': '#!/bin/bash\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
+                         ['tests/test_pipefail_pipes.py'])
+        files['testing/timer-stand-in/curl'] = 'no script\n'
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
+
+    def test_each_way_a_file_maps_is_one_entry(self):
+        """A top-level script maps only through the rows that list it, a
+        `.sh` with no shebang included; a file no row lists and no test
+        names maps to the fallback alone; no rule adds an empty entry."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel, text in {'server/tests/file_kinds.py': self.KINDS,
+                              'server/tests/test_pipefail_pipes.py': '',
+                              'server/legacy_api/tests/test_testing_scripts.py': '',
+                              'testing/queryj': '#!/bin/bash\n',
+                              'testing/steps.sh': 'echo\n',
+                              'testing/notes': 'plain\n'}.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(text)
+            for argv in (['init', '-q'], ['add', '-A']):
+                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+            tree, got = TOOL.Tree(root), {}
+            for name in ('queryj', 'steps.sh', 'notes'):
+                plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+                TOOL.cover_testing(plan, tree, f'testing/{name}')
+                got[name] = [(note.split(':')[0], targets)
+                             for _r, note, targets in plan.covers[f'testing/{name}']]
+        scripts = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_pipefail_pipes.py']
+        reader = 'a source check that reads every file of its kind (KIND_READERS)'
+        self.assertEqual(got, {'queryj': [(reader, scripts)], 'steps.sh': [(reader, scripts)],
+                               'notes': [('no test names it', TESTING_FALLBACK)]})
+
+    def test_a_git_dir_from_the_environment_reaches_no_rows_function(self):
+        """The rows' functions run git in the tree, not in the repository a
+        hook's GIT_DIR names (#431): there the stand-in is untracked."""
+        with tempfile.TemporaryDirectory() as other:
+            subprocess.run(['git', 'init', '-q'], cwd=other, env=git_env(), check=True)
+            files = {'server/tests/file_kinds.py': self.KINDS,
+                     'server/tests/test_pipefail_pipes.py': '',
+                     'testing/timer-stand-in/curl': '#!/bin/bash\n'}
+            with mock.patch.dict(os.environ, GIT_DIR=f'{other}/.git'):
+                self.assertEqual(testing_targets(files, 'timer-stand-in/curl'),
+                                 ['tests/test_pipefail_pipes.py'])
+                self.assertEqual(os.environ['GIT_DIR'], f'{other}/.git')
+
+    def test_a_kind_reader_the_tree_lacks_maps_nothing(self):
+        files = {'server/tests/file_kinds.py': self.KINDS,
+                 'testing/timer-stand-in/curl': '#!/bin/bash\n'}
+        self.assertEqual(testing_targets(files, 'timer-stand-in/curl'), TESTING_FALLBACK)
+
+    def test_a_rows_module_that_cant_run_stops_the_tool_with_the_reason(self):
+        """#431 review: a row whose test the tree has, and whose module is
+        missing, fails to parse, or lacks the function, exits with a message
+        naming the module and the row rather than a traceback."""
+        version = sys.version.split()[0]
+        row = 'which KIND_READERS row tests/test_pipefail_pipes.py lists files with'
+        kinds = 'server/tests/file_kinds.py'
+        cases = {
+            'missing': ({}, f'affected-tests: python {version} cannot load '
+                            f'server/tests/file_kinds.py, {row}: [Errno 2]'),
+            'unparsable': ({kinds: 'def (:\n'}, f'affected-tests: python {version} cannot '
+                           f'load server/tests/file_kinds.py, {row}: invalid syntax'),
+            'no function': ({kinds: ''}, 'affected-tests: server/tests/file_kinds.py has no '
+                                         f'function shell_files(), {row}'),
+        }
+        got = {}
+        for case, (module, message) in cases.items():
+            files = {'server/tests/test_pipefail_pipes.py': '',
+                     'testing/timer-stand-in/curl': '#!/bin/bash\n', **module}
+            with self.assertRaises(SystemExit) as stopped:
+                testing_targets(files, 'timer-stand-in/curl')
+            got[case] = str(stopped.exception.code)[:len(message)]
+        self.assertEqual(got, {case: message for case, (_module, message) in cases.items()})
+
+    def test_each_rows_module_parses_on_python_3_12(self):
+        """affected-tests loads each row's module with the host's python3,
+        which plan-checks.yml says is older than the server's on CI's
+        runner. At 3.12, `except A, B:` is a SyntaxError (#431 review)."""
+        parsed = [module for module in sorted({row.module for row in TOOL.KIND_READERS})
+                  if ast.parse((REPO / 'server' / module).read_text(), module,
+                               feature_version=(3, 12))]
+        self.assertEqual(parsed, ['tests/file_kinds.py', 'tests/test_php_cite_lines.py',
+                                  'tools/golden_inputs.py'])
+        with self.assertRaises(SyntaxError):
+            ast.parse('try:\n    pass\nexcept A, B:\n    pass\n', feature_version=(3, 12))
+
+    def test_a_listing_by_file_name_maps_each_path(self):
+        # test_php_cite_lines.py's php_files() lists name -> [absolute paths];
+        # the stand-in builds the name, so no cite of it maps the test.
+        files = {'server/tests/test_php_cite_lines.py': (
+            'from pathlib import Path\nROOT = Path(__file__).resolve().parents[2]\n'
+            'NAME = "face" + ".php"\n\n\n'
+            'def sources():\n    return []\n\n\n'
+            'def php_files():\n    return {NAME: [ROOT / "testing" / NAME]}\n')}
+        self.assertEqual(testing_targets(files, 'face.php'), ['tests/test_php_cite_lines.py'])
+
+    def test_a_module_that_names_a_file_maps_the_plain_tests_that_import_it(self):
+        """A helper's cite reaches the plain tests and conftest folders that
+        import it, directly or through a test file; a browser test or the
+        browser conftest maps only through a cite of its own."""
+        imports = 'from racing.tests.scenarios import CSV\n'
+        files = {'server/racing/tests/scenarios.py': 'CSV = TESTING / "data" / "outlaw-class.csv"\n',
+                 'server/racing/tests/test_finals.py': imports,
+                 'server/racing/tests/test_round.py': 'from racing.tests.test_finals import CSV\n',
+                 'server/media/tests/conftest.py': imports,
+                 'server/ui/tests/browser/conftest.py': imports,
+                 'server/ui/tests/browser/test_kiosk.py': imports,
+                 'server/ui/tests/browser/test_photos.py': 'PHOTO = "outlaw-class.csv"\n'}
+        self.assertEqual(testing_targets(files, 'data/outlaw-class.csv'),
+                         ['media/tests', 'racing/tests/test_finals.py',
+                          'racing/tests/test_round.py', 'ui/tests/browser/test_photos.py'])
+
+    def test_a_conftest_that_names_a_file_maps_its_folder(self):
+        files = {'server/media/tests/conftest.py': 'FACES = "testing/faces"\n'}
+        self.assertEqual(testing_targets(files, 'faces'), ['media/tests'])
+
+    def test_the_root_conftest_that_names_a_file_runs_everything(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel, text in {'server/conftest.py': 'FACES = "testing/faces"\n',
+                              'testing/faces': ''}.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(text)
+            plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+            TOOL.cover_testing(plan, TOOL.Tree(root), 'testing/faces')
+        self.assertEqual(plan.everything, ['testing/faces: the root conftest names it, '
+                                           'or imports what names it'])
+        self.assertEqual([t for _r, _n, ts in plan.covers['testing/faces'] for t in ts],
+                         TESTING_FALLBACK)
 
 
 class TestFile(unittest.TestCase):
@@ -3373,6 +3686,91 @@ class RealTree(unittest.TestCase):
                              (db, 'legacy_api/tests/test_database_check.py')):
             with self.subTest(path=path, reader=reader):
                 self.assertIn(f'      {reader}\n', section(out, path) + '\n')
+
+    def test_each_testing_file_maps_to_every_test_that_cites_its_path(self):
+        """#431 narrowed testing/ names to their cites: a test that writes a
+        tracked file's `testing/<rel>` keeps it, and #399's stand-ins map
+        only to the fallback pair, to the KIND_READERS tests, and to tests
+        that write their path."""
+        files = subprocess.run(['git', 'ls-files', 'testing/'], cwd=REPO, env=git_env(),
+                               check=True, capture_output=True, text=True).stdout.split()
+        tree, misses = TOOL.Tree(REPO), []
+        # Only the files a test cites by path, the ones a miss can be found for.
+        texts = '\n'.join(tree.text(t) for t in tree.test_files())
+        stand_ins = [f for f in files if f.startswith('testing/timer-stand-in/')]
+        self.assertTrue(stand_ins)
+        for path in [f for f in files if f in texts or f in stand_ins]:
+            plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+            TOOL.cover_testing(plan, tree, path)
+            targets = {t for _r, _n, ts in plan.covers[path] for t in ts}
+            cite = re.compile(rf'(?<![\w-]){re.escape(path)}(?![\w-])')
+            misses += [f'{path}: {t}' for t in tree.test_files()
+                       if path in tree.text(t) and cite.search(tree.text(t))
+                       and t not in targets]
+            if path.startswith('testing/timer-stand-in/'):
+                rel = path[len('testing/'):]
+                readers = {row.test for row in TOOL.KIND_READERS}
+                self.assertEqual([t for t in sorted(targets) if t not in TESTING_FALLBACK
+                                  and t not in readers and rel not in tree.text(t)], [], path)
+        self.assertEqual(misses, [])
+
+    def test_the_checks_that_list_a_kind_map_each_file_they_read(self):
+        """The readers #431's review confirmed with a mutant or a trace:
+        test_docker_checks.py scans testing/README.md for exec'd manage.py,
+        and the pipe linters read #399's stand-ins, which `sleep` had never
+        mapped to; a file each other row's function lists; and a file
+        each of two rows leaves out: the stand-in has no suffix
+        test_docker_checks.py reads, and README.md is no script."""
+        tree = TOOL.Tree(REPO)
+
+        def targets(path):
+            plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+            TOOL.cover_testing(plan, tree, path)
+            return {t for _r, _n, ts in plan.covers[path] for t in ts}
+
+        self.assertIn('tests/test_docker_checks.py', targets('testing/README.md'))
+        self.assertIn('tests/test_docker_checks.py',
+                      targets('testing/data/carphotos/make-pattern-o6.py'))
+        self.assertNotIn('tests/test_docker_checks.py', targets('testing/timer-stand-in/curl'))
+        self.assertNotIn('tests/test_pipefail_pipes.py', targets('testing/README.md'))
+        for stand_in in ('testing/timer-stand-in/curl', 'testing/timer-stand-in/sleep'):
+            for test in ('tests/test_pipefail_pipes.py', 'tests/test_subshell_state.py'):
+                self.assertIn(test, targets(stand_in), stand_in)
+        self.assertIn('tests/test_php_cite_lines.py', targets('testing/test-face-detection.php'))
+        self.assertIn('tests/test_golden_inputs.py', targets('testing/common.sh'))
+        self.assertIn('legacy_api/tests/test_testing_scripts.py', targets('testing/actionj'))
+        self.assertIn('media/tests/test_faces.py', targets('testing/data/headshots/Cub-0033.jpg'))
+        self.assertIn('tests/test_transcript_diff_live.py', targets('testing/README.md'))
+
+    def test_each_kind_reader_takes_its_files_from_its_row(self):
+        """A row names the function its test lists files with: the test
+        defines it, or imports it or its module, so a row can't go stale. A
+        test that imports a function of tests/file_kinds.py has its row,
+        from whatever module it imports it: test_arithmetic_operands.py took
+        shell_files from test_pipefail_pipes.py."""
+        imported = {}
+        for test in TOOL.Tree(REPO).test_files():
+            for node in ast.walk(ast.parse((REPO / 'server' / test).read_text())):
+                if isinstance(node, ast.ImportFrom):
+                    imported.setdefault(test, set()).update(
+                        (node.module, a.name) for a in node.names)
+                elif isinstance(node, ast.FunctionDef):
+                    imported.setdefault(test, set()).add((test, node.name))
+        for row in TOOL.KIND_READERS:
+            dotted = row.module.removesuffix('.py').replace('/', '.')
+            package, _, base = dotted.rpartition('.')
+            with self.subTest(test=row.test, selector=row.selector):
+                self.assertTrue({(row.module, row.selector), (dotted, row.selector),
+                                 (package, base)} & imported.get(row.test, set()))
+                self.assertTrue(callable(getattr(
+                    TOOL.load_module(REPO / 'server' / row.module), row.selector, None)))
+        rows = {(row.test, row.selector) for row in TOOL.KIND_READERS}
+        kinds = {node.name for node in ast.parse(TestingReaders.KINDS).body
+                 if isinstance(node, ast.FunctionDef)}
+        self.assertEqual(sorted((test, name) for test, names in imported.items()
+                                for module, name in names
+                                if module != test and name in kinds
+                                and (test, name) not in rows), [])
 
     def test_every_command_and_server_tool_maps(self):
         server = REPO / 'server'
