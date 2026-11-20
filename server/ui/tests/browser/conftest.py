@@ -574,21 +574,30 @@ def _barrier(page):
     evaluate that sent it returns, so the drain found the set empty with a
     poll's last request out (#224 retro, 1 run in 50 under load;
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
-    fetch sent after the stop, answered 204 here; its end is reported after
+    fetch sent after the stop, which Chromium fails at once: a URL block on
+    a CDP session of its own, closed after. A route for it turned
+    Playwright's interception on and off at each settle, and a document
+    that committed as it turned on sent its requests, the barrier's among
+    them, to the server with no `request` event (#347, gap 1:
+    `test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts`).
+    Blocked, its end is still reported after
     the earlier fetch's start (the same test). STOP_SENDING sends it, and
     then stops the main frame's fetch and XMLHttpRequest in the same task."""
     if not page.url.startswith("http"):
         return
-    page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
+    blocker = page.context.new_cdp_session(page)
     try:
+        blocker.send("Network.enable")
+        blocker.send("Network.setBlockedURLs", {"urls": [f"*{SETTLE_BARRIER}"]})
         with page.expect_event(
-            "requestfinished",
+            "requestfailed",
             lambda r: r.url.endswith(SETTLE_BARRIER),
             timeout=InFlight.TIMEOUT_MS,
         ):
+            page.barrier_sent = True
             page.evaluate(STOP_SENDING, SETTLE_BARRIER)
     finally:
-        page.unroute(f"**{SETTLE_BARRIER}")
+        blocker.detach()
 
 
 # Playwright's failure texts for a request `block_sending` blocked: by its
@@ -718,6 +727,12 @@ def page(browser, live_server, size, page_errors):
 
     def request_failed(request):
         if request.failure in BLOCKED and getattr(page, "blocker", None):
+            return
+        if (
+            request.failure == BLOCKED[0]
+            and request.url.endswith(SETTLE_BARRIER)
+            and getattr(page, "barrier_sent", False)
+        ):
             return
         page_errors.add(f"request failed: {request.url} {request.failure}")
 

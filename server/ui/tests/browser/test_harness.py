@@ -495,6 +495,25 @@ def test_a_blocked_request_before_the_settle_is_a_page_error(page, page_errors, 
     page_errors.errors.clear()
 
 
+def test_the_barrier_blocked_before_the_settle_is_a_page_error(
+    page, page_errors, event
+):
+    """The page errors drop the settle's blocked barrier, and only once the
+    settle sent it: the same failure before then still counts."""
+    page.goto("/login/")
+    session = page.context.new_cdp_session(page)
+    session.send("Network.enable")
+    session.send("Network.setBlockedURLs", {"urls": [f"*{conftest.SETTLE_BARRIER}"]})
+    with page.expect_event("requestfailed"):
+        page.evaluate(
+            "(url) => { fetch(url).catch(() => {}); }", conftest.SETTLE_BARRIER
+        )
+    session.detach()
+    url = f"{page.url.rsplit('/', 2)[0]}{conftest.SETTLE_BARRIER}"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
 def test_the_block_outlasts_the_settle(page, event):
     """The block ends with its CDP session (#409, PR #424), so the session
     stays open after the settle returns: an image the page asks for later
