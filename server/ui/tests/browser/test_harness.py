@@ -858,8 +858,63 @@ def test_another_request_blocked_after_the_barrier_is_a_page_error(
     page_errors.errors.clear()
 
 
-# The commit and the barrier race, and the barrier lost in most runs before
-# #347's fix, not in every run: each size runs the test this many times.
+# Fetches /login/?held in the task that sends the barrier, just before it.
+FETCH_BEFORE_THE_BARRIER = """() => {
+  const send = window.fetch.bind(window);
+  window.fetch = (url, ...rest) => {
+    if (String(url).endsWith('settle-barrier')) send('/login/?held').catch(() => {});
+    return send(url, ...rest);
+  };
+}"""
+
+
+@pytest.mark.parametrize("route", ["page", "context", "none"])
+def test_the_barrier_follows_a_fetch_sent_before_it(
+    page, page_errors, event, monkeypatch, route
+):
+    """The barrier's end reaches Python after the `request` event of a fetch
+    the page sent just before it, with a route on the page, on its context,
+    or none: Playwright reports a request by the Fetch domain where a route
+    has it intercepting, and a blocked barrier there came first (#347). The
+    fetch is held, by the route or by the server, until the barrier is in."""
+    gate = threading.Event()
+    held = []
+
+    def hold(sender, environ, **kwargs):
+        if environ.get("QUERY_STRING") == "held":
+            gate.wait(InFlight.TIMEOUT_MS / 1000)
+
+    request_started.connect(hold, weak=False)
+    if route == "page":
+        page.route("**/login/?held", lambda r: held.append(r))
+    elif route == "context":
+        page.context.route("**/login/?held", lambda r: held.append(r))
+    seen = []
+    page.on("request", lambda r: r.url.endswith("?held") and seen.append(r))
+    barrier = conftest._barrier
+    at_barrier = []
+
+    def barrier_then_release(tab):
+        barrier(tab)
+        at_barrier.append(len(seen))
+        gate.set()
+        for held_route in held:
+            held_route.fulfill(status=204)
+
+    try:
+        page.goto("/login/")
+        page.evaluate(FETCH_BEFORE_THE_BARRIER)
+        monkeypatch.setattr(conftest, "_barrier", barrier_then_release)
+        assert _settle(page) == []
+    finally:
+        gate.set()
+        request_started.disconnect(hold)
+    assert at_barrier == [1]
+    assert page_errors.errors == []
+
+
+# The commit and the barrier race, and the old barrier lost only in some
+# runs, fewer under load (#347): each size runs the test this many times.
 COMMIT_RACES = 3
 
 
@@ -873,9 +928,10 @@ def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
     Playwright's interception on as the commit landed. The new document's
     requests then reached the server with no `request` event, the barrier's
     among them: a 404 and a 10 s wait for its end (#316's log). Here the
-    server holds a navigation until the settle's first stop. The settle
-    now blocks the barrier, which never reaches the server, and every
-    request the server gets after the release has its `request` event."""
+    server holds a navigation until the settle's first stop, and the held
+    page fetches once as it loads. The barrier now never reaches the
+    server, and every request the server gets after the release has its
+    `request` event."""
     gate = threading.Event()
     held = []
     after = []
@@ -883,12 +939,14 @@ def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
     def hold(sender, environ, **kwargs):
         if environ.get("QUERY_STRING") == "held":
             held.append(environ["PATH_INFO"])
-            # Past the settle's waits, so only the release lets it go.
-            gate.wait(3 * InFlight.TIMEOUT_MS / 1000)
+            gate.wait(InFlight.TIMEOUT_MS / 1000)
         elif gate.is_set():
             after.append(environ["PATH_INFO"])
 
     request_started.connect(hold, weak=False)
+    page.add_init_script(
+        "if (location.search === '?held') fetch('/login/?from-the-held-page');"
+    )
     try:
         page.goto("/login/?all")
         seen = []
@@ -911,6 +969,7 @@ def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
         gate.set()
         request_started.disconnect(hold)
     assert conftest.SETTLE_BARRIER not in after
+    assert "/login/" in after, "the held page's own fetch reached the server"
     wait_until(
         page,
         lambda: not Counter(after) - Counter(seen),
