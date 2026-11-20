@@ -16,7 +16,8 @@ SHEBANG = re.compile(r"^#!\s*\S*\b(?:ba)?sh\b|^#!\s*/usr/bin/env\s+(?:ba)?sh\b")
 # Where a command a reader or a script runs is written.  Python tests hold
 # stand-ins, test_docker_checks.py's own among them.
 EXEC_SUFFIXES = (".md", ".sh", ".yml", ".yaml", ".html", ".txt", ".py")
-# A name, since ruff formats `except (A, B):` for python 3.14 alone.
+# A name, since ruff's format for the server's python drops the parentheses
+# of `except (A, B):`, which older pythons need.
 UNREADABLE = (UnicodeDecodeError, OSError)
 
 

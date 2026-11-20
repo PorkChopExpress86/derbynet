@@ -603,8 +603,8 @@ class TestingReaders(unittest.TestCase):
 
     def test_each_rows_module_parses_on_python_3_12(self):
         """affected-tests loads each row's module with the host's python3,
-        which can be older than the server's 3.14 (plan-checks.yml): Ubuntu
-        24.04's is 3.12, where `except A, B:` is a SyntaxError (#431 review)."""
+        which plan-checks.yml says is older than the server's on CI's
+        runner. At 3.12, `except A, B:` is a SyntaxError (#431 review)."""
         parsed = [module for module in sorted({row.module for row in TOOL.KIND_READERS})
                   if ast.parse((REPO / 'server' / module).read_text(), module,
                                feature_version=(3, 12))]
