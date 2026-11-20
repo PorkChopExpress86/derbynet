@@ -828,6 +828,36 @@ def test_the_barrier_blocked_before_the_settle_is_a_page_error(
     page_errors.errors.clear()
 
 
+def test_another_request_blocked_after_the_barrier_is_a_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """The page errors drop the barrier's failure alone: another request
+    blocked once the barrier is sent, before the settle's own block, still
+    counts."""
+    page.goto("/login/")
+    block = conftest.block_sending
+
+    def fail_one_then_block(tab):
+        session = tab.context.new_cdp_session(tab)
+        session.send("Network.enable")
+        session.send("Network.setBlockedURLs", {"urls": ["*held-request"]})
+        # A stylesheet, which no stop stubs (#409's PR #424 stubs images).
+        with tab.expect_event("requestfailed"):
+            tab.evaluate(
+                """() => document.head.append(Object.assign(
+                  document.createElement('link'),
+                  {rel: 'stylesheet', href: '/held-request'}))"""
+            )
+        session.detach()
+        block(tab)
+
+    monkeypatch.setattr(conftest, "block_sending", fail_one_then_block)
+    assert _settle(page) == []
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
 # The commit and the barrier race, and the barrier lost in most runs before
 # #347's fix, not in every run: each size runs the test this many times.
 COMMIT_RACES = 3
@@ -875,6 +905,7 @@ def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
         with monkeypatch.context() as patch:
             patch.setattr(conftest, "stop_timers", release_then_stop)
             assert _settle(page) == []
+        assert page.url.endswith("/login/?held")
     finally:
         gate.set()
         request_started.disconnect(hold)
