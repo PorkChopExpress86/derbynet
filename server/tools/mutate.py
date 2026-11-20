@@ -24,6 +24,19 @@ test name, and pytest deselected the test without a word. This refuses:
   git directory named for the file. A SIGKILL leaves the lock behind too,
   and the refusal names it.
 
+Every pytest run it starts loads `tools/kill_guard.py` (`-p kill_guard`), so
+`os.kill` and `os.killpg` refuse a process the run did not start: a mutant
+that turns a parsed pid into the wrong one, as retro-391's `$PPID` named
+`systemd --user` and ended the desktop session, fails its test instead of
+signalling it. A run in which the guard refused a signal reads `KILLED`
+(`BROKE` with `--expect pass`) with the refusal in its parentheses (#448).
+The guard covers the Python tests' own calls, not a `kill` a script under
+test runs. Before a mutant of code whose tests signal a pid, run those tests
+once with `--kill-guard-print`, which sends nothing and lists each refusal:
+
+    PYTHONPATH=tools uv run python -m pytest -p kill_guard --kill-guard-print \\
+        tests/test_detach.py
+
 Run it from server/, in the worktree under test, for one mutant:
 
     uv run python tools/mutate.py --file ui/views.py --old 'a < b' --new 'a <= b' \\
@@ -39,8 +52,10 @@ narrowed to each `--file` given, one after another against the same tests:
 #336's mutants were picked by hand, mostly one way, and 21 of 98 survived
 on branches no test reached; the listing's every condition and operand,
 each made true and made false, is what "each condition is mutated" means
-(#336 retro). It prints a row per mutant as it runs (`KILLED`, `SURVIVED`,
-or `REFUSED` or `ERROR` with pytest's last lines), then the count of each,
+(#336 retro). It prints a row per mutant as it runs (`KILLED` with
+pytest's short summary lines, the test and the error that killed it,
+`SURVIVED`, or `REFUSED` or `ERROR` with pytest's last lines), then the
+count of each,
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
 was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
@@ -59,7 +74,9 @@ still mutated by hand, one per call.
 
 Each run stops at its first failure (`-x`; a `--maxfail` given after it
 wins), since one failure kills the mutant (#344 retro). It prints
-pytest's output, then one line: `KILLED` (a test failed),
+pytest's output, then one line: `KILLED` (a test failed; with
+`failed in helper NAME` when a helper in a test file raised, not the test
+itself, so read whether the assert the mutant aims at failed),
 `SURVIVED` (every test passed), or with `--expect pass`, for a should-pass
 mutant, `PASSED` or `BROKE`. It exits 0 when the result is the one
 expected, 1 when it is not, and 2 when it refuses, when pytest errors (an
@@ -84,9 +101,11 @@ import hashlib
 import importlib
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REFUSED = 2
@@ -98,6 +117,11 @@ OUTCOMES = {
     "pass": {0: "PASSED", 1: "BROKE"},
 }
 EXPECTED = {"fail": "KILLED", "pass": "PASSED"}
+# The summary line tools/kill_guard.py prints for each signal it refused.
+GUARD_REFUSAL = re.compile(r"^kill_guard refused .*$", re.M)
+GUARD = Path(__file__).resolve().with_name("kill_guard.py")
+# The folder holding the copy of GUARD that each pytest run loads; main() sets it.
+_guard_folder: str | None = None
 # What --listed mutates: a `min()` a Markdown file quotes is no code.
 SOURCES = (".py", ".js", ".css")
 
@@ -237,14 +261,29 @@ def _pytest(pytest_args: list[str], timeout: float):
     return run, output
 
 
+def _pythonpath() -> list[str]:
+    return [os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else []
+
+
 def _pytest_once(pytest_args: list[str], timeout: float):
     """pytest's run, or None and what it printed when it passes `timeout`."""
     # A mutant's .pyc goes with each write (_drop_bytecode). An empty
     # pycache prefix, tried first, recompiled every module each run, and the
     # tool's timing tests missed their bounds (#370 review round).
+
+    # tools/kill_guard.py refuses a signal to a process outside the run. Its
+    # copy from before the first mutant is what each run loads, so a mutant of
+    # the guard is judged by the tests and not by itself (#448).
+    assert _guard_folder, "main() copies the guard before a mutant is written"
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join([_guard_folder, *_pythonpath()]),
+    }
     try:
         run = subprocess.run(
-            [sys.executable, "-m", "pytest", "-p", "no:xdist", *pytest_args],
+            [sys.executable, "-m", "pytest", "-p", "no:xdist", "-p", "kill_guard"]
+            + pytest_args,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -257,14 +296,90 @@ def _pytest_once(pytest_args: list[str], timeout: float):
 
 
 def _result(run, output: str, expect: str) -> tuple[str, str]:
-    """The result word for a finished run, and why when it shows nothing."""
+    """The result word for a finished run, and why when it shows nothing,
+    or for a failed run, the helper that raised (failed_in_helper()). A run
+    in which tools/kill_guard.py refused a signal reads KILLED (BROKE for
+    `--expect pass`) with its first refusal, ahead of the counts: a refusal in
+    a fixture's teardown is an error with no failure beside it (#448)."""
+    if run.returncode == 1 and (refused := GUARD_REFUSAL.search(output)):
+        return OUTCOMES[expect][1], refused.group(0)
     # Exit status 5: pytest collected no test, or deselected every one.
     if run.returncode in (0, 1, 5) and (why := refusal(counts(output))):
         return "REFUSED", why
     outcome = OUTCOMES[expect].get(run.returncode)
     if outcome is None:
         return "ERROR", f"pytest exit status {run.returncode}"
-    return outcome, ""
+    return outcome, failed_in_helper(output)
+
+
+# A traceback entry's place in pytest's output: `test_x.py:12: AssertionError`
+# for the entry that raised, `test_x.py:9: in join` or `test_x.py:9: ` for
+# one on the way to it.
+PLACE = re.compile(r"^(\S+\.py):(\d+): ", re.M)
+FAILURES = re.compile(r"^=+ FAILURES =+$", re.M)
+SECTION_END = re.compile(r"^={3,} ", re.M)
+# The test side of a traceback: below it, in the code under test or a
+# library, a raise is the mutant's effect, not the test's check.
+TEST_FILE = re.compile(r"^(?:test_\w*|\w+_test|conftest)\.py$")
+
+
+def failed_in_helper(output: str) -> str:
+    """`failed in helper NAME at FILE:LINE, not a test` when pytest's first
+    failure was raised outside a test function: in the last entry of its
+    traceback that lies in a test file (test_*.py, *_test.py or
+    conftest.py) under the working directory, the innermost function is
+    not named `test*`. Empty otherwise. #417's M3, M10 and M11 read KILLED,
+    killed by join_at's check that a run was still waiting, not by the
+    order assert they aimed at (#417 retro)."""
+    failures = FAILURES.search(output)
+    if failures is None:
+        return ""
+    end = SECTION_END.search(output, failures.end())
+    section = output[failures.end() : end.start() if end else len(output)]
+    place = None
+    for m in PLACE.finditer(section):
+        path = Path(m.group(1))
+        if TEST_FILE.match(path.name) and not path.is_absolute() and path.is_file():
+            place = (m.group(1), int(m.group(2)))
+    if place is None:
+        return ""
+    name = _function_at(Path(place[0]), place[1])
+    if name is None or name.startswith("test"):
+        return ""
+    return f"failed in helper {name} at {place[0]}:{place[1]}, not a test"
+
+
+def _function_at(path: Path, line: int) -> str | None:
+    """The innermost function whose lines hold `line`, or None."""
+    try:
+        tree = ast.parse(path.read_bytes())
+    except SyntaxError:
+        return None
+    holders = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.lineno <= line <= node.end_lineno
+    ]
+    # Each function that holds the line starts inside the one before it.
+    holders.sort(key=lambda node: node.lineno)
+    return holders[-1].name if holders else None
+
+
+def killed_by(output: str) -> list[str]:
+    """The `FAILED` and `ERROR` lines of pytest's short test summary: the
+    test that killed a mutant and its error. #347's KILLED rows named no
+    test, so a kill by a bound or a flake read as one by an assert, and a
+    row was rerun by hand to see which (#347 retro)."""
+    lines = output.splitlines()
+    starts = [i for i, line in enumerate(lines) if "short test summary info" in line]
+    if not starts:
+        return []
+    return [
+        line
+        for line in lines[starts[-1] + 1 :]
+        if line.startswith(("FAILED ", "ERROR "))
+    ]
 
 
 def _listing():
@@ -420,6 +535,10 @@ def listed(args) -> int:
                 if word in ("REFUSED", "ERROR") and output:
                     for line in output.splitlines()[-15:]:
                         print(f"    {line}")
+                else:
+                    # Only a failed run has a short summary: a KILLED one.
+                    for line in killed_by(output):
+                        print(f"    {line}")
         except (SystemExit, Changed) as stop:
             left = found[len(rows) :]
             if isinstance(stop, Changed):
@@ -448,6 +567,28 @@ def listed(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Runs the tool with a copy of the guard that is removed when it ends,
+    a stop while it is made, a stop or a second stop during the removal
+    included; a SIGKILL leaves the copy behind, as it leaves the mutant and
+    the lock."""
+    global _guard_folder
+    for signum in STOPS:
+        signal.signal(signum, _stop)
+    try:
+        # The stops are held until the name is kept: a stop that lands inside
+        # mkdtemp, after it made the folder, has no name to remove it by.
+        with _held():
+            _guard_folder = tempfile.mkdtemp(prefix="mutate-guard-")
+        shutil.copy(GUARD, Path(_guard_folder) / "kill_guard.py")
+        return _main(argv)
+    finally:
+        with _held():
+            if _guard_folder:
+                shutil.rmtree(_guard_folder, ignore_errors=True)
+        _guard_folder = None
+
+
+def _main(argv: list[str] | None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--file",
@@ -472,8 +613,6 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--listed takes no --old, --new or --expect")
     elif args.old is None or args.new is None or not args.file or len(args.file) > 1:
         parser.error("give one --file, --old and --new, or --listed")
-    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(signum, _stop)
     if any(XDIST.match(arg) for arg in args.pytest_args):
         print(
             "mutate.py: refused: xdist leaves the deselected count out of its"
@@ -535,7 +674,7 @@ def main(argv: list[str] | None = None) -> int:
     if outcome in ("REFUSED", "ERROR"):
         print(f"{outcome}  {mutant}  ({why})")
         return REFUSED
-    print(f"{outcome}  {mutant}")
+    print(f"{outcome}  {mutant}" + (f"  ({why})" if why else ""))
     return 0 if outcome == EXPECTED[args.expect] else 1
 
 

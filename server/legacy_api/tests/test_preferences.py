@@ -75,7 +75,9 @@ def coordinator(client, event):
 
 def names(model, event, **where):
     return list(
-        model.objects.filter(event=event, **where).values_list("name", flat=True)
+        model.objects.filter(event=event, **where)
+        .order_by("name")
+        .values_list("name", flat=True)
     )
 
 

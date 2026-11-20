@@ -243,10 +243,15 @@ def fake_apt_get(tmp_path, script):
 
 
 def shim(tmp_path, *args, **env):
+    from tools.kill_guard import MARK
+
+    # tools/mutate.py's runs refuse a signal to a process that no parent
+    # chain leads back to them unless it carries the run's token, and
+    # `setsid` parts the dpkg-lock test's holder from its parents (#448).
     started = time.monotonic()
     done = subprocess.run(
         [str(tmp_path / "apt-get"), *args],
-        env={"PATH": "/usr/bin:/bin", **env},
+        env={"PATH": "/usr/bin:/bin", MARK: os.environ.get(MARK, ""), **env},
         capture_output=True,
         text=True,
         timeout=60,
