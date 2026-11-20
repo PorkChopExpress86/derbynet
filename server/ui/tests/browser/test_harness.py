@@ -4,12 +4,16 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
+from django.core.signals import request_started
 from playwright.sync_api import expect
 
 from ui.tests.browser import conftest
@@ -803,3 +807,62 @@ def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
     assert page.in_flight.drain(page) == []
     assert not [url for url in on_the_opener if "popup-target" in url]
     close_tab(page, popup)
+
+
+# The commit and the barrier race, and the barrier lost in most runs before
+# #347's fix, not in every run: each size runs the test this many times.
+COMMIT_RACES = 3
+
+
+@pytest.mark.parametrize("attempt", range(COMMIT_RACES))
+def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
+    page, page_errors, event, monkeypatch, attempt
+):
+    """The settle ran while a navigation was out: a test that failed in
+    `log_in` with the login POST held (#347 gap 1). Its stop waits for the
+    new document's commit, and the barrier's `page.route` then turned
+    Playwright's interception on as the commit landed. The new document's
+    requests then reached the server with no `request` event, the barrier's
+    among them: a 404 and a 10 s wait for its end (#316's log). Here the
+    server holds a navigation until the settle's first stop. The settle
+    now blocks the barrier, which never reaches the server, and every
+    request the server gets after the release has its `request` event."""
+    gate = threading.Event()
+    held = []
+    after = []
+
+    def hold(sender, environ, **kwargs):
+        if environ.get("QUERY_STRING") == "held":
+            held.append(environ["PATH_INFO"])
+            gate.wait(InFlight.TIMEOUT_MS / 1000)
+        elif gate.is_set():
+            after.append(environ["PATH_INFO"])
+
+    request_started.connect(hold, weak=False)
+    try:
+        page.goto("/login/?all")
+        seen = []
+        page.on(
+            "request", lambda r: gate.is_set() and seen.append(urlsplit(r.url).path)
+        )
+        page.evaluate("() => { location.href = '/login/?held'; }")
+        wait_until(page, lambda: held, "the held navigation at the server")
+        stop = conftest.stop_timers
+
+        def release_then_stop(tab):
+            gate.set()
+            stop(tab)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(conftest, "stop_timers", release_then_stop)
+            assert _settle(page) == []
+    finally:
+        gate.set()
+        request_started.disconnect(hold)
+    assert conftest.SETTLE_BARRIER not in after
+    wait_until(
+        page,
+        lambda: not Counter(after) - Counter(seen),
+        f"a request event for each of {after} (got {seen})",
+    )
+    assert page_errors.errors == []
