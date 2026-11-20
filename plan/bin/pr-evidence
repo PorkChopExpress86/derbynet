@@ -3,7 +3,7 @@
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
 Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket] [--closes N]...]
-       plan/bin/pr-evidence --check BODY.md [--closes N]...    (a body with no ticket, such as a retro's)
+       plan/bin/pr-evidence --check BODY.md [--head SHA] [--closes N]...    (a body with no ticket, such as a retro's)
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -86,10 +86,37 @@ they must match. It is labelled CI load: extra evidence until the owner
 amends D85, never a local load run. Other links to runs in the body are not
 read.
 
+`--check` also refuses a hand-off header that names a head other than the
+PR's (#427). A hand-off log starts with the line the brief asks for, which the
+body keeps when it pastes the output: `cwd <dir> HEAD <sha>`, `# HEAD <sha>`,
+`HEAD: <sha>`, `cwd=<dir> head=<sha>`, `head <sha>` (the line tools/detach.sh
+prints), `worktree <dir> head <sha>`. A header is a line that starts with
+`cwd`, `worktree`, `HEAD` or `head` (after any `#`, `>` or `$`), and for
+`cwd` and `worktree` names the head after the directory. Its sha, 7 to 40 hex
+digits, must be a prefix of `--head SHA` (or of PR N's head, with `--pr N`),
+else the body names the line: the run is older than the last edit
+(#407's retro mutants ran two commits before its final head, #413's first
+mutation round at an older head). A line the body means to leave at another
+head carries `[before run]` (BEFORE_RUN) on the header line itself or on the
+nearest line above it, outside the fence the header sits in: a reproduction
+on the base, a control run on master, the run before the fix. The marker is
+the author's word that the run is meant to be older, and the limit left:
+nothing checks that it is. D113 lets a branch skip the rerun when master's new
+commits touch nothing it reads, so a header that names the commit before a
+merge is accepted too: when `--head` is a merge commit, each commit on its
+first-parent line down to the first commit that is no merge passes
+(`merge_chain`), read from the checkout's git; nothing checks what the merged
+commits touched, which `plan/bin/pr-merge` does. A body with a header and no
+`--head` or `--pr` is refused for it, as a `CI load:` item is. Only a header
+line is read: prose that names an older head, such as a round's history, a
+mutant's note or a `load run:` line that names another run's head, is not. The
+sweep over the 285 bodies merged by 2026-11-20 is in the PR of #427.
+
 Exits 1 on a key the body gives no evidence for, on a CI load item not
-accepted or given with no head, on a `--head` that is not PR N's head, on a
-placeholder, on a closing keyword for another issue, on a body that names
-<issue> in no closing keyword and no "Part of", or when the issue, the
+accepted or given with no head, on a hand-off header that is not at the PR's
+head and not marked, or given with no head, on a `--head` that is not PR N's
+head, on a placeholder, on a closing keyword for another issue, on a body that
+names <issue> in no closing keyword and no "Part of", or when the issue, the
 PR or a run cannot be read.
 """
 
@@ -157,6 +184,16 @@ CLOSING = re.compile(
     r"|https://github\.com/(?P<url_repo>[\w.-]+/[\w.-]+)/issues/(?P<url_number>\d+))",
     re.IGNORECASE,
 )
+# The line a hand-off log starts with, as the fork's merged bodies and saved
+# logs write it (`cwd X HEAD S`, `cwd: X  HEAD: S`, `cwd=X head=S`, `# HEAD S`,
+# `HEAD: S`, `HEAD S`, `worktree X head S`, ...); tools/detach.sh prints
+# `head S`. It starts with a keyword, so prose and a `load run:` line that
+# name a head are not read. The tests' HEADER_SHAPES lists each shape.
+HEADER = re.compile(
+    r"^\s*(?:[#>$]\s*)*(?:(?:cwd|worktree)\b.*?\b)?head\b[:=]?\s*(?P<sha>[0-9a-f]{7,40})\b",
+    re.IGNORECASE,
+)
+BEFORE_RUN = "[before run]"
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
 RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
 CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
@@ -362,6 +399,67 @@ def links_ticket(body: str, issue: str) -> bool:
                    for _n, _words, number, in_fork in closing_refs(body, strict=True)))
 
 
+def handoff_headers(body: str) -> list[tuple[int, str, str, bool]]:
+    """Each hand-off header as (its line number, the line, its sha in lower
+    case, whether it is marked `[before run]`): on the line, or on the nearest
+    non-blank line above it. For a header inside a code fence that is the
+    line above the fence's opener, so one caption marks the fence's headers."""
+    lines = body.splitlines()
+    found, fence = [], None
+    for i, line in enumerate(lines):
+        edge = FENCE.match(line)
+        if fence is None and edge:
+            fence = (len(edge[1]), i)
+            continue
+        if fence and edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+            fence = None
+            continue
+        header = HEADER.match(line)
+        if header:
+            above = (fence[1] if fence else i) - 1
+            while above >= 0 and not lines[above].strip():
+                above -= 1
+            caption = lines[above] if above >= 0 else ""
+            marked = BEFORE_RUN.casefold() in f"{line} {caption}".casefold()
+            found.append((i + 1, line.strip(), header["sha"].casefold(), marked))
+    return found
+
+
+def merge_chain(head: str, root: str = ROOT) -> list[str]:
+    """The commits D113 lets a header name for a `head` that is a merge: its
+    first parent while the commit is a merge, down to the first that is none,
+    which is the branch's own last commit. Empty when git cannot read `head`,
+    and for a commit that is no merge."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    chain, commit = [], head
+    for _ in range(100):
+        done = subprocess.run(["git", "-C", root, "rev-list", "--parents", "-n", "1", commit],
+                              capture_output=True, text=True, env=env)
+        parents = done.stdout.split()[1:] if done.returncode == 0 else []
+        if len(parents) < 2:
+            break
+        commit = parents[0]
+        chain.append(commit)
+    return chain
+
+
+def stale_headers(body: str, head: str | None, chain=merge_chain) -> list[str]:
+    """A line for each unmarked hand-off header: `line N: <the line>` with
+    why it is refused, when its sha is no prefix of `head` and names none of
+    the commits before a merge at `head` (`chain`), or when there is no head."""
+    unmarked = [h for h in handoff_headers(body) if not h[3]]
+    if not head:
+        return [f"line {n}: {line}: no --head or --pr to check it at"
+                for n, line, _sha, _marked in unmarked]
+    head = head.casefold()
+    stale = [h for h in unmarked if not head.startswith(h[2])]
+    before = [c.casefold() for c in chain(head)] if stale else []
+    return [f"line {n}: {line}: the PR's head is {head}, so this run is older than its last "
+            f"edit; run it again at the head, or write {BEFORE_RUN} on it if it is a before, "
+            "reproduction or control run"
+            for n, line, sha, _m in stale if not any(c.startswith(sha) for c in before)]
+
+
 def ci_load_items(body: str) -> list[str]:
     """The evidence text of each `CI load:` item outside `## Still open`."""
     found, section, chunk = [], None, []
@@ -516,11 +614,14 @@ def main(argv: list[str]) -> int:
         print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
               f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
               "<pre>, <code>, a ~~~ fence and an indented line count as code)")
+    stale = stale_headers(body, head)
+    for line in stale:
+        print(f"hand-off head not the PR's, {line}")
     loads = check_ci_load(body, head, args.flake_ticket)
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if missing or unfilled or closes or unlinked or refused else 0
+    return 1 if missing or unfilled or closes or unlinked or stale or refused else 0
 
 
 if __name__ == "__main__":
