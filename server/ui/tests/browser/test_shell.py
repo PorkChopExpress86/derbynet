@@ -45,10 +45,9 @@ def test_each_role_sees_exactly_its_registry_entries(login, role):
         expect(page.get_by_role("navigation", name="Main menu")).to_be_hidden()
 
 
+@pytest.mark.sizes("phone", reason="the drawer is the phone's")
 def test_the_more_drawer_holds_the_rest_and_the_help_link(login):
     page = login("RaceCrew")
-    if page.size == "desktop":
-        pytest.skip("the drawer is the phone's")
     page.goto("/")
 
     page.get_by_role("button", name="More").click()
@@ -67,10 +66,9 @@ def test_the_more_drawer_holds_the_rest_and_the_help_link(login):
     expect(page.get_by_role("button", name="More")).to_be_focused()
 
 
+@pytest.mark.sizes("desktop", reason="the sidebar is the desktop's")
 def test_the_sidebar_shows_the_help_link_and_version(login):
     page = login("RaceCoordinator")
-    if page.size == "phone":
-        pytest.skip("the sidebar is the desktop's")
     page.goto("/")
 
     sidebar = page.get_by_role("navigation", name="Main menu")

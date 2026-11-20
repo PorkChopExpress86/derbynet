@@ -111,8 +111,10 @@ class IssueStandIn:
         return subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '61', *argv],
                               capture_output=True, text=True, env=self.env)
 
-    def check(self, body, *argv):
-        (self.tmp / 'body.md').write_text(body)
+    def check(self, body, *argv, link=True):
+        """The tool's --check on `body`, with a last line `Part of #61.`
+        unless `link` is false (TicketLink)."""
+        (self.tmp / 'body.md').write_text(body + ('\nPart of #61.\n' if link else ''))
         return self.run_tool('--check', str(self.tmp / 'body.md'), *argv)
 
 
@@ -209,7 +211,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
 
     def check_at(self, items, head=HEAD, pr=None, flake_ticket=False):
-        (self.tmp / 'body.md').write_text(evidence(KEYS) + items)
+        (self.tmp / 'body.md').write_text('Part of #61.\n\n' + evidence(KEYS) + items)
         argv = ['--check', str(self.tmp / 'body.md')] + (['--head', head] if head else [])
         return self.run_tool(*argv, *(['--pr', pr] if pr else []),
                              *(['--flake-ticket'] if flake_ticket else []))
@@ -561,11 +563,109 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
     def test_a_body_with_crlf_line_ends_is_refused_for_its_placeholder(self):
         # The #408 review's crlf.md, as bytes.
         (self.tmp / 'body.md').write_bytes(
-            (evidence(KEYS) + 'x\n- Manual check\nLOOP-OUTPUT\n').replace('\n', '\r\n').encode())
+            (evidence(KEYS) + 'x\n- Manual check\nLOOP-OUTPUT\nPart of #61.\n').replace('\n', '\r\n').encode())
         done = self.run_tool('--check', str(self.tmp / 'body.md'))
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:],
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
+
+
+# The lines of #444's body that named #434, which its merge left open (#434
+# retro), with #434 as the stand-in's #61.
+BODY_444 = ('## Why\n\n`test_kiosk_results_by_racer.py`\'s give-up test should pass every '
+            'run, on CI and under load (#61).\n\n## What changed\n\nThe test only.\n')
+UNLINKED = ('no "Closes #61" or "Part of #61" outside code: the merge leaves #61 open '
+            'with no link to the PR (an HTML comment, <pre>, <code>, a ~~~ fence and an '
+            'indented line count as code)')
+
+
+class TicketLink(IssueStandIn, unittest.TestCase):
+    """A body names #61 in a closing keyword or "Part of #61". The cases call
+    `TOOL.links_ticket` in process (plan/AGENT-BRIEF.md); the command line,
+    for the exit code and the message, runs only in
+    `test_444s_body_naming_the_ticket_in_prose_is_refused` and
+    `test_a_body_with_no_issue_needs_no_link`."""
+
+    def test_444s_body_naming_the_ticket_in_prose_is_refused(self):
+        done = self.check(evidence(KEYS) + BODY_444, link=False)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [UNLINKED])
+
+    def test_each_link_outside_code_passes(self):
+        for line in ('Closes #61.', 'Fixes: #61', 'resolves #61', 'Part of #61.',
+                     'This is part of #61, as its Still open says.',
+                     'Closes PorkChopExpress86/derbynet#61',
+                     'Closes https://github.com/PorkChopExpress86/derbynet/issues/61'):
+            with self.subTest(line=line):
+                self.assertTrue(TOOL.links_ticket(BODY_444 + line + '\n', '61'))
+
+    def test_a_link_in_code_another_number_or_repo_or_a_bare_mention_is_refused(self):
+        for line in ('`Closes #61`', '```\nPart of #61\n```', 'Part of #610', 'Part of #6',
+                     'Part of `#61`', 'Refs #61', 'Issue #61.', 'counterpart of #61',
+                     'Closes jeffpiazza/derbynet#61', 'Closes #610', 'Fixes #59',
+                     'Closes https://github.com/jeffpiazza/derbynet/issues/61'):
+            with self.subTest(line=line):
+                self.assertFalse(TOOL.links_ticket(BODY_444 + line + '\n', '61'))
+
+    def test_a_link_github_draws_as_code_or_not_at_all_is_refused(self):
+        """`gh api markdown` linked #61 in none of these (an HTML comment, a
+        ~~~ fence, an indented block, a fence with no end, <pre> and <code>,
+        a quoted fence); the PR body pastes the runs."""
+        for lines in ('<!-- Part of #61 -->', 'a <!-- Part of #61 --> b',
+                      '<!--\nPart of #61\n-->', '<!--\nxxPart of #61\nxx\n-->', '<!--\nCloses #61',
+                      'a <!-- Part of #61\ny --> b', '<pre>\nxxCloses #61\n</pre>',
+                      '~~~\nPart of #61\n~~~', '~~~~\nCloses #61\n~~~~', '~~~\nCloses #61',
+                      '```\nPart of #61', '    Part of #61', '\tCloses #61',
+                      '- item\n\n      Part of #61',
+                      '~~~\nx\n~~~ y\nPart of #61\n~~~', '~~~\n```\nPart of #61\n```\n~~~',
+                      '```\n~~~\nPart of #61\n~~~\n```',
+                      '<pre>Part of #61</pre>', '<PRE>\nPart of #61\n</PRE>',
+                      '<code>Part of #61</code>', 'x <pre>Part of #61', 'x <code>Part of #61',
+                      '> ```\n> Part of #61\n> ```', '> quote\n>\n>     Part of #61'):
+            with self.subTest(lines=lines):
+                self.assertFalse(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
+
+    def test_a_link_after_such_code_ends_passes(self):
+        """`gh api markdown` linked #61 in each of these too."""
+        for lines in ('<!-- note -->\nPart of #61', '<!-- note --> Part of #61',
+                      '<!--\nnote\n--> Closes #61', '~~~\nx\n~~~\nPart of #61',
+                      '~~~~\n~~~\nx\n~~~~\nPart of #61', '~~~\nx\n~~~~\nPart of #61',
+                      '   Part of #61', '- Part of #61', '<!--\n```\n-->\nPart of #61',
+                      '<!-- a --> Part of #61 <!-- b -->', 'a <!-- x\ny --> Part of #61',
+                      '<pre>x</pre> Part of #61', '<code>x</code>\nPart of #61',
+                      '<precious>Part of #61</precious>', '<script>Part of #61</script>',
+                      '> Part of #61', '> ```\n> x\n> ```\n\nPart of #61'):
+            with self.subTest(lines=lines):
+                self.assertTrue(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
+
+    def test_the_limit_left_is_a_false_refusal_never_a_missed_one(self):
+        """`gh api markdown` linked #61 in each of these, and the strict
+        reading refuses them: it leaves out a lazy continuation line, which
+        it cannot tell from a code block without parsing the paragraph above,
+        and a comment opened mid-line and never closed."""
+        for lines in ('text\n    Part of #61', 'x <!-- Closes #61'):
+            with self.subTest(lines=lines):
+                self.assertFalse(TOOL.links_ticket(BODY_444 + lines + '\n', '61'))
+
+    def test_a_close_foreign_closes_must_refuse_is_still_read_in_that_code(self):
+        """The default view keeps what GitHub might act on: only a closed
+        backtick fence and a code span are quoted."""
+        for lines in ('<!-- Closes #59 -->', '~~~\nCloses #59\n~~~', '    Closes #59',
+                      '```\nCloses #59', '> ```\n> Closes #59\n> ```'):
+            with self.subTest(lines=lines):
+                self.assertEqual(len(TOOL.foreign_closes(lines + '\n', {'61'})), 1)
+
+    def test_still_open_alone_is_no_link(self):
+        body = evidence(KEYS[1:]) + '\n## Still open\n\n- ' + KEYS[0] + '\n'
+        self.assertFalse(TOOL.links_ticket(body, '61'))
+        self.assertTrue(TOOL.links_ticket(body + 'Part of #61.\n', '61'))
+
+    def test_a_body_with_no_issue_needs_no_link(self):
+        (self.tmp / 'body.md').write_text('## Summary\n\nA retro.\n')
+        done = subprocess.run([sys.executable, '-I', str(PR_EVIDENCE), '--check',
+                               str(self.tmp / 'body.md')],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, NO_ISSUE + '\n', ''))
 
 
 # The line of #421's body draft that pr-merge refused at merge time, since

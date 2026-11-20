@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.mutate import counts, main, stopped_on_error
+from tests import outside_process
+from tools.mutate import counts, failed_in_helper, killed_by, main, stopped_on_error
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -73,12 +74,28 @@ def project(tmp_path):
             pass
 
 
-def mutate(project, old, new, *pytest_args, expect="fail", wait=False, tool=()):
-    command = [sys.executable, str(TOOL), "--file", "mod.py", "--old", old]
+def mutate(
+    project,
+    old,
+    new,
+    *pytest_args,
+    expect="fail",
+    wait=False,
+    tool=(),
+    file="mod.py",
+    unset=(),
+    env=None,
+    program=TOOL,
+):
+    """The tool's run of a mutant, with `env` added to its environment and
+    the names in `unset` taken out."""
+    command = [sys.executable, str(program), "--file", file, "--old", old]
     command += ["--new", new, "--expect", expect, *tool]
     command += ["--", "-p", "no:cacheprovider", *pytest_args]
     # The project has no ini file, so no `addopts` and no Django settings.
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
+    env = {k: v for k, v in os.environ.items() if k not in (*TOOL_UNSET, *unset)} | (
+        env or {}
+    )
     if wait:
         return subprocess.Popen(command, cwd=project, env=env, text=True)
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
@@ -90,6 +107,167 @@ def test_a_killed_mutant_exits_0_and_the_file_is_restored(project):
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
     assert run.stdout.count("test session starts") == 1, "pytest's output once"
     assert (project / "mod.py").read_text() == MODULE
+
+
+HELPER_TESTS = """\
+from mod import bound
+
+
+def check(a, b):
+    assert bound(a, b)
+
+
+def test_through_a_helper():
+    check(1, 2)
+
+
+def test_in_its_body():
+    assert bound(1, 2)
+"""
+
+
+@pytest.mark.parametrize(
+    ("new", "test", "note"),
+    [
+        (
+            "a > b",
+            "test_through_a_helper",
+            "  (failed in helper check at test_helper.py:5, not a test)",
+        ),
+        ("a > b", "test_in_its_body", ""),
+        # Raised in the code under test, called from the test's body.
+        ("[][1]", "test_in_its_body", ""),
+        (
+            "[][1]",
+            "test_through_a_helper",
+            "  (failed in helper check at test_helper.py:5, not a test)",
+        ),
+    ],
+)
+def test_a_mutant_killed_in_a_helper_names_it(project, new, test, note):
+    """#417's M3, M10 and M11 read KILLED, killed by join_at's check that a
+    run still waited, not by the order assert they aimed at (#417 retro)."""
+    (project / "test_helper.py").write_text(HELPER_TESTS)
+    run = mutate(project, "a < b", new, f"test_helper.py::{test}")
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1] == f"KILLED  mod.py: 'a < b' -> {new!r}{note}"
+
+
+HELPERS = """\
+import pytest
+
+
+def check(a, b):
+    assert a < b
+
+
+def test_outer():
+    def inner():
+        assert False
+
+    inner()
+
+
+class TestKind:
+    def test_method(self):
+        assert False
+
+
+AT_MODULE_LEVEL = 1
+"""
+
+
+def failures(*places, after=""):
+    """pytest's output for one failure whose traceback passes `places`."""
+    lines = [
+        "=" * 10 + " test session starts " + "=" * 10,
+        "",
+        "=" * 10 + " FAILURES " + "=" * 10,
+    ]
+    lines += ["_" * 5 + " test_x " + "_" * 5]
+    for place in places:
+        lines += ["    code", ">   raise", f"{place}"]
+    return "\n".join(lines) + "\n" + after
+
+
+@pytest.mark.parametrize(
+    ("output", "found"),
+    [
+        (
+            failures("test_h.py:12: ", "test_h.py:5: AssertionError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        # A library or the code under test below the helper.
+        (
+            failures("test_h.py:5: in check", "/usr/lib/python3/x.py:9: TimeoutError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        (
+            failures("test_h.py:5: in check", "helpers.py:2: ValueError"),
+            "failed in helper check at test_h.py:5, not a test",
+        ),
+        (
+            failures("test_h.py:5: in check", "conftest.py:2: AssertionError"),
+            "failed in helper fixture at conftest.py:2, not a test",
+        ),
+        (failures("test_h.py:12: AssertionError"), ""),
+        (
+            failures("test_h.py:12: in test_outer", "test_h.py:10: AssertionError"),
+            "failed in helper inner at test_h.py:10, not a test",
+        ),
+        (failures("test_h.py:17: AssertionError"), ""),
+        (failures("test_h.py:20: AssertionError"), ""),
+        (failures("test_gone.py:5: AssertionError"), ""),
+        (failures("test_broken.py:1: AssertionError"), ""),
+        (failures("helpers.py:2: ValueError"), ""),
+        # A place after the section, such as a warning's, is no frame.
+        (
+            failures(
+                "test_h.py:12: AssertionError",
+                after="=" * 5
+                + " warnings summary "
+                + "=" * 5
+                + "\ntest_h.py:5: Warn\n",
+            ),
+            "",
+        ),
+        (failures("test_h.py:5: AssertionError").replace(" FAILURES ", " ERRORS "), ""),
+        ("test_h.py:5: AssertionError\n", ""),
+    ],
+    # Ids by case, not by the output, which a mutant of failures() changes
+    # (mutate.py's run then finds no such node id).
+    ids=[
+        "helper",
+        "library-below",
+        "code-below",
+        "conftest",
+        "test-body",
+        "nested",
+        "method",
+        "module-level",
+        "missing-file",
+        "unparsable",
+        "no-test-file",
+        "after-section",
+        "errors-section",
+        "no-section",
+    ],
+)
+def test_failed_in_helper_names_the_test_side_function_that_raised(
+    tmp_path, monkeypatch, output, found
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "test_h.py").write_text(HELPERS)
+    (tmp_path / "conftest.py").write_text("def fixture():\n    assert False\n")
+    (tmp_path / "test_broken.py").write_text("def check(:\n")
+    (tmp_path / "helpers.py").write_text("def run():\n    raise ValueError\n")
+    assert failed_in_helper(output) == found
+
+
+def test_an_absolute_place_is_no_frame(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "test_h.py").write_text(HELPERS)
+    assert failed_in_helper(failures(f"{tmp_path}/test_h.py:5: AssertionError")) == ""
 
 
 def test_a_surviving_mutant_exits_1(project):
@@ -179,20 +357,28 @@ def test_a_stopped_run_restores_the_file(project, signum):
     assert (project / "mod.py").read_text() == MODULE
 
 
-def test_after_a_sigkill_the_next_run_is_refused(project):
+def test_after_a_sigkill_the_next_run_is_refused(project, tmp_path_factory):
     """A SIGKILL leaves the mutant in the file, and no run may take it as
-    the original."""
-    tool = mutate(project, "1 + 1", "2", "test_mod.py::test_waits", wait=True)
+    the original. The killed run's guard copy stays in its own TMPDIR, the
+    only folder this test leaves it in."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tmpdir = {"TMPDIR": str(folder)}
+    tool = mutate(
+        project, "1 + 1", "2", "test_mod.py::test_waits", wait=True, env=tmpdir
+    )
     started(project, tool)
     tool.kill()
     tool.wait(timeout=30)
     assert "return 2" in (project / "mod.py").read_text()
-    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    left = list(folder.iterdir())
+    assert [p.name.startswith("mutate-guard-") for p in left] == [True]
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound", env=tmpdir)
     assert run.returncode == 2
     assert "refused" in run.stderr
     (project / "started").unlink()
-    run = mutate(project, "1 + 1", "2", "test_mod.py::test_the_bound")
+    run = mutate(project, "1 + 1", "2", "test_mod.py::test_the_bound", env=tmpdir)
     assert run.returncode == 2, "the leftover lock or mutant, whichever it meets"
+    assert list(folder.iterdir()) == left, "a refused run removes its own copy"
 
 
 def test_a_file_that_differs_from_the_index_is_refused(project):
@@ -436,6 +622,11 @@ def listed(project, *pytest_args, tool=(), wait=False):
     return subprocess.run(command, cwd=project, env=env, text=True, capture_output=True)
 
 
+def rows(run):
+    """The listed run's rows, without the pytest lines indented under them."""
+    return [line for line in run.stdout.splitlines() if not line.startswith(" ")]
+
+
 def commit(project, module, tests=""):
     (project / "mod.py").write_text(module)
     (project / "test_mod.py").write_text(TESTS + tests)
@@ -447,7 +638,7 @@ def test_listed_runs_each_mutant_and_names_each_survivor(project):
     has b at 0 or below."""
     commit(project, MODULE + PICK, PICK_TESTS)
     run = listed(project, "test_mod.py::test_pick")
-    assert run.stdout.splitlines()[:6] == [
+    assert rows(run)[:6] == [
         "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
         "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
         "KILLED    mod.py:10  operand  a > 0  ->  True",
@@ -461,6 +652,42 @@ def test_listed_runs_each_mutant_and_names_each_survivor(project):
     )
     assert run.returncode == 1
     assert (project / "mod.py").read_text() == MODULE + PICK
+
+
+def test_listed_names_the_test_and_error_under_each_killed_row(project):
+    """#347's KILLED rows named no test: a kill by a bound or a flake read
+    as one by the test's assert, and the row was rerun by hand (#347 retro).
+    `pick(1, 1) == 1` fails each mutant that makes the condition false, and
+    `pick(0, 1) == 0` each that makes it true."""
+    commit(project, MODULE + PICK, PICK_TESTS)
+    run = listed(project, "test_mod.py::test_pick")
+    lines = run.stdout.splitlines()
+    assert lines[:2] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  True",
+        "    FAILED test_mod.py::test_pick - assert 1 == 0",
+    ], run.stdout
+    assert lines[2:4] == [
+        "KILLED    mod.py:10  condition  a > 0 and b > 0  ->  False",
+        "    FAILED test_mod.py::test_pick - assert 0 == 1",
+    ], run.stdout
+    survivor = lines.index("SURVIVED  mod.py:10  operand  b > 0  ->  True")
+    assert not lines[survivor + 1].startswith(" "), run.stdout
+
+
+def test_killed_by_reads_only_the_short_summary():
+    """A captured log's `ERROR` line above the summary is no test."""
+    output = (
+        "ERROR    asyncio:base_events.py:1893 Exception in callback\n"
+        "==================== short test summary info ====================\n"
+        "FAILED t.py::test_a - assert 1 == 2\n"
+        "ERROR t.py::test_b - RuntimeError: an environment problem\n"
+        "=================== 1 failed, 1 error in 0.10s ===================\n"
+    )
+    assert killed_by(output) == [
+        "FAILED t.py::test_a - assert 1 == 2",
+        "ERROR t.py::test_b - RuntimeError: an environment problem",
+    ]
+    assert killed_by("1 failed in 0.1s\n") == []
 
 
 def test_listed_exits_0_when_every_mutant_is_killed(project):
@@ -547,12 +774,11 @@ def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
     (PR #364's review found both counted as helpers)."""
     commit(project, MODULE, GUARD_TESTS)
     run = listed(project, "test_mod.py::test_ends", tool=("--file", "test_mod.py"))
-    rows = run.stdout.splitlines()
-    assert rows[1:3] == [
+    assert rows(run)[1:3] == [
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  True',
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  False',
     ], run.stdout
-    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows, run.stdout
+    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows(run)
     assert run.returncode == 0, run.stdout + run.stderr
     assert (project / "test_mod.py").read_text() == TESTS + GUARD_TESTS
 
@@ -564,7 +790,9 @@ def test_listed_skips_a_test_file_it_is_not_named(project):
         "SKIPPED   test_mod.py: 10 listed, in a test file"
         " (name it with --file to mutate its helpers)" in run.stdout
     ), run.stdout
-    assert "test_mod.py:" not in run.stdout.replace("SKIPPED   test_mod.py:", "")
+    # No row names a mutant in it; a KILLED row's pytest line names its test.
+    listed_rows = "\n".join(rows(run)).replace("SKIPPED   test_mod.py:", "")
+    assert "test_mod.py:" not in listed_rows, run.stdout
 
 
 def test_listed_takes_no_old_or_new(project):
@@ -622,7 +850,7 @@ def test_listed_narrows_to_each_file_given_and_lists_scripts_and_stylesheets(pro
     subprocess.run([*GIT, "add", "tool", "a.css"], cwd=project, check=True)
     commit(project, MODULE + PICK, PICK_TESTS)
     run = listed(project, "test_mod.py::test_the_bound", tool=("--file", "tool"))
-    assert [line.split()[1] for line in run.stdout.splitlines()[:2]] == [
+    assert [line.split()[1] for line in rows(run)[:2]] == [
         "tool:2",
         "tool:2",
     ], run.stdout
@@ -687,12 +915,13 @@ def test_a_run_past_its_bound_that_printed_nothing_is_an_error(project):
 # edit, for the #358 review's cases: a second signal while the file is put
 # back or the lock is taken, and an edit by someone else during the run.
 WRAPPER = """\
-import os, pathlib, sys, time
+import os, pathlib, shutil, sys, tempfile, time
 sys.path.insert(0, {tools!r})
 import mutate
+rmtree = shutil.rmtree
 ORIGINAL = pathlib.Path("mod.py").read_bytes()
 write_bytes, fdopen, result = pathlib.Path.write_bytes, os.fdopen, mutate._result
-unlink = pathlib.Path.unlink
+unlink, mkdtemp = pathlib.Path.unlink, tempfile.mkdtemp
 
 
 def mark(name):
@@ -725,6 +954,26 @@ def slow_unlock(self, *args):
     return unlink(self, *args)
 
 
+def held_mkdtemp(*args, **kwargs):
+    path = mkdtemp(*args, **kwargs)
+    pathlib.Path("making").write_text(path)
+    deadline = time.monotonic() + 30
+    while not os.path.exists("go"):
+        assert time.monotonic() < deadline, "no go"
+        time.sleep(0.02)
+    return path
+
+
+def failing_mkdtemp(*args, **kwargs):
+    raise OSError("no room for the guard")
+
+
+def slow_rmtree(path, *args, **kwargs):
+    pathlib.Path("removing").write_text(str(path))
+    time.sleep(2)
+    return rmtree(path, *args, **kwargs)
+
+
 def edit_after_first(*args):
     mutate._result = result
     with open("mod.py", "a") as f:
@@ -737,8 +986,9 @@ sys.exit(mutate.main(sys.argv[1:]))
 """
 
 
-def wrapped(project, patch, mode, *pytest_args, tool=()):
-    """The tool, under `patch`, in `mode` (single: `1 + 1` -> `2`)."""
+def wrapped(project, patch, mode, *pytest_args, tool=(), env=None):
+    """The tool, under `patch`, in `mode` (single: `1 + 1` -> `2`), with
+    `env` added to its environment."""
     (project / "wrap.py").write_text(
         WRAPPER.format(tools=str(TOOL.parent), patch=patch)
     )
@@ -747,7 +997,7 @@ def wrapped(project, patch, mode, *pytest_args, tool=()):
         ["--listed", "--base", "HEAD~1"] if mode == "listed" else first
     )
     command += [*tool, "--", "-p", "no:cacheprovider", *pytest_args]
-    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET}
+    env = {k: v for k, v in os.environ.items() if k not in TOOL_UNSET} | (env or {})
     return subprocess.Popen(
         command,
         cwd=project,
@@ -886,7 +1136,11 @@ def test_listed_stops_when_the_file_changes_between_mutants(project):
     assert no_lock(project)
 
 
-def test_after_a_sigkill_the_next_listed_run_is_refused(project):
+def test_after_a_sigkill_the_next_listed_run_is_refused(
+    project, tmp_path_factory, monkeypatch
+):
+    folder = tmp_path_factory.mktemp("tmp")
+    monkeypatch.setenv("TMPDIR", str(folder))
     commit(project, MODULE + PICK, PICK_TESTS)
     tool = listed(project, "test_mod.py::test_waits", wait=True)
     deadline = time.monotonic() + 30
@@ -896,10 +1150,13 @@ def test_after_a_sigkill_the_next_listed_run_is_refused(project):
     tool.kill()
     tool.wait(timeout=30)
     assert "if True:" in (project / "mod.py").read_text(), "the mutant is left"
+    left = list(folder.iterdir())
+    assert [p.name.startswith("mutate-guard-") for p in left] == [True]
     run = listed(project, "test_mod.py::test_pick")
     assert run.returncode == 2
     assert "refused" in run.stderr
     assert "if True:" in (project / "mod.py").read_text(), "and left alone"
+    assert list(folder.iterdir()) == left, "a refused run removes its own copy"
 
 
 def test_listed_runs_a_crlf_files_mutants(project):
@@ -997,3 +1254,320 @@ def test_a_mutant_runs_past_a_stale_pyc_of_its_file(project):
     run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
     assert run.returncode == 0, run.stdout + run.stderr
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
+
+
+# kill_guard (#448): every pytest run mutate.py starts refuses a signal to a
+# process outside its tree.
+VICTIM = """\
+from pathlib import Path
+
+
+def victim():
+    if Path("own").exists():
+        return int(Path("own").read_text())
+    return int(Path("outside.pid").read_text())
+"""
+SIGNAL_TESTS = """\
+import os
+import signal
+import subprocess
+from pathlib import Path
+
+import pytest
+from victim import victim
+
+
+@pytest.fixture
+def held():
+    held = subprocess.Popen(["sleep", "120"])
+    Path("own").write_text(str(held.pid))
+    yield held
+    held.kill()
+    held.wait(timeout=10)
+
+
+def test_stops_its_own_sleeper(held):
+    os.kill(victim(), signal.SIGTERM)
+    assert held.wait(timeout=10) == -signal.SIGTERM
+
+
+def test_swallows_what_it_gets(held):
+    try:
+        os.kill(victim(), signal.SIGTERM)
+    except BaseException:
+        pass
+
+
+@pytest.fixture
+def stops_in_teardown(held):
+    yield
+    os.kill(victim(), signal.SIGTERM)
+
+
+def test_stops_in_teardown(stops_in_teardown):
+    pass
+"""
+# Where `victim()` names the sleeper outside the tree.
+OUTSIDE_BRANCH = ('if Path("own").exists():', "if False:")
+
+
+# The sleeper is started in `tmp_path`, which is the project.
+outside = outside_process.outside
+
+
+def with_victim(project):
+    (project / "victim.py").write_text(VICTIM)
+    (project / "test_guard.py").write_text(SIGNAL_TESTS)
+    subprocess.run([*GIT, "add", "victim.py"], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "victim"], cwd=project, check=True)
+
+
+@pytest.mark.parametrize(
+    "test",
+    [
+        "test_stops_its_own_sleeper",
+        "test_swallows_what_it_gets",
+        "test_stops_in_teardown",
+    ],
+)
+def test_a_mutant_that_signals_a_process_outside_the_tree_reads_killed_with_the_refusal(
+    project, outside, test
+):
+    """The test's body, a refusal it swallowed, and a refusal in a fixture's
+    teardown, which pytest counts as an error and not a failure."""
+    with_victim(project)
+    run = mutate(project, *OUTSIDE_BRANCH, f"test_guard.py::{test}", file="victim.py")
+    assert run.returncode == 0, run.stdout + run.stderr
+    last = run.stdout.splitlines()[-1]
+    assert last.startswith("KILLED  victim.py: "), run.stdout
+    assert "(kill_guard refused os.kill(" in last
+    assert outside_process.alive(outside)
+
+
+def test_listed_runs_each_mutant_under_the_guard(project, outside):
+    with_victim(project)
+    run = listed(project, "test_guard.py::test_stops_its_own_sleeper")
+    listed_rows = rows(run)
+    assert len(listed_rows) >= 3, run.stdout
+    assert listed_rows[0].startswith(
+        'SURVIVED  victim.py:5  condition  Path("own").exists()  ->  True'
+    )
+    assert listed_rows[1].startswith(
+        'KILLED    victim.py:5  condition  Path("own").exists()  ->  False'
+    )
+    assert "(kill_guard refused os.kill(" in listed_rows[1]
+    assert outside_process.alive(outside)
+    assert run.returncode == 1, run.stdout + run.stderr
+
+
+def test_a_run_under_the_guard_names_it_and_a_test_that_signals_its_own_child_passes(
+    project,
+):
+    with_victim(project)
+    run = mutate(
+        project,
+        'int(Path("own").read_text())',
+        'int(Path("own").read_text()) + 0',
+        "test_guard.py::test_stops_its_own_sleeper",
+        "-v",
+        expect="pass",
+        file="victim.py",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "kill_guard: os.kill and os.killpg raises for a pid" in run.stdout
+    assert run.stdout.splitlines()[-1].startswith("PASSED  victim.py")
+
+
+def test_a_pythonpath_of_the_caller_is_kept_beside_the_guard(project, tmp_path_factory):
+    folder = tmp_path_factory.mktemp("libs")
+    (folder / "sentinel.py").write_text("VALUE = 1\n")
+    (project / "test_path.py").write_text(
+        "import sentinel\n\n\ndef test_it():\n    assert sentinel.VALUE == 1\n"
+    )
+    run = mutate(
+        project,
+        "1 + 1",
+        "2",
+        "test_path.py::test_it",
+        expect="pass",
+        env={"PYTHONPATH": str(folder)},
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_a_mutant_of_the_guard_itself_is_run_under_the_guard_as_it_was_before_it(
+    project,
+):
+    """The run loads the copy of the plugin made before the first mutant, so
+    a mutant of tools/kill_guard.py is judged by the tests and not by itself:
+    the stand-in plugin's header names the text it had before the mutant."""
+    (project / "plugin.py").write_text(
+        'def pytest_report_header(config):\n    return "plugin says ORIGINAL"\n'
+    )
+    subprocess.run([*GIT, "add", "plugin.py"], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "plugin"], cwd=project, check=True)
+    (project / "wrap.py").write_text(
+        WRAPPER.format(
+            tools=str(TOOL.parent), patch='mutate.GUARD = pathlib.Path("plugin.py")'
+        )
+    )
+    run = mutate(
+        project,
+        "ORIGINAL",
+        "MUTANT",
+        "test_mod.py::test_other",
+        expect="pass",
+        file="plugin.py",
+        program="wrap.py",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "plugin says ORIGINAL" in run.stdout
+    assert "MUTANT" not in run.stdout.replace("-> 'MUTANT'", "")
+    assert (project / "plugin.py").read_text().count("ORIGINAL") == 1
+
+
+def test_a_run_with_no_pythonpath_loads_the_guard_too(project):
+    run = mutate(
+        project,
+        "1 + 1",
+        "2",
+        "test_mod.py::test_other",
+        expect="pass",
+        unset=("PYTHONPATH",),
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "kill_guard: os.kill and os.killpg raises for a pid" in run.stdout
+
+
+def test_a_line_that_only_reads_like_a_refusal_does_not_kill_a_passing_run(project):
+    """The tool reads the plugin's summary line from a failed run: a test
+    that prints one and passes is no refusal."""
+    (project / "test_says.py").write_text(
+        "def test_says():\n"
+        '    print("\\nkill_guard refused os.kill(1, SIGTERM) at x: y", flush=True)\n'
+    )
+    run = mutate(project, "1 + 1", "2", "-s", "test_says.py::test_says")
+    assert run.returncode == 1, run.stdout + run.stderr
+    assert "kill_guard refused os.kill(1" in run.stdout
+    assert run.stdout.splitlines()[-1].startswith("SURVIVED  mod.py")
+
+
+def test_a_should_pass_mutant_that_signals_a_process_outside_the_tree_breaks(
+    project, outside
+):
+    with_victim(project)
+    run = mutate(
+        project,
+        *OUTSIDE_BRANCH,
+        "test_guard.py::test_stops_its_own_sleeper",
+        expect="pass",
+        file="victim.py",
+    )
+    assert run.returncode == 1, run.stdout + run.stderr
+    last = run.stdout.splitlines()[-1]
+    assert last.startswith("BROKE  victim.py: "), run.stdout
+    assert "(kill_guard refused os.kill(" in last
+    assert outside_process.alive(outside)
+
+
+def test_the_guard_copy_is_removed_when_the_run_ends(project, tmp_path_factory):
+    folder = tmp_path_factory.mktemp("tmp")
+    run = mutate(
+        project,
+        "1 + 1",
+        "2",
+        "test_mod.py::test_other",
+        expect="pass",
+        env={"TMPDIR": str(folder)},
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert list(folder.iterdir()) == []
+
+
+@pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGINT, signal.SIGHUP])
+def test_a_stop_while_the_guard_copy_is_made_removes_it(
+    project, tmp_path_factory, signum
+):
+    """The stop comes after mkdtemp made the folder and before main() has its
+    name: it is delivered once the name is kept, and the folder goes."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tool = wrapped(
+        project,
+        "mutate.tempfile.mkdtemp = held_mkdtemp",
+        "single",
+        "test_mod.py::test_the_bound",
+        env={"TMPDIR": str(folder)},
+    )
+    wait_for(project, "making", tool)
+    assert Path((project / "making").read_text()).parent == folder
+    tool.send_signal(signum)
+    (project / "go").touch()
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signum, err
+    assert list(folder.iterdir()) == []
+    assert (project / "mod.py").read_text() == MODULE
+    assert no_lock(project)
+
+
+def test_a_guard_copy_that_cannot_be_made_ends_the_run_on_that_error(project):
+    tool = wrapped(
+        project,
+        "mutate.tempfile.mkdtemp = failing_mkdtemp",
+        "single",
+        "test_mod.py::test_the_bound",
+    )
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 1, err
+    assert err.splitlines()[-1] == "OSError: no room for the guard"
+    assert "During handling" not in err
+    assert (project / "mod.py").read_text() == MODULE
+
+
+def test_a_second_signal_while_the_guard_copy_is_removed_waits_for_it(
+    project, tmp_path_factory
+):
+    folder = tmp_path_factory.mktemp("tmp")
+    tool = wrapped(
+        project,
+        "mutate.shutil.rmtree = slow_rmtree",
+        "single",
+        "test_mod.py::test_waits",
+        env={"TMPDIR": str(folder)},
+    )
+    wait_for(project, "started", tool)
+    tool.send_signal(signal.SIGTERM)
+    wait_for(project, "removing", tool)
+    tool.send_signal(signal.SIGTERM)
+    _, err = tool.communicate(timeout=30)
+    assert tool.returncode == 128 + signal.SIGTERM, err
+    assert Path((project / "removing").read_text()).parent == folder
+    assert list(folder.iterdir()) == []
+    assert (project / "mod.py").read_text() == MODULE
+    assert no_lock(project)
+
+
+def test_after_a_sigkill_the_guard_copy_is_left_and_the_next_run_goes_on(
+    project, tmp_path_factory
+):
+    """As the mutant and the lock are left; the next run makes a copy of its
+    own, and removes only that."""
+    folder = tmp_path_factory.mktemp("tmp")
+    tmpdir = {"TMPDIR": str(folder)}
+    tool = mutate(
+        project, "1 + 1", "2", "test_mod.py::test_waits", wait=True, env=tmpdir
+    )
+    started(project, tool)
+    tool.kill()
+    tool.wait(timeout=30)
+    left = list(folder.iterdir())
+    # Beside it a __pycache__, unless PYTHONDONTWRITEBYTECODE is set.
+    copy = (left[0] / "kill_guard.py").read_bytes()
+    assert copy == (TOOL.parent / "kill_guard.py").read_bytes()
+    assert len(left) == 1
+    subprocess.run([*GIT, "checkout", "mod.py"], cwd=project, check=True)
+    for lock in (project / ".git").glob("mutate-*.lock"):
+        lock.unlink()
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound", env=tmpdir)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
+    assert list(folder.iterdir()) == left

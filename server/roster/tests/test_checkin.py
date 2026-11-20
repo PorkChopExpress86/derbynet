@@ -90,19 +90,22 @@ def test_a_racer_with_heats_or_a_finished_round_gets_no_question(race):
     assert round_in_progress_for(late_racer(event, 201)) is None
 
 
+def raced_lanes(round):
+    rows = HeatLane.objects.filter(round=round).filter(HAS_RESULT)
+    return list(rows.order_by("heat", "lane").values())
+
+
 def test_the_race_crew_adds_a_car_that_just_passed(client, race):
     event, round = race
     run_first_heat(round)
     racer = late_racer(event, 201)
-    raced = list(HeatLane.objects.filter(round=round).filter(HAS_RESULT).values())
+    raced = raced_lanes(round)
 
     added = add_to_round_in_progress(racer, crew(client))
 
     assert added.round == round
     assert heats_of(racer, round) > 0
-    assert list(HeatLane.objects.filter(round=round).filter(HAS_RESULT).values()) == (
-        raced
-    )
+    assert raced_lanes(round) == raced
 
 
 def test_a_second_add_is_refused(client, race):

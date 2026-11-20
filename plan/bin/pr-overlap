@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Names each other open PR that changes a file PR <number> changes, and
+whether git merges the two heads (`git merge-tree`).
+
+#424 (ticket #409) and #433 (ticket #347) each built a `STOP_SENDING` stub
+in server/ui/tests/browser/conftest.py. #424 was open 4 h before #433's
+draft, yet the overlap showed only in #433's review rounds, and #424 then
+conflicted with master in four files. The trial merge of Code review's
+step 4 ran only for a source check or a shell script, and pr-merge's area
+rule fires only at merge time (#347 retro). Run it when a ticket's draft PR
+opens (plan/implement-all-tickets.md, Code review, steps 1 and 4).
+
+It prints one line per overlapping PR, then each file both change, marked
+`conflict` where git can't merge the two. Each head is first merged with
+origin/master, in objects no ref names, so a conflict is one between the
+two PRs, not one with a master commit the older PR lacks: #393's stale
+head read as conflicting with #424 in two files neither PR changed. A head
+that conflicts with origin/master on its own is named, and pr-merge refuses
+it anyway. It fetches origin/master and each PR's head (refs/pull/<n>/head).
+Exits 0 when no other open PR changes a file this one changes, 1 when one
+does, 2 when gh or git fails or the PR is not open.
+
+Limits of `gh pr list --json files`, which lists at most the first 100 files
+of a PR (#76 has 337 changed files and 100 listed) and only a renamed file's
+new path (#182 renamed sheets/closed.html and lists sheet_closed.html alone):
+an overlap on a file past the 100th, or on a renamed file's old path, is not
+named.
+
+Usage: plan/bin/pr-overlap <pr>
+"""
+import json
+import os
+import subprocess
+import sys
+
+GH = os.environ.get('GH', 'gh')
+REPO = os.environ.get('REPO', 'PorkChopExpress86/derbynet')
+# Every git call drops the GIT_* vars: under a hook's GIT_DIR git would read
+# the hook's repository, not the one the tool runs in (memory git-dir-in-hooks).
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+# The merge commits no ref names need an author, which a fresh clone lacks
+# (pr-merge's commit-tree sets the same).
+COMMIT_ENV = {**GIT_ENV, 'GIT_AUTHOR_NAME': 'pr-overlap',
+              'GIT_AUTHOR_EMAIL': 'pr-overlap@localhost',
+              'GIT_COMMITTER_NAME': 'pr-overlap',
+              'GIT_COMMITTER_EMAIL': 'pr-overlap@localhost'}
+
+
+def fail(why):
+    print(f'pr-overlap: {why}', file=sys.stderr)
+    sys.exit(2)
+
+
+def open_prs():
+    run = subprocess.run(
+        [GH, 'pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '200',
+         '--json', 'number,headRefName,headRefOid,files'],
+        capture_output=True, text=True)
+    if run.returncode:
+        fail(f'gh pr list: {run.stderr.strip()}')
+    return json.loads(run.stdout)
+
+
+def merge(ours, theirs):
+    """The tree git writes for the merge of two commits, and the paths it
+    can't merge."""
+    run = subprocess.run(
+        ['git', 'merge-tree', '--write-tree', '--name-only', '--no-messages',
+         ours, theirs],
+        capture_output=True, text=True, env=GIT_ENV)
+    # It prints the tree, then each path it can't merge. git 2.53 exits 1 on
+    # a conflict and on an error alike ("not something we can merge", for a
+    # blob), and only a merge prints a tree.
+    lines = run.stdout.splitlines()
+    if not lines:
+        fail(f'git merge-tree {ours[:8]} {theirs[:8]}: {run.stderr.strip()}')
+    return lines[0], set(lines[1:])
+
+
+def git(*args, env=GIT_ENV):
+    run = subprocess.run(['git', *args], capture_output=True, text=True, env=env)
+    if run.returncode:
+        fail(f'git {" ".join(args)}: {run.stderr.strip()}')
+    return run.stdout.strip()
+
+
+def on_master(master, head):
+    """A commit of `head` merged with origin/master, or None when the two
+    conflict. No ref names it."""
+    tree, clash = merge(master, head)
+    if clash:
+        return None
+    return git('commit-tree', '--no-gpg-sign', tree, '-p', master, '-p', head,
+               '-m', 'pr-overlap', env=COMMIT_ENV)
+
+
+def main(argv):
+    if argv in (['-h'], ['--help']):
+        print(__doc__.strip())
+        return 0
+    if len(argv) != 1:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    number = argv[0]
+    prs = open_prs()
+    mine = next((pr for pr in prs if str(pr['number']) == number), None)
+    if mine is None:
+        fail(f'#{number} is not an open PR')
+    paths = {f['path'] for f in mine['files']}
+    others = [(pr, sorted(paths & {f['path'] for f in pr['files']}))
+              for pr in prs if pr is not mine]
+    others = [(pr, shared) for pr, shared in others if shared]
+    if not others:
+        print(f'no other open PR changes a file #{number} changes')
+        return 0
+    refs = [f'refs/pull/{pr["number"]}/head' for pr in [mine] + [p for p, _ in others]]
+    git('fetch', '-q', 'origin', '+refs/heads/master:refs/remotes/origin/master', *refs)
+    master = git('rev-parse', 'refs/remotes/origin/master')
+    ours = on_master(master, mine['headRefOid'])
+    if ours is None:
+        print(f'#{number} conflicts with origin/master; update it, then rerun')
+    for pr, shared in others:
+        theirs = on_master(master, pr['headRefOid'])
+        clash = set()
+        if ours is None or theirs is None:
+            heads = ((number, ours), (pr['number'], theirs))
+            clashing = [f'#{n}' for n, merged in heads if merged is None]
+            verb = 'conflict' if len(clashing) == 2 else 'conflicts'
+            verdict = (f'not merged, since {" and ".join(clashing)} {verb}'
+                       ' with origin/master')
+        elif clash := merge(ours, theirs)[1]:
+            verdict = f'git cannot merge the two ({len(clash)} conflicts)'
+        else:
+            verdict = 'git merges the two'
+        print(f'#{pr["number"]} {pr["headRefName"]} {pr["headRefOid"][:8]}:'
+              f" changes {len(shared)} of #{number}'s files; {verdict}")
+        for path in sorted(set(shared) | clash):
+            print(f'  {"conflict" if path in clash else "both    "}  {path}')
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
