@@ -904,6 +904,7 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
             with self.subTest(n=n):
                 self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:n]}')), [])
         self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:12].upper()}')), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=CURRENT.upper()), [])
 
     def test_a_sha_that_is_no_prefix_of_the_head_is_refused_at_each_end(self):
         """Near misses: the last digit of a 40-digit sha, the 7th of a 7-digit
@@ -989,7 +990,7 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         """The caption of the first fence reaches a header after a shorter
         fence line and after one with an info string, both inside it; the
         header after its close is outside and has no caption of its own."""
-        body = (f'[before run]\n````\n```\nHEAD {OLDER}\n```text\nHEAD {OLDER}\n```\n'
+        body = (f'[before run]\n````\n```\nHEAD {OLDER}\n````text\nHEAD {OLDER}\n```\n'
                 f'HEAD {OLDER}\n````\nHEAD {OLDER}\n')
         self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 10'])
 

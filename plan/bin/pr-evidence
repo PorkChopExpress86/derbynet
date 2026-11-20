@@ -408,10 +408,11 @@ def handoff_headers(body: str) -> list[tuple[int, str, str, bool]]:
     found, fence = [], None
     for i, line in enumerate(lines):
         edge = FENCE.match(line)
-        if fence is None and edge:
-            fence = (len(edge[1]), i)
-            continue
-        if fence and edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
+        if fence is None:
+            if edge:
+                fence = (len(edge[1]), i)
+                continue
+        elif edge and not edge[2].strip() and len(edge[1]) >= fence[0]:
             fence = None
             continue
         header = HEADER.match(line)
