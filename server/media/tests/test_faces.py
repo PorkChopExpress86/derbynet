@@ -14,16 +14,14 @@ counts a zero-width box as no face, so its output lists the real misses:
 from media import faces
 from media.photos import _open_upright
 from media.tests.conftest import HEADSHOTS
+from tests.file_kinds import headshots
 
 PHP_MISSES = {"Cub-1612.jpg", "head-A.jpg"}
 NOT_A_FACE = "no-photo.jpg"
 
 
 def detected():
-    return {
-        path.name: faces.detect(_open_upright(path)[0])
-        for path in sorted(HEADSHOTS.glob("*.jpg"))
-    }
+    return {path.name: faces.detect(_open_upright(path)[0]) for path in headshots()}
 
 
 def test_opencv_misses_no_more_headshots_than_php():
