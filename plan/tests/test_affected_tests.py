@@ -658,6 +658,118 @@ class TestingReaders(unittest.TestCase):
                          TESTING_FALLBACK)
 
 
+def mapped(files, path):
+    """What map_file maps `path` to in a git repository of `files`, repository
+    path -> text, and `path` itself: each entry's rule and targets."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for rel, text in {path: '', **files}.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        for argv in (['init', '-q'], ['add', '-A']):
+            subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+        TOOL.map_file(plan, TOOL.Tree(root), path)
+        return [(rule, targets) for rule, _note, targets in plan.covers[path]]
+
+
+class OutsideTesting(unittest.TestCase):
+    """#471: a check that lists every file of a kind reads those files
+    outside testing/ too, and #462 mapped only testing/ paths to it."""
+
+    KINDS = TestingReaders.KINDS
+    SCRIPT_TESTS = ('tests/test_arithmetic_operands.py', 'tests/test_pipefail_pipes.py',
+                    'tests/test_subshell_state.py')
+
+    def stand_in(self, *tests):
+        return {'server/tests/file_kinds.py': self.KINDS,
+                **{f'server/{t}': '' for t in tests}}
+
+    def test_a_script_outside_testing_maps_to_the_checks_that_list_shell_files(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        self.assertEqual(mapped(files, 'server/tools/detach.sh'),
+                         [('server-tools', []), ('kind-readers', list(self.SCRIPT_TESTS))])
+
+    def test_a_guide_outside_testing_maps_to_the_check_of_exec_d_commands(self):
+        files = self.stand_in('tests/test_docker_checks.py')
+        got = mapped(files, 'docs/database.md')
+        self.assertEqual([r for r in got if r[0] == 'kind-readers'],
+                         [('kind-readers', ['tests/test_docker_checks.py'])])
+
+    def test_a_file_no_row_lists_maps_to_no_reader(self):
+        """A picture is no script and no file a command is written in; a
+        file with no shebang and no suffix is no script."""
+        files = self.stand_in(*self.SCRIPT_TESTS, 'tests/test_docker_checks.py')
+        files['installer/script'] = 'no shebang\n'
+        self.assertEqual(mapped(files, 'artwork/logo.png'), [('fallback', [])])
+        self.assertEqual(mapped(files, 'installer/script'), [('fallback', [])])
+
+    def test_a_row_whose_test_the_tree_lacks_maps_nothing(self):
+        files = self.stand_in('tests/test_pipefail_pipes.py')
+        self.assertEqual(mapped(files, 'installer/run.sh'),
+                         [('kind-readers', ['tests/test_pipefail_pipes.py']), ('fallback', [])])
+
+    def test_a_reader_adds_a_target_but_leaves_the_app_tests_to_the_fallback(self):
+        """A source check that lists the file says nothing of what the file
+        does: server/ui/middleware.py still runs the tests of its app."""
+        files = self.stand_in('tests/test_docker_checks.py', 'ui/tests/test_x.py')
+        self.assertEqual(mapped(files, 'server/ui/middleware.py'),
+                         [('ui-python', []), ('kind-readers', ['tests/test_docker_checks.py']),
+                          ('fallback', ['ui/tests'])])
+
+    def test_a_script_outside_server_still_leaves_the_rest_to_ci(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        self.assertEqual(mapped(files, 'installer/run.sh'),
+                         [('kind-readers', list(self.SCRIPT_TESTS)), ('fallback', [])])
+
+    def test_a_guide_at_the_top_is_docs_only_beside_the_reader_it_gets(self):
+        """cover_docs says the file has no pytest target of its own, and the
+        check that execs its commands is listed after it."""
+        out = section(run('plan/README.md', root=REPO), 'plan/README.md')
+        self.assertIn('  [docs] docs only: no pytest target of its own.', out)
+        self.assertIn('  [kind-readers] a source check that reads every file of its kind '
+                      '(KIND_READERS)\n      tests/test_docker_checks.py', out)
+
+    def test_a_testing_file_is_mapped_once(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        got = mapped(files, 'testing/timer-stand-in/curl')
+        self.assertEqual([rule for rule, _targets in got], ['testing'])
+
+    def test_the_hand_off_lists_the_checks_the_source_checks_run(self):
+        """test_docker_checks.py and the pipe linters are in
+        tools/source-checks.sh, which every hand-off runs, so the printed
+        commands leave them out and one line names them."""
+        for path, tests in (('server/tools/detach.sh', self.SCRIPT_TESTS[1:]),
+                            ('docs/database.md', ('tests/test_docker_checks.py',))):
+            with self.subTest(path=path):
+                out = run(path, root=REPO)
+                for test in tests:
+                    self.assertIn(f'      {test}\n', section(out, path) + '\n')
+                    self.assertNotIn(f'pytest -n auto {test}', commands(out))
+                line = next(ln for ln in out.splitlines()
+                            if ln.startswith('tools/source-checks.sh runs these'))
+                for test in tests:
+                    self.assertIn(test, line)
+
+    def test_each_kind_of_file_a_row_lists_outside_testing_maps_to_its_test(self):
+        """In the real tree, one file of each top-level folder that each row's
+        function lists, outside testing/, maps to the row's test."""
+        tree, misses, seen = TOOL.Tree(REPO), [], set()
+        for row in TOOL.KIND_READERS:
+            for path in sorted(tree.listed(row)):
+                folder = path.split('/')[0] if '/' in path else '.'
+                if path.startswith('testing/') or not tree.exists(row.test) \
+                        or (row.test, row.selector, folder) in seen:
+                    continue
+                seen.add((row.test, row.selector, folder))
+                plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+                TOOL.map_file(plan, tree, path)
+                if row.test not in {t for _r, _n, ts in plan.covers[path] for t in ts}:
+                    misses.append(f'{path}: {row.test}')
+        self.assertEqual(misses, [])
+        self.assertGreater(len(seen), 25)
+
+
 class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
