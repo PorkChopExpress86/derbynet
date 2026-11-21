@@ -11,22 +11,17 @@ other size at collection instead.
 The check reads every module under `ui/tests`, so a helper such as
 `desktop_only(page)` in a module a browser test imports is read too. A skip
 (`pytest.skip(...)`, `raise pytest.skip.Exception(...)`, or a call of a
-function whose body skips outright) counts when a condition it sits under
-reads a size and no other name. The condition is an `if`, a `while`, an
-`x if c else y`, a `match` subject, or the operands before it in an `and` or
+function whose body skips outright) counts when any condition it sits under
+reads a size, even when that condition also reads another name or test
+parameter (#458). The condition is an `if`, a `while`, an `x if c else y`,
+a `match` subject or case guard, or the operands before it in an `and` or
 `or`. A size read is `<x>.size`, `<x>.viewport_size`, `<x>.is_mobile`, the
-`size` fixture, or a name the function binds from a size alone
-(`s = page.size`). A name the module binds at its top level, or an imported
-upper-case name, is a constant, not another name. A condition that also
-reads another name, such as a test's own parameter, depends on more than the
-size and is left alone.
+`size` fixture, or a name the function binds from an expression that reads
+a size (`s = page.size`, `phone = page.size == "phone"`).
 
-What it reads past, left to review, since each needs more than one module's
-syntax to tell from a skip on something else:
-- a helper that compares the size with its own parameter
-  (`only(page, "desktop")`), read as depending on that parameter;
-- a constant read through a module (`conftest.DESKTOP`) or a lower-case
-  imported name, read as another name;
+What it reads past, left to review:
+- a helper that takes the size as an argument and compares its own
+  parameter (`only(page.size, "desktop")`);
 - a skip under a further condition in a helper called under a size
   condition, as the helper may skip on something else;
 - `pytest.skip` under another name (`from pytest import skip as s`), and a
@@ -34,7 +29,6 @@ syntax to tell from a skip on something else:
 """
 
 import ast
-import re
 from pathlib import Path
 
 TESTS = Path(__file__).resolve().parent
@@ -52,45 +46,20 @@ def modules(root: Path) -> dict[str, str]:
     }
 
 
-def constants(tree: ast.Module) -> set[str]:
-    """Names the module binds at its top level, and imported upper-case
-    names."""
-    names = set()
-    for node in tree.body:
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            names |= {t.id for t in targets if isinstance(t, ast.Name)}
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                name = (alias.asname or alias.name).split(".")[0]
-                if re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
-                    names.add(name)
-    return names
-
-
 def is_size_read(node: ast.AST, held: set[str]) -> bool:
     if isinstance(node, ast.Attribute):
         return node.attr in SIZE_READS
     return isinstance(node, ast.Name) and (node.id in SIZE_READS or node.id in held)
 
 
-def on_size_alone(nodes: list[ast.AST], held: set[str], fixed: set[str]) -> bool:
-    """True when `nodes` read a size and every other name in them is a
-    constant in `fixed`."""
-    walked = [n for node in nodes for n in ast.walk(node)]
-    reads = [n for n in walked if is_size_read(n, held)]
-    inside = {id(n) for read in reads for n in ast.walk(read)}
-    names = [
-        n
-        for n in walked
-        if isinstance(n, ast.Name) and id(n) not in inside and n.id not in fixed
-    ]
-    return bool(reads) and not names
+def reads_size(nodes: list[ast.AST], held: set[str]) -> bool:
+    """True when any node in `nodes` reads a size."""
+    return any(is_size_read(n, held) for node in nodes for n in ast.walk(node))
 
 
-def held_names(function: ast.AST, fixed: set[str]) -> set[str]:
-    """Names `function` binds from a size alone, as `s = page.size`, read
-    in the order they are bound."""
+def held_names(function: ast.AST) -> set[str]:
+    """Names `function` binds from an expression that reads a size, as
+    `s = page.size`, read in the order they are bound."""
     held: set[str] = set()
     binds = sorted(
         (
@@ -103,7 +72,7 @@ def held_names(function: ast.AST, fixed: set[str]) -> set[str]:
     )
     for node in binds:
         targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-        if on_size_alone([node.value], held, fixed):
+        if reads_size([node.value], held):
             held |= {t.id for t in targets if isinstance(t, ast.Name)}
     return held
 
@@ -142,20 +111,19 @@ def skippers(trees: list[ast.Module]) -> set[str]:
 
 
 def size_skips(source: str, calls: set[str] = frozenset()) -> list[tuple[int, str]]:
-    """`(line, function)` of each skip under a condition on the size alone;
+    """`(line, function)` of each skip under a condition that reads a size;
     a call of a name in `calls` is a skip."""
     tree = ast.parse(source)
-    fixed = constants(tree)
     found = []
 
     def visit(node, function, held, guarded):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            function, held, guarded = node.name, held_names(node, fixed), False
+            function, held, guarded = node.name, held_names(node), False
         if guarded and is_skip(node, calls):
             found.append((node.lineno, function))
         if isinstance(node, (ast.If, ast.IfExp, ast.While)):
             visit(node.test, function, held, guarded)
-            inner = guarded or on_size_alone([node.test], held, fixed)
+            inner = guarded or reads_size([node.test], held)
             branches = (
                 [node.body, node.orelse]
                 if isinstance(node, ast.IfExp)
@@ -168,13 +136,13 @@ def size_skips(source: str, calls: set[str] = frozenset()) -> list[tuple[int, st
             visit(node.subject, function, held, guarded)
             for case in node.cases:
                 tests = [node.subject] + ([case.guard] if case.guard else [])
-                inner = guarded or on_size_alone(tests, held, fixed)
+                inner = guarded or reads_size(tests, held)
                 for child in case.body:
                     visit(child, function, held, inner)
             return
         if isinstance(node, ast.BoolOp):
             for i, value in enumerate(node.values):
-                inner = guarded or on_size_alone(node.values[:i], held, fixed)
+                inner = guarded or reads_size(node.values[:i], held)
                 visit(value, function, held, inner)
             return
         for child in ast.iter_child_nodes(node):
@@ -196,7 +164,7 @@ def tree_skips(root: Path) -> list[tuple[str, int, str]]:
     ]
 
 
-def test_a_skip_on_the_size_alone_is_found():
+def test_a_skip_on_the_size_is_found():
     source = """
 def desktop_only(page):
     if page.size != "desktop":
@@ -235,6 +203,11 @@ def test_and_a_parameter(page, cancel):
         pytest.skip("depends on cancel too")
 
 
+def test_only_a_parameter(page, cancel):
+    if cancel == "pointercancel":
+        pytest.skip("not the size")
+
+
 def test_another_condition(page):
     if page.url:
         pytest.skip("not the size")
@@ -266,6 +239,7 @@ def test_no_name_at_all(page):
         (22, "test_nested"),
         (26, "test_expression"),
         (31, "test_bare_import"),
+        (36, "test_and_a_parameter"),
     ]
 
 
@@ -411,7 +385,7 @@ def test_a_size_held_in_a_block(page):
     ]
 
 
-def test_a_size_beside_another_name_is_left_alone():
+def test_a_size_beside_another_name_is_found():
     source = """
 from ui.tests.race import want
 
@@ -427,9 +401,21 @@ def test_a_held_parameter(page, cancel):
         pytest.skip("x")
 
 
+def test_a_held_size_with_a_parameter(page, cancel):
+    held = cancel and page.size == "phone"
+    if held:
+        pytest.skip("x")
+
+
 def test_a_match_with_a_guard(page, cancel):
     match page.size:
         case "phone" if cancel:
+            pytest.skip("x")
+
+
+def test_a_match_guard_with_a_size(page, cancel):
+    match cancel:
+        case "pointercancel" if page.size == "phone":
             pytest.skip("x")
 
 
@@ -440,6 +426,35 @@ def test_and_before_the_size(page, cancel):
 def test_a_local_name(page):
     want = page.url
     if page.size != want:
+        pytest.skip("x")
+
+
+def test_a_viewport_beside_a_box(page, box):
+    if page.viewport_size["width"] < box["x"]:
+        pytest.skip("x")
+"""
+    assert size_skips(source, {"not_on_a_phone"}) == [
+        (7, "test_a_lower_case_import"),
+        (13, "test_a_held_parameter"),
+        (19, "test_a_held_size_with_a_parameter"),
+        (25, "test_a_match_with_a_guard"),
+        (31, "test_a_match_guard_with_a_size"),
+        (35, "test_and_before_the_size"),
+        (41, "test_a_local_name"),
+        (46, "test_a_viewport_beside_a_box"),
+    ]
+
+
+def test_skips_not_on_a_size_are_allowed():
+    source = """
+def test_a_parameter_only_skip(cancel):
+    if cancel == "pointercancel":
+        pytest.skip("x")
+
+
+def test_a_held_parameter_only(cancel):
+    s = cancel
+    if s == "pointercancel":
         pytest.skip("x")
 
 
@@ -460,9 +475,14 @@ def test_a_raise_of_something_else(page):
             raise ValueError("x")
 
 
-def test_a_viewport_beside_a_box(page, box):
-    if page.viewport_size["width"] < box["x"]:
-        pytest.skip("x")
+def test_a_match_without_size(cancel):
+    match cancel:
+        case "pointercancel":
+            pytest.skip("x")
+
+
+def test_and_without_size(page, cancel):
+    cancel and page.url and pytest.skip("x")
 """
     assert size_skips(source, {"not_on_a_phone"}) == []
 
