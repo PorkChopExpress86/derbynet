@@ -98,6 +98,23 @@ while [ "${pid:-0}" -gt 1 ]; do
   [ "$(ps -o comm= -p "$pid" || true)" = timeout ] && refuse "it runs under timeout"
   pid=$(ps -o ppid= -p "$pid" | tr -d ' ') || pid=1
 done
+# pytest-repeat's --count renames each case `[P]` to `[P-1-N]` .. `[P-N-N]`,
+# so a node id that names `[P]` selects nothing: #463's run waited for the
+# lock, then collected 0 items and exited 5 (#463 retro).
+count=
+for arg in "$@"; do
+  case "$arg" in --count|--count=*) count=1 ;; esac
+done
+if [ -n "$count" ]; then
+  for arg in "$@"; do
+    if [[ "$arg" == *::*\[* && ! "$arg" =~ -[0-9]+-[0-9]+\]$ ]]; then
+      echo "pytest-under-load.sh: --count renames the [case] of $arg to" \
+           "[case-1-N] .. [case-N-N], so it selects no test. Name the test" \
+           "without its [case], and choose the case with -k." >&2
+      exit 2
+    fi
+  done
+fi
 # The lock needs util-linux's flock(1), which macOS lacks (#354 review).
 if ! command -v flock >/dev/null; then
   echo "pytest-under-load.sh: it needs flock(1), for the lock that keeps one" \

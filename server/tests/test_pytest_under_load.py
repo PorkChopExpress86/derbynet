@@ -78,6 +78,54 @@ def test_a_timeout_is_refused():
     assert "it runs under timeout" in result.stderr
 
 
+@pytest.mark.parametrize("count", ["--count 3", "--count=3"])
+def test_a_case_s_node_id_under_count_is_refused_before_the_lock(tmp_path, count):
+    """--count renames `[TERM]` to `[TERM-1-3]`, so #463's node ids selected
+    nothing, after the run had waited for the lock (#463 retro)."""
+    case_id = "tests/test_x.py::test_signal[TERM]"
+    result = run(
+        f"'{SCRIPT}' --loops 0 -n 4 {count} '{case_id}' >/dev/null",
+        out=str(tmp_path / "run"),
+        lock=str(tmp_path / "load.lock"),
+    )
+    assert result.returncode == 2
+    assert f"renames the [case] of {case_id}" in result.stderr
+    assert not (tmp_path / "load.lock").exists()
+
+
+@pytest.mark.parametrize(
+    "node, ran", [("test_signal[TERM-1-2]", "1 passed"), ("test_signal", "2 passed")]
+)
+def test_a_node_id_that_selects_under_count_runs(tmp_path, node, ran):
+    """The id pytest-repeat gives a repeat, `[case-1-N]`, selects that
+    repeat, and a test's id without its case selects each."""
+    (tmp_path / "test_case.py").write_text(
+        "import pytest\n\n\n"
+        "@pytest.mark.parametrize('sig', ['TERM'])\n"
+        "def test_signal(sig):\n    pass\n"
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"'{SCRIPT}' --loops 0 -p no:cacheprovider --count 2"
+            f" '{tmp_path}/test_case.py::{node}' >out",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "run"),
+            "DERBYNET_LOAD_LOCK": str(tmp_path / "load.lock"),
+        },
+    )
+    summary = (tmp_path / "out").read_text()
+    assert result.returncode == 0, summary + result.stderr
+    assert f"{ran} in" in summary
+
+
 def test_an_output_folder_with_files_is_refused(tmp_path):
     (tmp_path / "junit.xml").write_text("an earlier run's results")
     # Output to a file, as the Bash tool's run_in_background sends it.
