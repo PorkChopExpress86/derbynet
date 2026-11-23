@@ -328,8 +328,9 @@ NAVIGATES_ON_A_WORKER_TIMER = """if (location.search == '?nav') {
 def test_close_tab_closes_a_tab_that_keeps_navigating(page, event):
     """A tab can navigate on no reply and no timer of its page, here a
     Worker's, and each new document navigates again. `close_tab` cancels
-    each later navigation (STOP_BEACONS_AND_NAVIGATIONS). When it returns, the server has no request
-    of the tab in hand, and none arrives after (#409)."""
+    each later navigation (STOP_BEACONS_AND_NAVIGATIONS). When it returns,
+    the server has no request of the tab in hand, and none arrives after
+    (#409)."""
     page.goto("/login/")
     tab = page.context.new_page()
     tab.add_init_script(NAVIGATES_ON_A_WORKER_TIMER)
