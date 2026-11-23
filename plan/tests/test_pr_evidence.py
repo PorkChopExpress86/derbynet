@@ -1143,7 +1143,9 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
 
     def test_a_header_that_says_there_were_no_edits_passes(self):
         for tail in ('; uncommitted: 0 files', '; uncommitted: no', 'dirty=0 port 18399',
-                     'changed: 0', 'status: 0 changes', 'load 19.41 18.95 16.63'):
+                     'changed: 0', 'status: 0 changes', 'load 19.41 18.95 16.63',
+                     '(no uncommitted changes)', 'uncommitted: none', '0 uncommitted files',
+                     'nothing staged', 'staged: none', '(committed, git status clean: 0 files)'):
             with self.subTest(tail=tail):
                 self.assertEqual(self.stale(fenced(f'cwd /x HEAD {CURRENT} {tail}')), [])
 

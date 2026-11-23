@@ -251,11 +251,12 @@ BEFORE_RUN = "[before run]"
 # A header's words after its sha that say the run read edits on top of the
 # commit, as the fork's merged bodies write them: `+ staged round-2 edits`,
 # `(+ untracked testing/zz-probe-356.sh)`, `plus the uncommitted fix round`,
-# `with uncommitted changes`, `+ working tree`. `uncommitted: no` and
-# `uncommitted: 0 files` say there were none.
+# `with uncommitted changes`, `+ working tree`. `uncommitted: no`,
+# `uncommitted: 0 files`, `staged: none`, `no uncommitted changes`, `0
+# uncommitted files` and `nothing staged` say there were none.
 EDITS = re.compile(
-    r"(?<![\w+])(?:\+|plus)(?=\s)|\b(?:uncommitted|staged|untracked|working tree)\b"
-    r"(?!:\s*(?:no|0)\b)",
+    r"(?<![\w+])(?:\+|plus)(?=\s)|(?<!\bno )(?<!\bnothing )(?<!\b0 )"
+    r"\b(?:uncommitted|staged|untracked|working tree)\b(?!:\s*(?:no|none|0)\b)",
     re.IGNORECASE,
 )
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
