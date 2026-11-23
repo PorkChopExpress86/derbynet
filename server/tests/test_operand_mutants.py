@@ -3,10 +3,13 @@
 
 import ast
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from tools import operand_mutants as om
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def listed(diff: str) -> list[tuple[int, str, str, str]]:
@@ -380,6 +383,79 @@ def test_javascript_in_a_python_if_keeps_its_mutants():
         ("operand", "x.b", "true"),
         ("operand", "x.b", "false"),
     ]
+
+
+def added_at(path: str, needle: str) -> str:
+    """A diff that adds the one line of the repository's `path` holding
+    `needle`."""
+    lines = om.read(ROOT / path).split("\n")
+    [n] = [i for i, line in enumerate(lines, 1) if needle in line]
+    return f"+++ b/{path}\n@@ -{n - 1},0 +{n} @@\n+{lines[n - 1]}\n"
+
+
+def test_a_comprehension_s_if_is_python_and_a_browser_test_s_string_javascript():
+    """heats.py's `next((n for n, r, h, _ in index if (r, h) == current), 0)`
+    listed `r, h -> true` twice, JavaScript spliced into Python, which
+    `mutate.py --listed` refused (#468). Its comprehension's condition is
+    listed by AST only, and a browser test's JavaScript `if (` in a string
+    keeps its mutants."""
+    heats = added_at("server/racing/services/heats.py", "index if (r, h) == current")
+    assert [(m.kind, m.old, m.new) for m in om.mutants(heats, ROOT)] == [
+        ("condition", "(r, h) == current", "True"),
+        ("condition", "(r, h) == current", "False"),
+    ]
+    slideshow = added_at(
+        "server/ui/tests/browser/test_kiosk_slideshow.py", "slides at the change"
+    )
+    assert [(m.kind, m.old, m.new) for m in om.mutants(slideshow, ROOT)] == [
+        ("condition", "slides.length !== 1", "true"),
+        ("condition", "slides.length !== 1", "false"),
+    ]
+
+
+def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path):
+    """By AST, a JavaScript `if (` in a Python file is listed inside a
+    string, a triple-quoted one's inner line and an f-string's text too,
+    and not in code: a comprehension's `if (`, a Python `if (`, a comment,
+    or an f-string's `{...}` field (#468). ast's columns count UTF-8 bytes,
+    so the `é`s before line 7's string leave it holding its `if (`."""
+    text = (
+        "seen = [n for n in xs if (n, 1) in done]\n"
+        "if (a, b) in seen:  # if (c) in a comment\n"
+        '    é = page.evaluate("() => { if (ok && ready) go(); }")\n'
+        'JS = """\n'
+        "  if (é && b) stop();\n"
+        '"""\n'
+        'ééééé = "if (k) x"\n'
+        'y = f"{z if (q) else w} if (v) run()"\n'
+    )
+    (tmp_path / "t.py").write_text(text)
+    diff = "+++ b/t.py\n@@ -0,0 +1,8 @@\n" + "".join(
+        f"+{line}\n" for line in text.splitlines()
+    )
+    found = om.mutants(diff, tmp_path)
+    javascript = [(m.line, m.old, m.new) for m in found if m.new in ("true", "false")]
+    assert javascript == [
+        (3, "ok && ready", "true"),
+        (3, "ok && ready", "false"),
+        (3, "ok", "true"),
+        (3, "ok", "false"),
+        (3, "ready", "true"),
+        (3, "ready", "false"),
+        (5, "é && b", "true"),
+        (5, "é && b", "false"),
+        (5, "é", "true"),
+        (5, "é", "false"),
+        (5, "b", "true"),
+        (5, "b", "false"),
+        (7, "k", "true"),
+        (7, "k", "false"),
+        (8, "v", "true"),
+        (8, "v", "false"),
+    ]
+    # The Python conditions are still listed, by AST.
+    python = {(m.line, m.old) for m in found if m.new in ("True", "False")}
+    assert python == {(1, "(n, 1) in done"), (2, "(a, b) in seen"), (8, "q")}
 
 
 def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path):
