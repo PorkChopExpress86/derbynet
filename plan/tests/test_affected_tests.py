@@ -1244,6 +1244,24 @@ class BeforeTheHandOff(unittest.TestCase):
                           before_hand_off(out))
         self.assertNotIn('mutate.py', commands(out))
 
+    def test_a_changed_conftest_lists_its_claims_and_its_helpers_mutants(self):
+        """D123 counts a conftest's claims, and mutate.py takes a conftest as
+        a test file. #347's diff changed the browser conftest and
+        test_harness.py, the tool named only test_harness.py, review counted
+        26 unlisted claims where the fix round found 32, and the table had no
+        rows for the conftest's `_intercepted` (#347 retro)."""
+        out = run('server/ui/tests/browser/conftest.py', 'server/ui/tests/test_dashboard.py')
+        files = 'ui/tests/browser/conftest.py ui/tests/test_dashboard.py'
+        self.assertIn(f'  uv run python tools/docstring_claims.py {files}\n',
+                      before_hand_off(out))
+        self.assertIn(f'  uv run python tools/docstring_claims.py --check <the PR body draft> '
+                      f'{files}\n', before_hand_off(out))
+        self.assertIn('  uv run python tools/mutate.py --listed --file '
+                      'ui/tests/browser/conftest.py -- ', before_hand_off(out))
+        self.assertIn('[everything] a shared conftest', out)
+        out = run('server/ui/tests/gone/conftest.py')
+        self.assertNotIn('Before the first hand-off run', out)
+
     def test_a_changed_source_file_lists_its_operand_mutants(self):
         for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css',
                      'server/ui/static/ui/kiosk-ondeck.js'):

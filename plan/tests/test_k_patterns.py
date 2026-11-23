@@ -75,6 +75,25 @@ class KPatterns(unittest.TestCase):
         done = self.run_them('-k', 'runs_them_again')
         self.assertIn('Ran 1 test', done.stderr)
 
+    def test_a_python_older_than_3_14_is_refused_before_any_test(self):
+        """The lead's new machine ran plan/tests under python3 3.12, and three
+        failed with a SyntaxError that named no cause (#347 retro)."""
+        for version, refused in (((3, 12, 3), True), ((3, 13, 9), True),
+                                 ((3, 14, 0), False), ((3, 15, 2), False)):
+            with self.subTest(version=version):
+                done = subprocess.run(
+                    [sys.executable, '-I', '-c',
+                     'import runpy, sys\n'
+                     f'sys.version_info = {version + ("final", 0)!r}\n'
+                     f'sys.argv = ["python -m unittest", "discover", "-s", {str(self.dir)!r}]\n'
+                     'runpy.run_module("unittest", run_name="__main__")\n'],
+                    capture_output=True, text=True, timeout=60)
+                self.assertEqual(done.returncode, 2 if refused else 0, done.stderr)
+                line = (f'plan/tests: python3 is {".".join(map(str, version))}, and plan/tests '
+                        'need 3.14: put a 3.14 python3 first on PATH')
+                self.assertEqual(line in done.stderr, refused, done.stderr)
+                self.assertEqual('Ran 2 tests' in done.stderr, not refused, done.stderr)
+
     def test_every_plan_test_module_imports_it(self):
         missing = []
         # discover recurses into packages below plan/tests.
