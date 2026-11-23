@@ -568,27 +568,51 @@ def close_tab(page, tab):
 SETTLE_BARRIER = "/settle-barrier"
 
 
+def _intercepted(page) -> bool:
+    """Whether Playwright already intercepts `page`'s requests: a route on
+    the page or on its context turns it on (Playwright 1.64's
+    `needsRequestInterception`). Read from Playwright's own route lists,
+    which are private, with no default: a release that renames them fails
+    here instead of guessing."""
+    return bool(page._impl_obj._routes or page.context._impl_obj._routes)
+
+
 def _barrier(page):
     """Wait until Playwright has reported the requests `page` sent before
     its timers stopped. A `request` event can reach Python after the
     evaluate that sent it returns, so the drain found the set empty with a
     poll's last request out (#224 retro, 1 run in 50 under load;
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
-    fetch sent after the stop, answered 204 here; its end is reported after
+    fetch sent after the stop, and its end must reach Python by the path
+    the page's own requests take
+    (`test_the_barrier_follows_a_fetch_sent_before_it`): through Chromium's
+    Fetch domain where a route already has Playwright intercepting, so a
+    route answers it there. Elsewhere a URL block on a CDP session of its
+    own fails it, and the session stays open until the context closes. A
+    route there turned the interception on and off at each settle, and a
+    document that committed as it turned on sent its requests, the
+    barrier's among them, to the server with no `request` event (#347,
+    gap 1: `test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts`).
+    So its end follows
     the earlier fetch's start (the same test). STOP_SENDING sends it, and
     then stops the main frame's fetch and XMLHttpRequest in the same task."""
     if not page.url.startswith("http"):
         return
-    page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
-    try:
-        with page.expect_event(
-            "requestfinished",
-            lambda r: r.url.endswith(SETTLE_BARRIER),
-            timeout=InFlight.TIMEOUT_MS,
-        ):
-            page.evaluate(STOP_SENDING, SETTLE_BARRIER)
-    finally:
-        page.unroute(f"**{SETTLE_BARRIER}")
+    if _intercepted(page):
+        page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
+        end = "requestfinished"
+    else:
+        session = page.context.new_cdp_session(page)
+        session.send("Network.enable")
+        session.send("Network.setBlockedURLs", {"urls": [f"*{SETTLE_BARRIER}"]})
+        end = "requestfailed"
+    with page.expect_event(
+        end,
+        lambda r: r.url.endswith(SETTLE_BARRIER),
+        timeout=InFlight.TIMEOUT_MS,
+    ):
+        page.barrier_sent = True
+        page.evaluate(STOP_SENDING, SETTLE_BARRIER)
 
 
 # Playwright's failure texts for a request `block_sending` blocked: by its
@@ -721,6 +745,12 @@ def page(browser, live_server, size, page_errors):
 
     def request_failed(request):
         if request.failure in BLOCKED and getattr(page, "blocker", None):
+            return
+        if (
+            request.failure == BLOCKED[0]
+            and request.url.endswith(SETTLE_BARRIER)
+            and getattr(page, "barrier_sent", False)
+        ):
             return
         page_errors.add(f"request failed: {request.url} {request.failure}")
 
