@@ -68,6 +68,21 @@ function carryHeldKeys() {
   carriedKeys.add('Enter');
   carriedKeys.add(' ');
 }
+// #400: a form in a sheet that submits carries Enter too, so a held Enter
+// submits it once, from a field or a submit button. Chromium submits again
+// on each auto-repeat, so `hx-sync` replace sent a POST per repeat, aborting
+// the one before, and drop, or no hx-sync, sent one when a repeat came after
+// a reply that kept the focus in the form, such as a refusal
+// (test_a_held_enter_in_a_sheet_form_submits_once,
+// test_a_held_enter_after_a_refusal_sends_nothing_more,
+// test_a_held_enter_adds_a_racer_and_saves_nothing_more). PHP's naming
+// dialog posts once for the same press: it closes before its POST
+// (kiosk-dashboard.js:261-263), and the repeats land on the page's body
+// (the PR's php-scratch run). A form off any sheet keeps its repeats
+// (test_a_held_enter_in_a_form_off_a_sheet_still_repeats).
+document.addEventListener('submit', (e) => {
+  if (e.target.closest('[data-sheet]')) carriedKeys.add('Enter');
+}, true);
 
 document.addEventListener('alpine:init', () => {
   // One sheet at a time (#39: one level only). Focus returns to the control

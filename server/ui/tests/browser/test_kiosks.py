@@ -2372,11 +2372,11 @@ def test_a_held_enter_in_a_sheet_form_submits_once(
     """#400: Enter goes down in the tv card's Name sheet, in its field with
     Lobby typed or on Save name, or on Standings in its Page sheet, and
     submits the form. The POST is held at its route while two auto-repeat
-    keydowns land on the same control, then the keyup: htmx sends the one
-    POST. Before, each repeat sent another, and the form's
-    `hx-sync="#kiosk-board:replace"` aborted the one before it (3 sends).
-    PHP's naming dialog posts one kiosk.assign for the same press, its
-    repeats landing on BODY (the PR's php-scratch run). The held POST then
+    keydowns land on the same control, then the keyup: htmx sends one
+    POST. Before, each repeat sent another, and the form's hx-sync, which
+    replaces, aborted the earlier ones (the PR's red run). PHP's naming
+    dialog posts once for the same press, its repeats landing on the page's
+    body (the PR's php-scratch run). The held POST then
     saves and the sheet closes. Near miss: a fresh Enter press in the
     reopened sheet submits it again."""
     kiosk(event, "tv", name="Main")
@@ -2467,8 +2467,8 @@ def test_a_held_enter_in_a_form_off_a_sheet_still_repeats(login, event, where, s
 
 
 def test_a_held_enter_after_a_refusal_sends_nothing_more(login, event):
-    """#400's risk: the scene editor's Add kiosk name form, with
-    `hx-sync="this:drop"`, drops a repeat only while its POST is out. Main
+    """#400's risk: the scene editor's Add kiosk name form, whose hx-sync
+    drops, drops a repeat only while its POST is out. Main
     is a name the scenes already use, so Enter in the field sends the POST,
     whose reply refuses it and leaves the sheet open, the focus back in the
     field. Two auto-repeat keydowns then land in the field and send
