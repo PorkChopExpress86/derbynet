@@ -64,7 +64,19 @@
       "Write(//tmp/claude-1000/**)",
       "Read(~/.claude/plugins/cache/**)",
       "Read(~/.cache/derbynet/**)",
-      "Bash(timeout *)"
+      "Bash(timeout *)",
+      "Bash(bash -n *)",
+      "Bash(chmod +x *)",
+      "Bash(rm -rf /tmp/claude-1000/*)",
+      "Bash(rm /tmp/claude-1000/*)",
+      "Bash(rm -rf ~/.cache/derbynet-drafts/*)",
+      "Bash(rm ~/.cache/derbynet-drafts/*)",
+      "Bash(kill *)",
+      "Bash(pkill -f *)",
+      "Bash(docker compose *)",
+      "Bash(docker stop *)",
+      "Bash(docker kill *)",
+      "mcp__plugin_playwright_playwright"
     ],
     "deny": [
       "Bash(git push --force *)",
