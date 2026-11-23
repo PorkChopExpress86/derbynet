@@ -26,7 +26,8 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_pipefail_pipes import ROOT, logical_lines, shell_files
+from tests.file_kinds import shell_files
+from tests.test_pipefail_pipes import ROOT, logical_lines
 
 DEFINITION = re.compile(r"^\s*(?:function\s+)?([A-Za-z_][\w-]*)\s*\(\)\s*(\{.*)?$")
 # `NAME=`, `NAME+=`, `NAME[...]=`, at a command's start or after a builtin
