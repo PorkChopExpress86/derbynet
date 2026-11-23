@@ -15,7 +15,17 @@ Each output line is `path:line  kind  old  ->  new`, where `old` occurs on
 that line of the new file. For each added line it lists:
 
 - `min(a, b, ...)` and `max(...)` (CSS, `Math.min`, Python): the call
-  replaced by each operand alone;
+  replaced by each operand alone. In Python an operand is a positional
+  argument, and a call needs two: `key=`, `default=`, `*xs` and `**kw`
+  are none, so `max(xs, key=f)` lists nothing, and an operand that is no
+  atom keeps its own parentheses, `(a + b)`, so it stands where the call
+  stood (#449: `key=lambda ...` made `return key=...`). A JavaScript or
+  CSS call takes no named argument, so each of its operands is one. A
+  call on a receiver of dotted names, `Math.max(...)`, is replaced with
+  its receiver; one on any other receiver, `f().max(...)`, lists nothing.
+  A JavaScript spread, `...xs`, is no operand, so `Math.max(0, ...xs)`
+  lists nothing. A call written right after a minus, `-max(a, b)`, lists
+  nothing either (`x-max(` in CSS is a name, not a call);
 - `clamp(lo, x, hi)`: `x` alone, `max(lo, x)` (no upper bound) and
   `min(x, hi)` (no lower bound);
 - a nested call's own mutants too, so `clamp(1rem, min(9vh, 11vw), 8rem)`
@@ -65,7 +75,10 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CALL = re.compile(r"(?<![\w-])(min|max|clamp)\(")
+# A receiver of dotted names, `Math.` or `self.items.`, is part of the call,
+# so a `Math.` call becomes its operand `a`, not `Math.a`; a call after
+# any other receiver, `f().` or `xs[0].`, is no match (#449).
+CALL = re.compile(r"(?<![\w.$-])((?:[A-Za-z_$][\w$]*\.)*)(min|max|clamp)\(")
 JS_IF = re.compile(r"\b(?:if|else if)\s*\(")
 FILTER = re.compile(r"\.filter\(\s*(\(?[\w, ]*\)?)\s*=>\s*")
 LISTENER = re.compile(r"(?:\baddEventListener|\.on)\(\s*(['\"`])([^'\"`]+)\1")
@@ -142,13 +155,40 @@ def split_top(text: str, seps: list[str]) -> list[str]:
     return parts
 
 
-def call_mutants(text: str) -> list[tuple[str, str, str]]:
+# Operands that stand where a call stood with no parentheses added; any
+# other keeps its own. An int is no atom here: with the call's `.real`
+# after it, it would read `1.real`.
+ATOMS = (ast.Name, ast.Attribute, ast.Subscript, ast.Call)
+
+
+def python_operands(call: str) -> list[str] | None:
+    """A Python `min()` or `max()` call's operands, each as it can stand
+    for the call, or [] when it has fewer than two; None when `call` is no
+    Python, such as CSS in a Python string."""
+    try:
+        node = ast.parse(call, mode="eval").body
+    except SyntaxError:
+        return None
+    args = [a for a in node.args if not isinstance(a, ast.Starred)]
+    if len(args) < 2:
+        return []
+    out = []
+    for a in args:
+        text = ast.get_source_segment(call, a)
+        atom = isinstance(a, ATOMS) or (
+            isinstance(a, ast.Constant) and type(a.value) is not int
+        )
+        out.append(text if atom else f"({text})")
+    return out
+
+
+def call_mutants(text: str, python: bool = False) -> list[tuple[str, str, str]]:
     out = []
     for m in CALL.finditer(text):
         end = closing(text, m.end())
         if end is None:
             continue
-        name, inner = m.group(1), text[m.end() : end]
+        name, inner = m.group(2), text[m.end() : end]
         call = text[m.start() : end + 1]
         args = split_top(inner, [","])
         if name == "clamp" and len(args) == 3:
@@ -156,9 +196,16 @@ def call_mutants(text: str) -> list[tuple[str, str, str]]:
             out.append(("clamp", call, x))
             out.append(("clamp", call, f"max({lo}, {x})"))
             out.append(("clamp", call, f"min({x}, {hi})"))
-        elif name in ("min", "max") and len(args) > 1:
-            for a in args:
-                out.append((name, call, a))
+        elif name in ("min", "max"):
+            operands = python_operands(call) if python else None
+            if operands is None:
+                operands = args
+            # A spread, `...xs`, is no operand, as `*xs` is none in Python:
+            # `Math.max(0, ...xs)` has one (#449). `...[a, b]` in a Python
+            # string parses as Python, so this runs on both readers.
+            operands = [a for a in operands if not a.startswith("...")]
+            if len(operands) > 1:
+                out += [(name, call, a) for a in operands]
     return out
 
 
@@ -216,7 +263,7 @@ def line_mutants(
 ) -> list[tuple[str, str, str]]:
     """The mutants one line holds; with `by_ast`, its Python conditions are
     left to python_conditions()."""
-    found = call_mutants(text)
+    found = call_mutants(text, python)
     py_if = None
     if python and (m := PY_IF.match(text)):
         if not by_ast:
