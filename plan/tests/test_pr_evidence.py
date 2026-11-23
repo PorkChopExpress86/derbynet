@@ -1186,7 +1186,8 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         repo.mkdir()
 
         def run(*args):
-            env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+            # No GIT_DIR from a pre-push hook, and no global git config.
+            env = {'PATH': os.environ['PATH'], 'HOME': str(self.tmp)}
             done = subprocess.run(
                 ['git', '-C', str(repo), '-c', 'user.name=t', '-c', 'user.email=t@example.com',
                  '-c', 'commit.gpgsign=false', *args],
