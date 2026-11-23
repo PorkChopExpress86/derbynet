@@ -207,9 +207,13 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def setUp(self):
         super().setUp()
         (self.tmp / 'runs.json').write_text('{}')
+        self.commits([PR_HEAD])
         gh = self.tmp / 'gh'
         gh.write_text(f'#!{sys.executable}\n'
                       'import json, sys\n'
+                      'if sys.argv[1] == "api" and "/pulls/421/commits" in sys.argv[2]:\n'
+                      f'    print(open({str(self.tmp / "commits.json")!r}).read())\n'
+                      '    sys.exit(0)\n'
                       'if sys.argv[1] == "api":\n'
                       f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
                       '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
@@ -224,6 +228,11 @@ class CiLoad(IssueStandIn, unittest.TestCase):
                       '    sys.exit(0)\n'
                       'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
                       f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def commits(self, shas, merges=()):
+        """PR 421's commits, oldest first; each of `merges` has two parents."""
+        (self.tmp / 'commits.json').write_text(json.dumps(
+            [{'sha': sha, 'parents': [{}, {}] if sha in merges else [{}]} for sha in shas]))
 
     def runs(self, **by_id):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
@@ -340,6 +349,32 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_body_naming_only_commits_before_the_last_is_refused(self):
+        """#347's draft named c355c7c5 and described its barrier after
+        9ae2c6a4 had changed it; the merge of master after it is no code of
+        the PR's (#347 retro)."""
+        old, last, merge = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32, PR_HEAD
+        self.commits([old, last, merge], merges=[merge])
+        for named, refused in (('c355c7c5', True), ('c355c7c', True), ('9ae2c6a4', False),
+                               ('0123456789ab', False), ('c355c7c5 and 9ae2c6a4', False),
+                               ('no commit', False), ('deadbeef', False),
+                               ('Xc355c7c5', False)):
+            with self.subTest(named=named):
+                done = self.check_at(f'Summary at {named}.\n', head=None, pr='421')
+                self.assertEqual(done.returncode, 1 if refused else 0,
+                                 done.stdout + done.stderr)
+                line = ('names commits of PR #421 only before its last that is no merge, '
+                        '9ae2c6a4 (the newest it names is c355c7c5)')
+                self.assertEqual(line in done.stdout, refused, done.stdout)
+        self.commits([old, merge], merges=[merge, old])
+        done = self.check_at('Summary at c355c7c5.\n', head=None, pr='421')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_without_pr_no_commits_are_read(self):
+        (self.tmp / 'commits.json').write_text('not json')
+        done = self.check_at('Summary at c355c7c5.\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_pr_gh_cannot_read_exits_with_its_message(self):
         done = self.check_at('', head=None, pr='999')
