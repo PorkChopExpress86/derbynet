@@ -100,12 +100,18 @@ while [ "${pid:-0}" -gt 1 ]; do
 done
 # pytest-repeat's --count renames each case `[P]` to `[P-1-N]` .. `[P-N-N]`,
 # so a node id that names `[P]` selects nothing: #463's run waited for the
-# lock, then collected 0 items and exited 5 (#463 retro).
+# lock, then collected 0 items and exited 5 (#463 retro).  A count of 1
+# renames nothing.
 count=
+next=
 for arg in "$@"; do
-  case "$arg" in --count|--count=*) count=1 ;; esac
+  if [ -n "$next" ]; then count=$arg; next=; continue; fi
+  case "$arg" in
+    --count) next=1 ;;
+    --count=*) count=${arg#--count=} ;;
+  esac
 done
-if [ -n "$count" ]; then
+if [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -gt 1 ]; then
   for arg in "$@"; do
     if [[ "$arg" == *::*\[* && ! "$arg" =~ -[0-9]+-[0-9]+\]$ ]]; then
       echo "pytest-under-load.sh: --count renames the [case] of $arg to" \

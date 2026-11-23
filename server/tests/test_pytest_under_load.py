@@ -94,11 +94,18 @@ def test_a_case_s_node_id_under_count_is_refused_before_the_lock(tmp_path, count
 
 
 @pytest.mark.parametrize(
-    "node, ran", [("test_signal[TERM-1-2]", "1 passed"), ("test_signal", "2 passed")]
+    "count, node, ran",
+    [
+        ("--count 2", "test_signal[TERM-1-2]", "1 passed"),
+        ("--count 2", "test_signal", "2 passed"),
+        ("--count 1", "test_signal[TERM]", "1 passed"),
+        ("--count=1", "test_signal[TERM]", "1 passed"),
+    ],
 )
-def test_a_node_id_that_selects_under_count_runs(tmp_path, node, ran):
+def test_a_node_id_that_selects_under_count_runs(tmp_path, count, node, ran):
     """The id pytest-repeat gives a repeat, `[case-1-N]`, selects that
-    repeat, and a test's id without its case selects each."""
+    repeat, and a test's id without its case selects each. A count of 1
+    renames nothing, as #463's light run selected its cases by id."""
     (tmp_path / "test_case.py").write_text(
         "import pytest\n\n\n"
         "@pytest.mark.parametrize('sig', ['TERM'])\n"
@@ -108,7 +115,7 @@ def test_a_node_id_that_selects_under_count_runs(tmp_path, node, ran):
         [
             "bash",
             "-c",
-            f"'{SCRIPT}' --loops 0 -p no:cacheprovider --count 2"
+            f"'{SCRIPT}' --loops 0 -p no:cacheprovider {count}"
             f" '{tmp_path}/test_case.py::{node}' >out",
         ],
         capture_output=True,
