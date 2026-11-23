@@ -2052,6 +2052,11 @@ def test_another_failure_beside_a_network_change_starts_no_rerun(tmp_path):
     ) in out
     assert not (tmp_path / "run" / "rerun.log").exists()
     assert "Rerunning" not in out
+    with pytest.raises(AssertionError) as raised:
+        assert_reran(tmp_path)
+    assert str(raised.value).startswith(
+        "the script ended without the `Rerunning` line; it printed:\n"
+    )
 
 
 def test_the_bare_error_text_in_a_failure_starts_no_rerun(tmp_path):
@@ -2191,13 +2196,19 @@ def start_held_rerun(tmp_path):
             env=env,
             start_new_session=True,
         )
-    wait_through(
-        run,
-        tmp_path / "held.out",
-        "start of the rerun's stub",
-        (folder / "rerunning").exists,
-        load_run_steps(tmp_path / "held.out", tmp_path / "held-run")[:3],
-    )
+    try:
+        wait_through(
+            run,
+            tmp_path / "held.out",
+            "start of the rerun's stub",
+            (folder / "rerunning").exists,
+            load_run_steps(tmp_path / "held.out", tmp_path / "held-run")[:3],
+        )
+    except BaseException:
+        # Its callers' finish() never gets the run: a rerun that hangs left
+        # the script running after the test (#463's mutants).
+        finish(tmp_path, run)
+        raise
     return run, lock
 
 
