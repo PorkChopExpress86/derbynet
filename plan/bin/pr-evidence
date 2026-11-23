@@ -96,9 +96,10 @@ the PR has since changed. A body that names none of the PR's commits passes,
 as do merges of master after the body was written. #347's draft named
 c355c7c5 and described its CDP-only barrier after 9ae2c6a4 had routed the
 barrier where a route already intercepts, and its new test went unmentioned
-(#347 retro). Over the fork's 80 merged PRs before it, none named only older
-commits. The limit left: naming the last commit once anywhere passes, though
-the rest of the body may still describe an older one.
+(#347 retro). Run over the fork's 81 merged PRs from #338 to #477, it
+refused none. The limits left: naming the last commit once anywhere passes,
+though the rest of the body may still describe an older one, and only a
+PR's first 100 commits are read (`per_page=100`).
 
 Exits 1 on a key the body gives no evidence for, on a body that names only
 commits of PR N older than its last that is no merge, on a CI load item not

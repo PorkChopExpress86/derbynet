@@ -62,7 +62,7 @@ Run `git worktree remove ../derbynet-wt-N`, `git branch -D issue-N-<slug>`, and 
 2. Spawn a general-purpose agent with `model: opus` and give it that list. It follows ~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills/engineering/retro/SKILL.md, ranks each candidate, and fixes every high and medium one:
    - It prefers a deterministic check (a test, ruff rule, pre-push hook, or CI step) to prose, and keeps CLAUDE.md to navigation pointers.
    - Repo fixes go in `git worktree add ../derbynet-wt-retro-N -b retro-N origin/master`. It runs the affected checks, commits, pushes, and returns a PR body written with /mattpocock-skills:pr.
-   - Memory files go straight into `~/.claude/projects/<clone>/memory/`, where `<clone>` is the main clone's absolute path with each `/` as `-`, such as `-mnt-samsung-dev-derbynet`. The clone moved off `/home/specter/dev/projects/derbynet` in November 2026, and this line still named the old folder until the #347 retro.
+   - Memory files go straight into ~/.claude/projects/-home-specter-dev-projects-derbynet/memory/.
    - Permissions in settings files stay as they are, and a change to ~/.claude/CLAUDE.md is only proposed.
    - It returns the low findings, and creates no branch when nothing is high or medium.
 3. If it returned a PR body, run `plan/bin/pr-evidence --check <path>` on it and send each line it names back (#411's retro body quoted `Closes #59` in prose), then open the PR. When the PR adds or changes a tool under plan/bin, server/tools or .githooks, or a CI workflow, spawn the Standards reviewer of Code review's step 2 on it (`model: sonnet`, in its own `git worktree add --detach` copy), with the tool's tests as its spec, and send its high and medium findings to the retro agent before the merge. A PR that changes only docs or memory skips the review. #285, #286, #288 and #289 merged with CI alone. Then merge and reset as in steps 4 and 5.
@@ -70,7 +70,7 @@ Run `git worktree remove ../derbynet-wt-N`, `git branch -D issue-N-<slug>`, and 
 
 ## Pausing mid-ticket
 
-When the loop must stop inside a ticket (a reboot, a stop condition), write `~/.claude/projects/<clone>/resume-N.md` (`<clone>` as in Retro, step 2) from the implementer's last report, and a memory note pointing at it. After #237's reboot, its file gave a skip count without the skips, which the second implementer guessed wrong in the PR body; listed full-suite commands without a `DERBYNET_TEST_PREFIX`; and called a load run unstarted that had begun (`server/var/load-runs/20261108-120936-2056795`). The file holds:
+When the loop must stop inside a ticket (a reboot, a stop condition), write `~/.claude/projects/-home-specter-dev-projects-derbynet/resume-N.md` from the implementer's last report, and a memory note pointing at it. After #237's reboot, its file gave a skip count without the skips, which the second implementer guessed wrong in the PR body; listed full-suite commands without a `DERBYNET_TEST_PREFIX`; and called a load run unstarted that had begun (`server/var/load-runs/20261108-120936-2056795`). The file holds:
 
 - the worktree, the branch, the pushed head, and each commit that holds real work;
 - each local commit no remote has, as `git -C <worktree> log --oneline HEAD --not --remotes` prints it (on a branch with no upstream too): #366's merge of master (743255ea) was left unpushed across the 2026-11-18 reboot, and only its resume file's line brought it back;

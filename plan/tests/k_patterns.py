@@ -13,6 +13,11 @@ repository's root.
 
 The run stops before any test, with exit 2, unittest's usage error, naming
 each pattern and the test names closest to it.
+
+It also stops a run on a Python older than 3.14, with exit 2 and the fix.
+The plan tools parse server/'s Python 3.14 (`except A, B:`), so under the
+3.12 python3 of the lead's new machine three tests failed with a
+SyntaxError that named no cause (#347 retro).
 """
 
 import difflib
@@ -77,10 +82,20 @@ def refuse_unmatched(program):
         sys.exit(2)
 
 
+def refuse_old_python(version=None):
+    version = version or sys.version_info
+    if tuple(version[:2]) < (3, 14):
+        print(f"plan/tests: python3 is {'.'.join(map(str, version[:3]))}, and plan/tests "
+              "need 3.14: put a 3.14 python3 first on PATH (plan/HANDOFF.md, Tools)",
+              file=sys.stderr)
+        sys.exit(2)
+
+
 _run_tests = unittest.TestProgram.runTests
 if not getattr(_run_tests, 'refuses_unmatched', False):
 
     def runTests(self, *args, **kwargs):
+        refuse_old_python()
         refuse_unmatched(self)
         return _run_tests(self, *args, **kwargs)
 
