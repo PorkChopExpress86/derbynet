@@ -1027,6 +1027,9 @@ def test_a_held_enter_adds_a_racer_and_saves_nothing_more(login, event):
             if (e.detail.requestConfig.verb === 'post')
               log.push(e.detail.requestConfig.path);
           }, true);
+          document.addEventListener('keydown', (e) => {
+            if (e.repeat) log.push('repeat');
+          }, true);
           document.addEventListener('keyup', () => log.push('keyup'), true);
         }"""
     )
@@ -1040,7 +1043,12 @@ def test_a_held_enter_adds_a_racer_and_saves_nothing_more(login, event):
     page.keyboard.up("Enter")
     page.wait_for_function("window.sends.includes('keyup')")
     # one read: htmx sends a repeat's POST in the repeat keydown's task.
-    assert page.evaluate("window.sends") == ["/checkin/racer/new/", "keyup"]
+    assert page.evaluate("window.sends") == [
+        "/checkin/racer/new/",
+        "repeat",
+        "repeat",
+        "keyup",
+    ]
     with htmx_post(page, f"/checkin/racer/{ada.pk}/"):
         page.keyboard.press("Enter")
     assert Racer.objects.filter(event=event, first_name="Ada").count() == 1
