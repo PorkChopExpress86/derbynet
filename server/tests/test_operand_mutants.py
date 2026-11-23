@@ -682,3 +682,44 @@ def test_a_file_the_diff_names_but_the_tree_lacks_is_not_crowded(tmp_path):
     many = ", ".join(f'"n{i}"' for i in range(21))
     diff = f"+++ b/gone.py\n@@ -0,0 +1 @@\n+S = {{{many}}}\n"
     assert om.crowded_in(diff, tmp_path) == []
+
+
+def test_a_call_below_an_early_return_is_moved_above_it(tmp_path):
+    """#383's `carryHeldKeys()` sat below `if (!opener) return;`, and
+    review's hand mutant that moved it above the guard survived; no listed
+    mutant moved it (#383 retro). A call below a guard that returns on
+    another line, or below no guard, moves nowhere."""
+    js = (
+        "close() {\n"
+        "  if (!opener) return;\n"
+        "  carryHeldKeys();\n"
+        "  if (!x) {\n"
+        "    return;\n"
+        "  }\n"
+        "  later();\n"
+        "  if (y) return 1;\n"
+        "  const z = f();\n"
+        "}\n"
+    )
+    (tmp_path / "app.js").write_text(js)
+    diff = "+++ b/app.js\n@@ -0,0 +1,10 @@\n" + "".join(
+        f"+{x}\n" for x in js.splitlines()
+    )
+    moved = [m for m in om.mutants(diff, tmp_path) if m.kind == "moved"]
+    guard, call = "  if (!opener) return;", "  carryHeldKeys();"
+    assert [(m.line, m.old, m.new) for m in moved] == [
+        (3, f"{guard}\n{call}", f"{call}\n{guard}")
+    ]
+    assert js[moved[0].span[0] : moved[0].span[1]] == f"{guard}\n{call}"
+    assert str(moved[0]) == (
+        f"app.js:3  moved  if (!opener) return; carryHeldKeys();  ->  {call} {guard}"
+    )
+
+
+def test_a_call_on_the_first_line_or_past_the_end_moves_nowhere(tmp_path):
+    """The first line has no line above it, though the file's last is a
+    guard, and a line the diff names past the file's end has none."""
+    js = "f();\nif (!x) return;"
+    (tmp_path / "a.js").write_text(js)
+    diff = "+++ b/a.js\n@@ -0,0 +1 @@\n+f();\n@@ -2,0 +3 @@\n+g();\n"
+    assert [m for m in om.mutants(diff, tmp_path) if m.kind == "moved"] == []
