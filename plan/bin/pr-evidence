@@ -3,7 +3,7 @@
 with `--check BODY.md` names each one the PR body gives no evidence for.
 
 Usage: plan/bin/pr-evidence <issue> [--check BODY.md [--head SHA] [--pr N] [--flake-ticket] [--closes N]...]
-       plan/bin/pr-evidence --check BODY.md [--closes N]...    (a body with no ticket, such as a retro's)
+       plan/bin/pr-evidence --check BODY.md [--head SHA] [--closes N]...    (a body with no ticket, such as a retro's)
 
 A line asks for evidence in the PR when it says so: "Evidence is ... in the
 PR", "The PR lists", "Record the size in the PR", "Attach" (but not
@@ -114,13 +114,52 @@ barrier where a route already intercepts, and its new test went unmentioned
 though the rest of the body may still describe an older one, and only a
 PR's first 100 commits are read (`per_page=100`).
 
+`--check` also refuses a hand-off header that names a head other than the
+PR's (#427). A hand-off log starts with the line the brief asks for, which the
+body keeps when it pastes the output: `cwd <dir> HEAD <sha>`, `# HEAD <sha>`,
+`HEAD: <sha>`, `cwd=<dir> head=<sha>`, `head <sha>` (the line tools/detach.sh
+prints), `worktree <dir> head <sha>`. A header is a line that starts, after
+any `#`, `>` or `$`, with `head` (any case, then `:`, `=` or a space) and its
+sha, or with `cwd` or `worktree` and has that `head` and sha later on (HEADER).
+Its sha, 7 to 40 hex digits, must be a prefix of `--head SHA`, or `--head` a
+prefix of it (or PR N's head, with `--pr N`), else the body names the line:
+the run is at another commit. A header whose words after the sha say the run
+read edits on top of that commit (`+ staged round-2 edits`, `plus the
+uncommitted fix round`, `with uncommitted changes`, `+ untracked probe.sh`:
+EDITS) is refused at the head too, since the run is at no commit: commit the
+edits before the run. A line the body means to leave at another head carries
+`[before run]` (BEFORE_RUN) on the header line itself or on its caption: a
+reproduction on the base, a control run on master, the run before the fix,
+with edits on top or not. The caption is the nearest non-blank line above the
+header or, for a header in a ``` or ~~~ fence (`read_lines`), above the
+fence's opener, so one caption marks a fence's headers; a caption that is
+itself a header marks only its own line. The marker is the author's word that
+the run is meant to be older, and the limit left: nothing checks that it is.
+D113 lets a branch skip the rerun when master's new commits touch nothing it
+reads, so a header that names the commit before a merge is accepted too: when
+`--head` is a merge commit, each commit on its first-parent line down to the
+first commit that is no merge passes. With `--pr N` those are the PR's last
+commit that is no merge and the merges after it, from the one read of PR N's
+commits the check above makes (`since_last_code`, with the same limit of 100
+commits); with `--head` alone, the checkout's git reads them (`merge_chain`).
+Any commit on that line passes: nothing here checks what master's merged
+commits touched, so a header before a merge D113 does not cover passes too
+(`plan/bin/pr-merge` reruns the source checks when its rule fires). A body
+with a header and no `--head` or `--pr` is refused for it, as a `CI load:`
+item is. Only a header line is read: prose that names an older head, such as
+a round's history, a mutant's note or a `load run:` line that names another
+run's head, is not. So the rule would not have caught the cases that led to
+it: #426 (#407's retro) gave its mutants at 977a8618 and #413 its round-2 hand
+mutants at e51a9c98 in prose, not under a header.
+
 Exits 1 on a key the body gives no evidence for, on a line whose result is
 a run not ended, on a body that names only
 commits of PR N older than its last that is no merge, on a CI load item not
-accepted or given with no head, on a `--head` that is not PR N's head, on a
-placeholder, on a closing keyword for another issue, on a body that names
-<issue> in no closing keyword and no "Part of", or when the issue, the
-PR or a run cannot be read.
+accepted or given with no head, on a hand-off header that is not at the PR's
+head or read edits on top of its commit and is not marked, or is given with no
+head, on a `--head` that is not PR N's head, on a placeholder, on a closing
+keyword for another issue, on a body that names <issue> in no closing keyword
+and no "Part of", or when the issue, the PR or a run cannot be read.
 """
 
 import argparse
@@ -129,6 +168,7 @@ import os
 import re
 import subprocess
 import sys
+from typing import NamedTuple
 
 ASKS = re.compile(
     r"\b(?:in|to) the PR\b|\bthe PR (?:lists|names|says|records|shows|explains)\b"
@@ -198,6 +238,27 @@ UNFINISHED = re.compile(
     re.IGNORECASE,
 )
 SHA_TOKEN = re.compile(r"(?<![0-9A-Za-z])[0-9a-f]{7,40}(?![0-9A-Za-z])")
+# The line a hand-off log starts with, as the fork's merged bodies and saved
+# logs write it (`cwd X HEAD S`, `cwd: X  HEAD: S`, `cwd=X head=S`, `# HEAD S`,
+# `HEAD: S`, `HEAD S`, `worktree X head S`, ...); tools/detach.sh prints
+# `head S`. It starts with a keyword, so prose and a `load run:` line that
+# name a head are not read. The tests' HEADER_SHAPES lists each shape.
+HEADER = re.compile(
+    r"^\s*(?:[#>$]\s*)*(?:(?:cwd|worktree)\b.*?\b)?head\b[:=]?\s*(?P<sha>[0-9a-f]{7,40})\b",
+    re.IGNORECASE,
+)
+BEFORE_RUN = "[before run]"
+# A header's words after its sha that say the run read edits on top of the
+# commit, as the fork's merged bodies write them: `+ staged round-2 edits`,
+# `(+ untracked testing/zz-probe-356.sh)`, `plus the uncommitted fix round`,
+# `with uncommitted changes`, `+ working tree`. `uncommitted: no`,
+# `uncommitted: 0 files`, `staged: none`, `no uncommitted changes`, `0
+# uncommitted files` and `nothing staged` say there were none.
+EDITS = re.compile(
+    r"(?<![\w+])(?:\+|plus)(?=\s)|(?<!\bno )(?<!\bnothing )(?<!\b0 )"
+    r"\b(?:uncommitted|staged|untracked|working tree)\b(?!:\s*(?:no|none|0)\b)",
+    re.IGNORECASE,
+)
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
 RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
 CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
@@ -313,9 +374,15 @@ def placeholders(body: str, defined=defined_names) -> list[str]:
 
 
 def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
-    """Each line GitHub reads as prose, as (its number, the line with each
-    code span replaced by a NUL, which breaks a keyword or reference it sits
-    in or between): a closed code fence is left out, and the lines of a fence
+    """The prose lines `read_lines` finds."""
+    return read_lines(body, strict)[0]
+
+
+def read_lines(body: str, strict: bool = False) -> tuple[list[tuple[int, str]], dict[int, int]]:
+    """Each line GitHub reads as prose, and for each line inside a code fence
+    the number of the fence's opening line. Prose is (its number, the line
+    with each code span replaced by a NUL, which breaks a keyword or reference
+    it sits in or between): a closed code fence is left out, and the lines of a fence
     that never closes are kept, as pr-merge reads cited decisions. Only a
     bare line of at least as many backticks as the opener closes a fence.
 
@@ -335,7 +402,7 @@ def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
     retro's PR body pastes the runs); that GitHub's closing keywords follow
     the renderer is assumed, since they act on a merge and cannot be read
     without one."""
-    kept, fence, raw_end = [], None, None
+    kept, openers, fence, raw_end = [], {}, None, None
     for n, line in enumerate(body.splitlines(), 1):
         if strict:
             line = QUOTE.sub("", line)
@@ -348,9 +415,9 @@ def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
         tilde = TILDE_FENCE.match(line) if strict else None
         if fence is None:
             if edge:
-                fence = (len(edge[1]), [], "`")
+                fence = (len(edge[1]), [], "`", n)
             elif tilde:
-                fence = (len(tilde[1]), [], "~")
+                fence = (len(tilde[1]), [], "~", n)
             elif strict and INDENTED.match(line):
                 continue
             else:
@@ -369,9 +436,10 @@ def unquoted_lines(body: str, strict: bool = False) -> list[tuple[int, str]]:
             fence = None
         else:
             fence[1].append((n, line))
+            openers[n] = fence[3]
     if fence and not strict:
         kept += [(n, CODE_SPAN.sub("\0", line)) for n, line in fence[1]]
-    return sorted(kept)
+    return sorted(kept), openers
 
 
 def closing_refs(body: str, strict: bool = False) -> list[tuple[int, str, str, bool]]:
@@ -401,6 +469,79 @@ def links_ticket(body: str, issue: str) -> bool:
     return (any(part_of.search(line) for _n, line in unquoted_lines(body, strict=True))
             or any(number == issue and in_fork
                    for _n, _words, number, in_fork in closing_refs(body, strict=True)))
+
+
+class Header(NamedTuple):
+    number: int  # its line in the body
+    line: str
+    sha: str  # in lower case
+    marked: bool  # `[before run]` on the line or its caption
+    edits: bool  # the run read edits on top of the commit (EDITS)
+
+
+def handoff_headers(body: str) -> list[Header]:
+    """Each hand-off header in `body`. It is marked by `[before run]` on the
+    line, or on its caption: the nearest non-blank line above it or, inside
+    a code fence (as `read_lines` reads one strictly, so ~~~ too), above the
+    fence's opener, so one caption marks the fence's headers. A caption that
+    is itself a header marks only its own line."""
+    lines = body.splitlines()
+    openers = read_lines(body, strict=True)[1]
+    found = []
+    for i, line in enumerate(lines, 1):
+        header = HEADER.match(line)
+        if not header:
+            continue
+        caption = next((above for above in reversed(lines[:openers.get(i, i) - 1])
+                        if above.strip()), "")
+        if HEADER.match(caption):
+            caption = ""
+        found.append(Header(i, line.strip(), header["sha"].casefold(),
+                            BEFORE_RUN.casefold() in f"{line} {caption}".casefold(),
+                            bool(EDITS.search(line, header.end()))))
+    return found
+
+
+def merge_chain(head: str, root: str = ROOT) -> list[str]:
+    """The commits D113 lets a header name for a `head` that is a merge: its
+    first parent while the commit is a merge, down to the first that is none,
+    which is the branch's own last commit. Empty when git cannot read `head`,
+    and for a commit that is no merge."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    chain, commit = [], head
+    for _ in range(100):
+        done = subprocess.run(["git", "-C", root, "rev-list", "--parents", "-n", "1", commit],
+                              capture_output=True, text=True, env=env)
+        parents = done.stdout.split()[1:]
+        if len(parents) < 2:
+            break
+        commit = parents[0]
+        chain.append(commit)
+    return chain
+
+
+def stale_headers(body: str, head: str | None, chain=merge_chain) -> list[str]:
+    """A line for each unmarked hand-off header: `line N: <the line>` with
+    why it is refused. That is a run that read edits no commit holds, a sha
+    that is no prefix of `head` (or `head` of it, for an abbreviated
+    `--head`) and names none of the commits before a merge at `head`
+    (`chain`), or any header when there is no head."""
+    unmarked = [h for h in handoff_headers(body) if not h.marked]
+    if not head:
+        return [f"line {h.number}: {h.line}: no --head or --pr to check it at" for h in unmarked]
+    head = head.casefold()
+    off = [h for h in unmarked if not (head.startswith(h.sha) or h.sha.startswith(head))]
+    before = [c.casefold() for c in chain(head)] if off else []
+    retry = f"write {BEFORE_RUN} on it if it is a before, reproduction or control run"
+    refused = []
+    for h in unmarked:
+        if h.edits:
+            refused.append(f"line {h.number}: {h.line}: the run read edits no commit holds; "
+                           f"commit them and run it again at the head, or {retry}")
+        elif h in off and not any(c.startswith(h.sha) for c in before):
+            refused.append(f"line {h.number}: {h.line}: the PR's head is {head}, and this run "
+                           f"is at another commit; run it again at the head, or {retry}")
+    return refused
 
 
 def ci_load_items(body: str) -> list[str]:
@@ -473,6 +614,15 @@ def unfinished(body: str) -> list[str]:
             if UNFINISHED.search(line)]
 
 
+def since_last_code(commits: list[dict]) -> list[str]:
+    """The SHAs of `commits` (the PR's, oldest first, as GitHub's pulls API
+    lists them) from the last that is no merge on: that commit and the merges
+    after it, which D113 lets a hand-off header name. Empty when every commit
+    is a merge."""
+    code = [i for i, c in enumerate(commits) if len(c["parents"]) == 1]
+    return [c["sha"] for c in commits[code[-1]:]] if code else []
+
+
 def stale_commits(body: str, commits: list[dict]) -> tuple[str, str] | None:
     """None when the body names no commit of `commits` (the PR's, oldest
     first, as GitHub's pulls API lists them), or names one at or after the
@@ -480,10 +630,10 @@ def stale_commits(body: str, commits: list[dict]) -> tuple[str, str] | None:
     shas = [c["sha"] for c in commits]
     tokens = set(SHA_TOKEN.findall(body))
     named = [i for i, sha in enumerate(shas) if any(sha.startswith(t) for t in tokens)]
-    code = [i for i, c in enumerate(commits) if len(c["parents"]) == 1]
-    if not named or not code or max(named) >= code[-1]:
+    recent = since_last_code(commits)
+    if not named or not recent or max(named) >= len(shas) - len(recent):
         return None
-    return shas[max(named)], shas[code[-1]]
+    return shas[max(named)], recent[0]
 
 
 def pr_commits(number: str) -> list[dict]:
@@ -546,12 +696,16 @@ def main(argv: list[str]) -> int:
         parser.error("--head, --pr, --flake-ticket and --closes go with --check")
     if not (args.issue or args.check):
         parser.error("give an issue, or --check BODY.md")
-    head = args.head
+    head, commits, chain = args.head, [], merge_chain
     if args.pr:
         real = pr_head(args.pr)
         if head and head != real:
             sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
         head = real
+        commits = pr_commits(args.pr)
+
+        def chain(_head):
+            return since_last_code(commits)
     asked = keys(issue_body(args.issue)) if args.issue else []
     if not args.check:
         for key in asked:
@@ -583,11 +737,14 @@ def main(argv: list[str]) -> int:
         print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
               f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
               "<pre>, <code>, a ~~~ fence and an indented line count as code)")
+    stale_heads = stale_headers(body, head, chain)
+    for line in stale_heads:
+        print(f"hand-off head not the PR's, {line}")
     running = unfinished(body)
     for found in running:
         print(f"a run not ended as a result, {found}: fill in its result, or move it "
               "under ## Still open")
-    stale = stale_commits(body, pr_commits(args.pr)) if args.pr else None
+    stale = stale_commits(body, commits)
     if stale:
         print(f"names commits of PR #{args.pr} only before its last that is no merge, "
               f"{stale[1][:8]} (the newest it names is {stale[0][:8]}): describe the code "
@@ -596,7 +753,8 @@ def main(argv: list[str]) -> int:
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if missing or unfilled or closes or unlinked or running or stale or refused else 0
+    return 1 if (missing or unfilled or closes or unlinked or running or stale or stale_heads
+                 or refused) else 0
 
 
 if __name__ == "__main__":
