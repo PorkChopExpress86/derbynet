@@ -54,14 +54,20 @@
 # checks read it: a PR merged during the run was never checked with this one
 # (#333 review).
 #
-# Usage: plan/bin/pr-merge <pr> [--base-checked] [--dry-run] [--squash|--rebase|--merge] [--delete-branch]
+# Usage: plan/bin/pr-merge <pr> [--base-checked] [--dry-run] [--areas-only] [--squash|--rebase|--merge] [--delete-branch]
 #   --base-checked  skips the area rule, once the combined diff's affected
 #                   tests ran on the merge; the source-check run still runs
 #   --dry-run       runs every check above, and stops before the merge
+#   --areas-only    runs only the area rule and the decision rows, with no
+#                   wait for CI: exits 1 with the area rule's refusal, or 0.
+#                   Run before the wait for CI, so a branch master moved
+#                   under is updated first: #427's PR 476 waited a CI round,
+#                   then was refused for #398's plan/owner-decisions.md
+#                   (#427 retro).
 #   -h, --help      prints this
 # With no merge method it squashes and deletes the branch, as the plan's PRs do.
 set -euo pipefail
-usage='usage: pr-merge <pr> [--base-checked] [--dry-run] [--squash|--rebase|--merge] [--delete-branch]'
+usage='usage: pr-merge <pr> [--base-checked] [--dry-run] [--areas-only] [--squash|--rebase|--merge] [--delete-branch]'
 case ${1:-} in
   -h|--help) sed -n '2,/^set -euo/{/^#/s/^# \{0,1\}//p}' "$0"; exit 0 ;;
 esac
@@ -69,11 +75,13 @@ PR=${1:?$usage}
 shift
 base_checked=0
 dry_run=0
+areas_only=0
 rest=()
 for arg in "$@"; do
   case $arg in
     --base-checked) base_checked=1 ;;
     --dry-run) dry_run=1 ;;
+    --areas-only) areas_only=1 ;;
     *) rest+=("$arg") ;;
   esac
 done
@@ -170,25 +178,28 @@ head=$("$GH" pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
 # A push of the head commit to parity-check/<name> runs the parity gate on the
 # same SHA (.github/workflows/parity.yml), so its checks show on the PR. The
 # gate is not a pull request check yet; leave those runs out.
-not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,workflow,event \
-               --jq '.[] | select(.bucket != "pass" and .bucket != "skipping")
-                     | select(.workflow != "parity" or .event != "push")
-                     | "\(.bucket) \(.name)"')
-if [ -n "$not_passed" ]; then
-  echo "not merging #$PR; checks on $head not passed:" >&2
-  echo "$not_passed" >&2
-  exit 1
-fi
-# A workflow GitHub rejected shows no check on the PR (#59 retro).
-if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
-  echo "not merging #$PR; could not read the workflow runs on $head" >&2
-  exit 1
-fi
-if [ -n "$rejected" ]; then
-  echo "not merging #$PR; GitHub rejected a workflow file on $head, so no check of it shows on the PR:" >&2
-  echo "$rejected" >&2
-  exit 1
-fi
+refuse_unfinished_checks() {
+  not_passed=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,workflow,event \
+                 --jq '.[] | select(.bucket != "pass" and .bucket != "skipping")
+                       | select(.workflow != "parity" or .event != "push")
+                       | "\(.bucket) \(.name)"')
+  if [ -n "$not_passed" ]; then
+    echo "not merging #$PR; checks on $head not passed:" >&2
+    echo "$not_passed" >&2
+    exit 1
+  fi
+  # A workflow GitHub rejected shows no check on the PR (#59 retro).
+  if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
+    echo "not merging #$PR; could not read the workflow runs on $head" >&2
+    exit 1
+  fi
+  if [ -n "$rejected" ]; then
+    echo "not merging #$PR; GitHub rejected a workflow file on $head, so no check of it shows on the PR:" >&2
+    echo "$rejected" >&2
+    exit 1
+  fi
+}
+[ "$areas_only" = 1 ] || refuse_unfinished_checks
 # The areas whose change on master since the merge base the PR's CI never saw:
 # each path printed as "<area>\t<path>".
 areas() {
@@ -316,6 +327,28 @@ master_paths=$(git diff --name-only "$base" "$master" | areas)
 # and an area both sides changed could go unseen (#206 retro).
 shared=$(LC_ALL=C comm -12 <(cut -f1 <<<"$pr_paths" | LC_ALL=C sort -u) \
            <(cut -f1 <<<"$master_paths" | LC_ALL=C sort -u) | grep . || true)
+refuse_shared_areas() {
+  [ -n "$shared" ] || return 0
+  {
+    echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
+    mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
+    git log --format='  %h %s' "$base..$master" -- "${moved[@]}"
+    for area in $shared; do
+      echo "$area"
+      awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
+      awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
+    done
+    echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
+    { git diff --name-only "$base" "$head"; git diff --name-only "$base" "$master"; } | sort -u |
+      "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
+  } >&2
+  exit 1
+}
+if [ "$areas_only" = 1 ]; then
+  refuse_shared_areas
+  echo "#$PR: origin/master ${master:0:8} moved in no area the PR changes since its merge base ${base:0:8}" >&2
+  exit 0
+fi
 pr_all=$(git diff --name-only "$base" "$head")
 master_all=$(git diff --name-only "$base" "$master")
 # The source checks, as either side's source-checks.sh lists them.
@@ -349,22 +382,7 @@ if { [ -n "$pr_checks" ] && [ -n "$master_code" ]; } ||
   } >&2
   source_checks_on_the_merge || exit 1
 fi
-if [ -n "$shared" ] && [ "$base_checked" = 0 ]; then
-  {
-    echo "not merging #$PR; origin/master moved since its merge base ${base:0:8}, in an area the PR also changes, so CI ran without these commits:"
-    mapfile -t moved < <(awk -F'\t' 'NR == FNR { s[$1]; next } $1 in s { print $2 }' <(echo "$shared") <(echo "$master_paths"))
-    git log --format='  %h %s' "$base..$master" -- "${moved[@]}"
-    for area in $shared; do
-      echo "$area"
-      awk -F'\t' -v a="$area" '$1 == a { print "  master:  " $2 }' <<<"$master_paths"
-      awk -F'\t' -v a="$area" '$1 == a { print "  this PR: " $2 }' <<<"$pr_paths"
-    done
-    echo "Run what plan/bin/affected-tests prints for the combined diff on the PR merged with origin/master, then rerun with --base-checked; or update the branch (gh pr update-branch $PR) and wait for CI again. For the combined diff it prints:"
-    { git diff --name-only "$base" "$head"; git diff --name-only "$base" "$master"; } | sort -u |
-      "${AFFECTED:-$(dirname "$0")/affected-tests}" --stdin || echo "(affected-tests failed)"
-  } >&2
-  exit 1
-fi
+[ "$base_checked" = 1 ] || refuse_shared_areas
 # An issue whose body has a "## Still open" section stays open for what that
 # section names (plan/README.md), so a PR that would close it is refused here
 # rather than the issue reopened after the merge.

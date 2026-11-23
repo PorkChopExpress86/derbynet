@@ -89,6 +89,8 @@ elif args[:1] == ['api'] and os.environ.get('FAKE_REJECTED'):
     # ff00bbc6 failed with no job.
     print('0' if args[1].endswith('/jobs') else
           '44236545824 .github/workflows/pi-images.yml https://example/44236545824')
+elif args[:2] == ['pr', 'checks'] and os.environ.get('FAKE_PENDING'):
+    print('pending server / tests')
 elif args[:2] == ['pr', 'merge']:
     if os.environ.get('FAKE_MERGE_HANG'):
         open(os.environ['FAKE_MERGE_HANG'], 'w').close()
@@ -357,6 +359,43 @@ class PrMerge(unittest.TestCase):
         done = self.merge(head)
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertIn('its body cites D138, which', done.stderr)
+        self.assertEqual(self.merged(), '')
+
+    def test_areas_only_refuses_a_moved_area_while_ci_still_runs(self):
+        """#427's PR 476 waited a CI round, then pr-merge refused it for
+        #398's plan/owner-decisions.md; the area rule needs no CI (#427 retro)."""
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.master('plan/owner-decisions.md')
+        self.env['FAKE_PENDING'] = '1'
+        self.env['FAKE_BODY'] = 'prose'
+        done = self.merge(head, '--areas-only')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('in an area the PR also changes', done.stderr)
+        self.assertIn('plan/\n  master:  plan/owner-decisions.md\n'
+                      '  this PR: plan/AGENT-BRIEF.md\n', done.stderr)
+        self.assertEqual(self.ran(), '')
+        self.assertEqual(self.merged(), '')
+
+    def test_areas_only_passes_an_unmoved_area_and_merges_nothing(self):
+        head = self.pr('plan/AGENT-BRIEF.md')
+        self.master('server/ui/kiosk.css')
+        self.env['FAKE_PENDING'] = '1'
+        self.env['FAKE_BODY'] = 'prose'
+        done = self.merge(head, '--areas-only')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('moved in no area the PR changes', done.stderr)
+        self.assertEqual(self.merged(), '')
+        self.env.pop('FAKE_PENDING')
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn('pr merge 7', self.merged())
+
+    def test_pending_checks_still_refuse_a_merge(self):
+        head = self.pr('server/ui/kiosk.css')
+        self.env['FAKE_PENDING'] = '1'
+        done = self.merge(head)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('checks on', done.stderr)
         self.assertEqual(self.merged(), '')
 
     def test_an_unrecorded_decision_refuses_before_the_source_checks_run(self):
