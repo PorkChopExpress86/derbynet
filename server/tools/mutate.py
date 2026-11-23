@@ -85,7 +85,10 @@ line, then pytest's output, then the same line again: `KILLED` (a test
 failed; with `failed in helper NAME` when a helper in a test file raised,
 not the test itself, so read whether the assert the mutant aims at
 failed, and with each test that passed with the mutant in and the count
-`-x` left unrun, since only the one that failed killed it),
+`-x` left unrun, since only the one that failed killed it; under
+pytest-repeat's `--count`, which runs on past a failure, the runs it
+failed in, `failed in F of N runs`, and when the first failure raised an
+AttributeError, NameError or TypeError, `failed on NAME, not an assert`),
 `SURVIVED` (every test passed), or with `--expect pass`, for a should-pass
 mutant, `PASSED` or `BROKE`. It exits 0 when the result is the one
 expected, 1 when it is not, and 2 when it refuses, when pytest errors (an
@@ -266,6 +269,11 @@ def _pytest(pytest_args: list[str], timeout: float):
     without `-x` and were stopped part-way, their mutants NOT RUN (#344
     retro). A `--maxfail` in the arguments comes after `-x` and wins. `-x`
     stops at a fixture's error too (stopped_on_error())."""
+    # A run of pytest-repeat's --count goes on past a failure, so its rate
+    # shows: #409's mutant that deleted stop_sending survived one run, then
+    # was killed in 5 of 10 and 1 of 3 (#409 retro).
+    if any(arg == "--count" or arg.startswith("--count=") for arg in pytest_args):
+        return _pytest_once(pytest_args, timeout)
     run, output = _pytest_once(["-x", *pytest_args], timeout)
     if stopped_on_error(counts(output)):
         return _pytest_once(pytest_args, timeout)
@@ -403,10 +411,31 @@ def _result(run, output: str, expect: str) -> tuple[str, str]:
         return "ERROR", f"pytest exit status {run.returncode}"
     why = [failed_in_helper(output)]
     if outcome == OUTCOMES[expect][1]:
+        why.append(raised_outside_an_assert(output))
         why.append(spared(output))
     if strays := STRAYS.search(output):
         why.append(strays.group(1))
     return outcome, "; ".join(w for w in why if w)
+
+
+# The errors a test's own code raises when a mutant breaks its scaffolding,
+# not the behaviour it asserts.
+SCAFFOLD_ERRORS = {"AttributeError", "NameError", "UnboundLocalError", "TypeError"}
+# The last line of a failure's traceback: `tests/test_x.py:12: AttributeError`.
+RAISED = re.compile(r"^\S+\.py:\d+: (\w+)$", re.M)
+
+
+def raised_outside_an_assert(output: str) -> str:
+    """`failed on NAME, not an assert` when pytest's first failure raised one
+    of SCAFFOLD_ERRORS. #409's m2 read KILLED on `tab.blocker`'s
+    AttributeError in its test, not on an assert (#409 retro)."""
+    failures = FAILURES.search(output)
+    if failures is None:
+        return ""
+    raised = RAISED.search(output, failures.end())
+    if raised is None or raised.group(1) not in SCAFFOLD_ERRORS:
+        return ""
+    return f"failed on {raised.group(1)}, not an assert"
 
 
 # pytest's header line for a run in one process: "collected 3 items".
@@ -426,7 +455,11 @@ def spared(output: str) -> str:
     collected = COLLECTED.search(output)
     unrun = int(collected.group(1)) - ran if collected else 0
     parts = []
-    if passed:
+    failed = found.get("failed", 0)
+    # pytest-repeat names each of --count's runs `[I-N]` or `[case-I-N]`.
+    if passed and failed and all(re.search(r"[[-]\d+-\d+\]$", p) for p in passed):
+        parts.append(f"failed in {failed} of {failed + len(passed)} runs")
+    elif passed:
         parts.append(f"{len(passed)} passed with the mutant in: {', '.join(passed)}")
     if unrun > 0:
         parts.append(f"{unrun} not run after the first failure (-x)")

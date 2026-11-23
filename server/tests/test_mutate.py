@@ -1682,3 +1682,63 @@ def test_a_process_the_run_left_running_is_named_and_killed(project):
 def test_a_run_that_leaves_nothing_names_nothing(project):
     run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
     assert "left" not in run.stdout.splitlines()[-1]
+
+
+SCAFFOLD_TEST = """\
+from mod import twice
+
+
+class Tab:
+    pass
+
+
+def test_reads_the_tab():
+    tab = Tab()
+    if twice() != 2:
+        tab.blocker.send("Network.enable")
+"""
+
+
+def test_a_kill_on_an_attribute_error_says_it_was_no_assert(project):
+    """#409's m2 read KILLED on `tab.blocker`'s AttributeError in its own
+    test, which the mutant reached, not on an assert (#409 retro)."""
+    (project / "test_scaffold.py").write_text(SCAFFOLD_TEST)
+    subprocess.run([*GIT, "add", "."], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "scaffold"], cwd=project, check=True)
+    run = mutate(project, "1 + 1", "1 + 2", "test_scaffold.py::test_reads_the_tab")
+    last = run.stdout.splitlines()[-1]
+    assert last.endswith("'1 + 2'  (failed on AttributeError, not an assert)")
+
+
+def test_a_kill_on_an_assert_names_no_error(project):
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    assert "not an assert" not in run.stdout.splitlines()[-1]
+
+
+SOMETIMES_TEST = """\
+from pathlib import Path
+
+from mod import twice
+
+
+def test_sometimes():
+    runs = Path("runs")
+    n = int(runs.read_text()) if runs.exists() else 0
+    runs.write_text(str(n + 1))
+    assert twice() == 2 or n % 2
+"""
+
+
+def test_a_kill_under_count_gives_the_runs_it_failed_in(project):
+    """#409's mutant that deleted stop_sending survived one run, then was
+    killed in some runs of ten and of three: a kill by chance (#409 retro)."""
+    (project / "test_sometimes.py").write_text(SOMETIMES_TEST)
+    subprocess.run([*GIT, "add", "."], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "sometimes"], cwd=project, check=True)
+    run = mutate(
+        project, "1 + 1", "1 + 2", "--count", "4", "test_sometimes.py::test_sometimes"
+    )
+    last = run.stdout.splitlines()[-1]
+    assert last == "KILLED  mod.py: '1 + 1' -> '1 + 2'  (failed in 2 of 4 runs)", (
+        run.stdout + run.stderr
+    )
