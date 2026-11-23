@@ -539,12 +539,12 @@ def stop_timers(tab):
             pass
 
 
-def stop_sending(tab):
-    """Stop every frame of `tab` but the main frame sending fetch and
-    XMLHttpRequest requests; the main frame's stop sends the barrier
-    (`_barrier`)."""
+def stop_sending(tab, but=None):
+    """Stop every frame of `tab` but the frame `but` sending fetch and
+    XMLHttpRequest requests. The settle passes the main frame, whose stop
+    sends the barrier (`_barrier`)."""
     for frame in tab.frames:
-        if frame == tab.main_frame:
+        if frame == but:
             continue
         try:
             frame.evaluate(STOP_SENDING, None)
@@ -555,8 +555,21 @@ def stop_sending(tab):
 def close_tab(page, tab):
     """Close a second tab of `page`'s context, such as the camera or a
     kiosk, once its polls have stopped and its requests are answered. A tab
-    closed with a request out fails the test (`InFlight.page_closed`)."""
+    closed with a request out fails the test (`InFlight.page_closed`).
+
+    Stopping the timers leaves the callbacks that send on no timer: the
+    camera's `onicecandidate` and `onnegotiationneeded` post a message
+    (camera-signaling.js), and a reply's handler can send again. So
+    STOP_SENDING runs in every frame of the tab, and the settle's block
+    (`block_sending`) then fails every other request the tab makes until
+    it closes. The wait is for the server's
+    replies to the requests sent before (#409:
+    `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
+    `test_close_tab_stops_a_loop_the_block_would_fail`,
+    `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
+    stop_sending(tab)
+    block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
@@ -621,16 +634,18 @@ BLOCKED = ("inspector", "net::ERR_BLOCKED_BY_CLIENT")
 
 
 def block_sending(page):
-    """Make Chromium block every later request of `page`, for the rest of
-    its life: an image, a beacon, a frame made after STOP_SENDING, and a
-    navigation, whose own request only the Fetch block stops
+    """Make Chromium block every later request of `page`, the settle's
+    page or a tab `close_tab` closes, for the rest of its life: an image, a
+    beacon, a frame made after STOP_SENDING, and a navigation, whose own
+    request only the Fetch block stops
     (`test_the_settle_blocks_what_the_stops_leave`). The block ends with its
     CDP session (#409, PR #424), so the session stays open on the page and
-    closes with its context. A blocked request fails at once, so every new
-    document and frame gets STOP_SENDING first: a fetch of theirs never
-    fails into a handler that would send again. A page that loads an
-    image again on its error would spin, the block failing each load at
-    once; no script under `ui/static/ui/` sets an image's `onerror`."""
+    closes with it (`test_close_tab_closes_a_tab_that_keeps_sending`). A
+    blocked request fails at once, so every new document and frame gets
+    STOP_SENDING first: a fetch of theirs never fails into a handler that
+    would send again. A page that loads an image again on its error would
+    spin, the block failing each load at once; no script under
+    `ui/static/ui/` sets an image's `onerror`."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
     # Before the first send: Playwright hands the page's events over while
@@ -664,7 +679,7 @@ def _settle(page) -> list[str]:
             close_tab(page, tab)
     if not getattr(page, "blocker", None):
         stop_timers(page)
-        stop_sending(page)
+        stop_sending(page, but=page.main_frame)
         _barrier(page)
         block_sending(page)
     return page.in_flight.drain(page)
