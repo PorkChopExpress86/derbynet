@@ -405,10 +405,10 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         """With --pr, the commits D113 lets a hand-off header name come from
         the PR's commit list the stale-commit refusal reads, read once, not
         from the checkout's git, which need not hold them (#427)."""
-        old, last = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32
-        self.commits([old, last, PR_HEAD], merges=[PR_HEAD])
-        for sha, refused in ((last, False), (last[:8], False), (PR_HEAD[:8], False),
-                             (old[:8], True)):
+        old, last, merge = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32, '5e1f0b9d' + '0' * 32
+        self.commits([old, last, merge, PR_HEAD], merges=[merge, PR_HEAD])
+        for sha, refused in ((last, False), (last[:8], False), (merge[:8], False),
+                             (PR_HEAD[:8], False), (old[:8], True)):
             with self.subTest(sha=sha):
                 (self.tmp / 'commit-reads').write_text('')
                 done = self.check_at(fenced(f'cwd /x HEAD {sha}'), head=None, pr='421')
@@ -977,8 +977,10 @@ def fenced(header, caption='Hand-off, committed head:'):
 
 
 class HandOffHeads(IssueStandIn, unittest.TestCase):
-    """A hand-off header names a head the PR's is a prefix of, or carries
-    `[before run]`, or names the commit before a merge at the head (#427). The
+    """A hand-off header names a head the PR's is a prefix of (or that an
+    abbreviated `--head` is a prefix of) and says of no edits on top, or
+    carries `[before run]`, or names the commit before a merge at the head
+    (#427). The
     cases call `TOOL.stale_headers` in process (plan/AGENT-BRIEF.md); the
     command line runs in `test_the_command_line_refuses_and_names_the_line`."""
 
@@ -1005,6 +1007,15 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
                 self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:n]}')), [])
         self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:12].upper()}')), [])
         self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=CURRENT.upper()), [])
+
+    def test_an_abbreviated_head_passes_a_longer_header_for_the_same_commit(self):
+        for n in (8, 12, 40):
+            with self.subTest(n=n):
+                self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:n]}'), head=CURRENT[:8]), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=CURRENT[:8].upper()), [])
+        for sha in (OLDER, CURRENT[:7] + 'f' + CURRENT[8:]):
+            with self.subTest(sha=sha):
+                self.assertEqual(len(self.stale(fenced(f'HEAD {sha}'), head=CURRENT[:8])), 1)
 
     def test_a_sha_that_is_no_prefix_of_the_head_is_refused_at_each_end(self):
         """Near misses: the last digit of a 40-digit sha, the 7th of a 7-digit
@@ -1094,6 +1105,48 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
                 f'HEAD {OLDER}\n````\nHEAD {OLDER}\n')
         self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 10'])
 
+    def test_a_tilde_fence_takes_its_caption_as_a_backtick_fence_does(self):
+        self.assertEqual(self.stale(f'[before run] on master:\n\n~~~\nHEAD {OLDER}\n~~~\n'), [])
+        self.assertEqual(self.stale(f'[before run]\n~~~text\n```\nHEAD {OLDER}\n~~~\n'), [])
+        body = f'[before run]\n~~~\nHEAD {OLDER}\n~~~\n~~~\nHEAD {OLDER}\n~~~\n'
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
+
+    def test_a_marked_header_line_captions_no_header_below_it(self):
+        for body in (f'HEAD {OLDER} [before run]\nHEAD {OLDER}\n',
+                     f'HEAD {OLDER} [before run]\n\nHEAD {OLDER}\n',
+                     f'HEAD {OLDER} [before run]\n```\nHEAD {OLDER}\n```\n'):
+            with self.subTest(body=body):
+                found = self.stale(body)
+                self.assertEqual(len(found), 1, found)
+                self.assertFalse(found[0].startswith('line 1:'), found)
+
+    def test_a_header_with_edits_on_top_of_its_commit_is_refused_at_the_head_too(self):
+        """The run read edits no commit holds, as the fork's merged bodies
+        wrote it (the PR number in each comment), so no head can be right."""
+        for tail in (
+                '+ staged round-2 edits',  # #393
+                '(+ staged: the two new cases)',  # #393
+                'plus the uncommitted fix round',  # #327
+                '+ working tree',  # #376
+                '+ untracked testing/zz-probe-356.sh',  # #361
+                'with uncommitted changes',  # #456
+                '(probe testing/zz-probe-406.sh uncommitted; PHP unchanged)',  # #410
+                '+ scratch edit:',  # #416
+        ):
+            with self.subTest(tail=tail):
+                header = f'cwd /x HEAD {CURRENT} {tail}'
+                found = self.stale(fenced(header))
+                self.assertEqual(len(found), 1, found)
+                self.assertTrue(found[0].startswith(
+                    f'line 4: {header}: the run read edits no commit holds'), found)
+                self.assertEqual(self.stale(fenced(f'cwd /x HEAD {OLDER} {tail} [before run]')), [])
+
+    def test_a_header_that_says_there_were_no_edits_passes(self):
+        for tail in ('; uncommitted: 0 files', '; uncommitted: no', 'dirty=0 port 18399',
+                     'changed: 0', 'status: 0 changes', 'load 19.41 18.95 16.63'):
+            with self.subTest(tail=tail):
+                self.assertEqual(self.stale(fenced(f'cwd /x HEAD {CURRENT} {tail}')), [])
+
     def test_a_marker_inside_a_fence_does_not_caption_a_header_after_it(self):
         body = f'x\n\n```\n[before run]\n```\nHEAD {OLDER}\n'
         self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
@@ -1126,7 +1179,9 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         self.assertEqual(self.stale(fenced(f'HEAD {OLDER} [before run]'), chain=chain), [])
         self.assertEqual(self.stale('No header.\n', chain=chain), [])
 
-    def test_the_merge_chain_is_the_first_parents_down_to_the_first_non_merge(self):
+    def merged_repo(self):
+        """A repository whose branch took two merges of master: the shas of
+        `work`, the branch's commit, `master_one`, `merge_one` and `merge_two`."""
         repo = self.tmp / 'repo'
         repo.mkdir()
 
@@ -1154,6 +1209,12 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         merge_one = run('rev-parse', 'HEAD')
         run('merge', '-q', '--no-ff', '-m', 'merge two', master_two)
         merge_two = run('rev-parse', 'HEAD')
+        return repo, {'work': work, 'master_one': master_one, 'merge_one': merge_one,
+                      'merge_two': merge_two}
+
+    def test_the_merge_chain_is_the_first_parents_down_to_the_first_non_merge(self):
+        repo, sha = self.merged_repo()
+        work, merge_one, merge_two = sha['work'], sha['merge_one'], sha['merge_two']
         root = str(repo)
         self.assertEqual(TOOL.merge_chain(merge_two, root), [merge_one, work])
         self.assertEqual(TOOL.merge_chain(merge_one, root), [work])
@@ -1196,6 +1257,28 @@ class HandOffHeads(IssueStandIn, unittest.TestCase):
         self.assertIn('no --head or --pr to check it at', done.stdout)
         done = self.check(evidence(KEYS))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = self.check(evidence(KEYS) + '\n' + fenced(f'cwd /x HEAD {CURRENT}'),
+                          '--head', CURRENT[:8])
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_the_command_line_reads_the_merge_chain_of_a_merge_head_from_the_checkout(self):
+        """Without --pr, the commit before a merge at --head comes from the
+        git of the checkout the tool sits in, here a copy of it in a repository
+        whose head is a merge."""
+        repo, sha = self.merged_repo()
+        tool = repo / 'plan' / 'bin' / 'pr-evidence'
+        tool.parent.mkdir(parents=True)
+        shutil.copy(PR_EVIDENCE, tool)
+        for named, refused in (('work', False), ('merge_one', False), ('master_one', True)):
+            for short in (False, True):
+                with self.subTest(named=named, short=short):
+                    at = sha['merge_two'][:8] if short else sha['merge_two']
+                    (self.tmp / 'body.md').write_text(fenced(f'cwd /x HEAD {sha[named][:10]}'))
+                    done = subprocess.run(
+                        [sys.executable, '-I', str(tool), '--check', str(self.tmp / 'body.md'),
+                         '--head', at], capture_output=True, text=True, env=self.env)
+                    self.assertEqual(done.returncode, 1 if refused else 0,
+                                     done.stdout + done.stderr)
 
 
 if __name__ == '__main__':
