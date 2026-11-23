@@ -217,11 +217,6 @@ const BOARD_FOCUS_CONTROLS = 'button, a[href]';
 // moved it elsewhere keeps it there.
 function keepFocusAcrossSwaps(board) {
   let focused = null;
-  const controlKey = (el) => {
-    const card = el.closest('[data-kiosk]');
-    return JSON.stringify([el.tagName, el.getAttribute('name'), el.getAttribute('value'),
-      el.dataset.action, card && card.dataset.kiosk]);
-  };
   document.addEventListener('focusin', (e) => {
     focused = board.contains(e.target) && e.target.matches(BOARD_FOCUS_CONTROLS)
       ? e.target : null;
@@ -239,13 +234,42 @@ function keepFocusAcrossSwaps(board) {
     if (!focused || focused.isConnected) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    const key = controlKey(focused);
+    const match = swappedInCopy(board, focused);
     focused = null;
-    const match = [...board.querySelectorAll(BOARD_FOCUS_CONTROLS)]
-      .find((el) => controlKey(el) === key);
     if (match) match.focus({ preventScroll: true });
   }).observe(board, { childList: true });
 }
+
+// "The same control" (D127): the same name, value, data-action and card, a
+// kiosk's on the board (data-kiosk) or a kiosk name's in the scene editor
+// (data-entry, D132).
+function controlKey(el) {
+  const card = el.closest('[data-kiosk], [data-entry]');
+  return JSON.stringify([el.tagName, el.getAttribute('name'), el.getAttribute('value'),
+    el.dataset.action, card && card.dataset.kiosk, card && card.dataset.entry]);
+}
+
+// The control under `root` that matches `gone`, which a swap removed.
+function swappedInCopy(root, gone) {
+  const key = controlKey(gone);
+  return [...root.querySelectorAll(BOARD_FOCUS_CONTROLS)].find((el) => controlKey(el) === key);
+}
+
+// D132 (#383): a save from a sheet answers with the board, or the scene's cards,
+// out of band (kiosks/views.py and scenes/views.py `changed`), which
+// removes the button that opened the sheet. When the sheet closes, the
+// focus goes to its swapped-in copy, matched as D127 matches. PHP's naming
+// dialog gives the focus back to nothing (modal.js:63), and the reply's
+// rebuild (kiosk-dashboard.js:99) leaves it on the page's body (#383's
+// php-scratch probe); PHP has no page dialog, only a <select> per kiosk
+// (kiosk-dashboard.js:158). The copy stands in for the opener, so it is
+// focused as ui.close() focuses the opener (app.js), with no preventScroll:
+// keepFocusAcrossSwaps passes it for a focus a board swap moves, which no
+// key or tap of the crew's asked for.
+document.addEventListener('ui:opener-gone', (e) => {
+  const copy = swappedInCopy(document, e.detail.opener);
+  if (copy) copy.focus();
+});
 
 document.addEventListener('alpine:init', () => {
   Alpine.store('kioskSheet', { title: '' });
