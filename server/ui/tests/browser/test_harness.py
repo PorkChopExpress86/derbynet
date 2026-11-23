@@ -251,10 +251,6 @@ TICKS = """() => {
   };
   tick();
 }"""
-# How long the server holds the fetch out at the stop: longer than
-# `close_tab` takes to stop and block the tab, so the loop runs under the
-# block while `close_tab` waits for that fetch.
-HELD_S = 1.0
 
 
 def test_close_tab_stops_a_loop_the_block_would_fail(page, event):
@@ -263,19 +259,15 @@ def test_close_tab_stops_a_loop_the_block_would_fail(page, event):
     the block alone, Chromium would fail each of its fetches into the
     loop's handler (#409). With STOP_SENDING first, each later fetch is a
     promise that never settles: here the loop starts in the task after the
-    stop and runs while `close_tab` waits for a fetch the server holds, and
-    Chromium fails none of its fetches."""
+    stop and runs until the tab closes, and Chromium fails none of its
+    fetches."""
     page.goto("/login/")
     tab = page.context.new_page()
     tab.goto("/login/")
     ticks, failed = [], []
     tab.on("request", lambda r: r.url.endswith("?tick") and ticks.append(r))
     tab.on("requestfailed", lambda r: r.url.endswith("?tick") and failed.append(r))
-    with at_the_server(
-        lambda environ: environ["QUERY_STRING"] == "held", hold=HELD_S
-    ) as server:
-        with tab.expect_event("request", lambda r: r.url.endswith("?held")):
-            tab.evaluate("() => { fetch('/login/?held'); }")
+    with at_the_server(lambda environ: environ["QUERY_STRING"] == "tick") as server:
         after_the_stop(tab, TICKS)
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
