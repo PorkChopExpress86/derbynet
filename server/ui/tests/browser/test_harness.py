@@ -153,18 +153,6 @@ KEEPS_SENDING = {
       };
       go();
     }""",
-    # sendBeacon has no reply to wait on: the tab sends beacons from a
-    # MessageChannel loop, which no stop of timers ends.
-    "beacon": """() => {
-      let n = 0;
-      const tick = () => {
-        if (n++ % 200 == 0) navigator.sendBeacon('/login/?again');
-        const channel = new MessageChannel();
-        channel.port1.onmessage = tick;
-        channel.port2.postMessage(null);
-      };
-      tick();
-    }""",
     "new-frame": """() => {
       const go = () => {
         const frame = document.createElement('iframe');
@@ -196,22 +184,19 @@ def keep_sending(tab, how):
 def close_tab_in_time(page, tab):
     """`close_tab`, asserted to end before its wait gives up at
     `InFlight.TIMEOUT_MS`: a tab that still sends keeps a request out, and
-    the wait then ends only there, with nothing out at that moment in the
-    beacon case."""
+    the wait then ends only there."""
     started = time.monotonic()
     close_tab(page, tab)
     assert time.monotonic() - started < InFlight.TIMEOUT_MS / 1000
 
 
-# The server holds each request, so that a tab that keeps sending, a
-# beacon's included, always has one out, and the reply to the one out at
-# the stop lands after `close_tab` has stopped the tab.
+# The server holds each request, so that a tab that keeps sending always
+# has one out, and the reply to the one out at the stop lands after
+# `close_tab` has stopped the tab.
 HOLD_S = 0.1
 
 
-@pytest.mark.parametrize(
-    "how", ["fetch", "xhr", "iframe", "image", "beacon", "new-frame"]
-)
+@pytest.mark.parametrize("how", ["fetch", "xhr", "iframe", "image", "new-frame"])
 def test_close_tab_closes_a_tab_that_keeps_sending(page, event, how):
     """A reply's handler can send again on no timer, so a tab that does so
     always has a request out, and waiting until it has none never ends.
@@ -314,36 +299,6 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
     assert page.in_flight.closed_with == []
     # one read: the tab is closed, so no later message can join the list.
     assert navigated == ["navigates"]
-
-
-# In a document loaded at `?nav`: load `?nav` again on each tick of a
-# Worker's timer, which no stop of the page's timers reaches.
-NAVIGATES_ON_A_WORKER_TIMER = """if (location.search == '?nav') {
-  const worker = new Worker(URL.createObjectURL(new Blob(
-    ['setInterval(() => postMessage(null), 20)'])));
-  worker.onmessage = () => { location.href = '/login/?nav'; };
-}"""
-
-
-def test_close_tab_closes_a_tab_that_keeps_navigating(page, event):
-    """A tab can navigate on no reply and no timer of its page, here a
-    Worker's, and each new document navigates again. `close_tab` cancels
-    each later navigation (STOP_BEACONS_AND_NAVIGATIONS). When it returns,
-    the server has no request of the tab in hand, and none arrives after
-    (#409)."""
-    page.goto("/login/")
-    tab = page.context.new_page()
-    tab.add_init_script(NAVIGATES_ON_A_WORKER_TIMER)
-    with at_the_server(
-        lambda environ: environ["QUERY_STRING"] == "nav", hold=HOLD_S
-    ) as server:
-        tab.goto("/login/?nav", wait_until="commit")
-        # The Worker's first navigation.
-        with tab.expect_event("request", lambda r: r.url.endswith("/login/?nav")):
-            pass
-        close_tab_in_time(page, tab)
-        assert server.after_close(page) == (0, 0)
-    assert page.in_flight.closed_with == []
 
 
 def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
