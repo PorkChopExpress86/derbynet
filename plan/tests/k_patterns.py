@@ -82,8 +82,8 @@ def refuse_unmatched(program):
         sys.exit(2)
 
 
-def refuse_old_python(version=None):
-    version = version or sys.version_info
+def refuse_old_python():
+    version = sys.version_info
     if tuple(version[:2]) < (3, 14):
         print(f"plan/tests: python3 is {'.'.join(map(str, version[:3]))}, and plan/tests "
               "need 3.14: put a 3.14 python3 first on PATH (plan/HANDOFF.md, Tools)",
