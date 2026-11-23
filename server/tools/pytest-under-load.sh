@@ -111,7 +111,7 @@ for arg in "$@"; do
     --count=*) count=${arg#--count=} ;;
   esac
 done
-if [[ "$count" =~ ^[0-9]+$ ]] && [ "$count" -gt 1 ]; then
+if [[ "$count" =~ ^[1-9][0-9]*$ ]] && [ "$count" -gt 1 ]; then
   for arg in "$@"; do
     if [[ "$arg" == *::*\[* && ! "$arg" =~ -[0-9]+-[0-9]+\]$ ]]; then
       echo "pytest-under-load.sh: --count renames the [case] of $arg to" \
