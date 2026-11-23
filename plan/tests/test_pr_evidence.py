@@ -154,6 +154,24 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn('no evidence in the body: Embedded images', done.stdout)
 
+    def test_a_run_not_ended_is_no_evidence(self):
+        """#347's draft read "STILL RUNNING, the line is filled in when the
+        detached run ends", and passed (#347 retro)."""
+        for rest in ('STILL RUNNING, the line is filled in when the detached run ends',
+                     'running at 9ae2c6a4', 'Pending.', 'queued on the load lock',
+                     'in progress', 'Waiting on the load lock'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('no evidence in the body: Embedded images', done.stdout)
+        for rest in ('25 of 25 passed (the run took 40 min)', 'runs at 17fd0994 passed',
+                     'queue-free run: 25 passed'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_key_under_another_section_than_still_open_is_no_evidence(self):
         body = evidence(KEYS[1:]) + '\n## Left for later\n\n- ' + KEYS[0] + '\n'
         done = self.check(body)

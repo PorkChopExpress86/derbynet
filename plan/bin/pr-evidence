@@ -12,8 +12,11 @@ first sentence, or its first two when another line starts the same way. The
 body gives each key a list item, `- <key>: <evidence>` (the key's closing
 stop may go), or a list item under
 `## Still open` when this PR leaves it for later. Evidence that is empty or
-starts "Not done" or "TODO" counts as none. A ticked box is left out, since
-an earlier PR gave its evidence.
+starts "Not done", "TODO", or a word for a run not ended ("running", "still
+running", "pending", "queued", "in progress", "waiting") counts as none. A
+ticked box is left out, since an earlier PR gave its evidence. #347's draft
+read "- `test_harness.py` passes 25 counts under load: STILL RUNNING, the
+line is filled in when the detached run ends", and passed (#347 retro).
 
 #61's body draft left out the reviewer's checklist its timer-guide box asked
 for, though the checklist was drafted, until the lead found it (#61 retro).
@@ -108,7 +111,10 @@ ASKS = re.compile(
 ELSEWHERE = re.compile(r"\b(?:to|on|in) this issue\b", re.IGNORECASE)
 ITEM = re.compile(r"^\s*[-*] (?:\[( |x|X)\] )?(.*)$")
 SENTENCES = re.compile(r".*?[.!?](?=\s|$)")
-NO_EVIDENCE = re.compile(r"^(?:not done|todo)\b", re.IGNORECASE)
+NO_EVIDENCE = re.compile(
+    r"^(?:not done|todo|(?:still )?running|pending|queued|in progress|waiting)\b",
+    re.IGNORECASE,
+)
 # A draft's stand-in for output still to come, such as PROBE-PENDING or
 # LOOP-OUTPUT in #399's drafts. A shell or Python name has no -. A path
 # (path/X-OUTPUT, X-OUTPUT.txt) or a shell default (${X-OUTPUT}) passes.
@@ -227,8 +233,8 @@ def body_items(body: str) -> tuple[list[str], list[str]]:
 
 def has_evidence(key: str, outside: list[str], still_open: list[str]) -> bool:
     """Whether an item reads `<key>: <evidence>` with evidence that is not
-    "Not done" or "TODO", or an item under `## Still open` starts with the
-    key. The key's closing stop may be left out before the colon."""
+    "Not done", "TODO" or a run not ended (NO_EVIDENCE), or an item under
+    `## Still open` starts with the key. The key's closing stop may be left out before the colon."""
     k = fold(key)
     for stem in {k, k.rstrip(".!?")}:
         for item in outside:
