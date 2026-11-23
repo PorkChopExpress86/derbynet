@@ -59,7 +59,8 @@ targets, then:
   --count, under `tools/hold-load-lock.sh`, a flake ticket's whole-file 25
   included (D133, amending D101's repeats; D85's second font under load stays
   for other files);
-- before the commands, `tools/docstring_claims.py` on each changed test file,
+- before the commands, `tools/docstring_claims.py` on each changed test file
+  and conftest (#347 retro),
   then with `--check` on the PR body draft over every one of them, since a
   catch-all row fails (#341 retro), with `--base BASE`, so that it asks only
   for the claims of the tests the diff adds or changes and of those that
@@ -68,8 +69,8 @@ targets, then:
   hold a condition (not a migration or vendored code), plan/'s Python
   tools and tests among them, with `tools/mutate.py --listed`, which runs
   every mutant it lists (#336 retro),
-  and `--listed --file` on each changed test file for its helpers (#345
-  retro): run them before the first hand-off run,
+  and `--listed --file` on each changed test file and conftest for its
+  helpers (#345 retro): run them before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
 - the commands, from server/.
@@ -599,6 +600,11 @@ def cover_everything(plan, tree, path):
     elif Path(rel).name == 'conftest.py':
         why = ('a shared conftest: its fixtures and hooks run in every test it '
                'collects (#282: the browser conftest hook ran in every collection)')
+        # Its docstrings make claims (D123), and mutate.py --file takes it
+        # as a test file: #347's tool line named test_harness.py alone
+        # beside a changed browser conftest (#347 retro).
+        if tree.exists(rel):
+            plan.changed_tests.append(rel)
     else:
         why = 'the settings every test runs with, the database settings among them'
     plan.everything.append(f'{path}: {why}')
