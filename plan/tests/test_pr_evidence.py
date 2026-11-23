@@ -158,28 +158,31 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
         """#347's draft read "STILL RUNNING, the line is filled in when the
         detached run ends", and passed (#347 retro)."""
         for rest in ('STILL RUNNING, the line is filled in when the detached run ends',
-                     'running at 9ae2c6a4', 'Pending.', 'queued on the load lock',
-                     'in progress', 'Waiting on the load lock'):
+                     'running (see Still open)', 'Pending.', 'queued; the lead reads it',
+                     'in progress', 'Waiting'):
             with self.subTest(rest=rest):
                 body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
                 done = self.check(body)
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn('no evidence in the body: Embedded images', done.stdout)
         for rest in ('25 of 25 passed (the run took 40 min)', 'runs at 17fd0994 passed',
-                     'queue-free run: 25 passed'):
+                     'queue-free run: 25 passed', 'Running `pytest` gives 5 passed.',
+                     'pending migrations apply cleanly (0 errors).',
+                     'waiting-room page passes 25 of 25.', 'queued runs all passed, 12 of 12.'):
             with self.subTest(rest=rest):
                 body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
                 done = self.check(body)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_line_whose_result_is_a_run_not_ended_is_refused(self):
-        """#437's body read "Results: pending. The hand-off chain runs
-        detached", and #457's "- Hand-off: queued by ..." (#437 retro)."""
+        """#437's draft read "Results: pending. The hand-off chain runs
+        detached", and #347's "under load: STILL RUNNING, the line is filled
+        in" (#437 retro)."""
         for line in ('Results: pending. The hand-off chain runs detached, and the lead reads '
                      'its exit codes.',
-                     '- Hand-off: queued by `server/tools/detach.sh` at 394028ea',
-                     '- `test_harness.py` under load: STILL RUNNING',
-                     '**Load run:** in progress', '* Postgres: not yet run', 'Results: TBD'):
+                     '- `test_harness.py` under load: STILL RUNNING, the line is filled in',
+                     '**Load run:** in progress', '* Postgres: not yet run',
+                     '- Hand-off: queued (see Still open)'):
             with self.subTest(line=line):
                 done = self.check(evidence(KEYS) + '\n' + line + '\n')
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
@@ -188,6 +191,10 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
         for line in ('Writers, red on master: running them all, then the tool, loses R3.',
                      'PR 2 of 2 (D91). It adds the guides: running-a-race, timer-operation.',
                      'Results: 25 of 25 passed; none pending.', '`Results: pending`',
+                     "Tradeoffs: pending the owner's decision on D85.",
+                     '- Follow-up: queued as #9 for later.',
+                     'Migrations: pending migrations apply cleanly (0 errors).', '- Owner: TBD',
+                     '- Hand-off: queued by `server/tools/detach.sh` at 394028ea',
                      '```\nResults: pending\n```', '    Results: pending',
                      '<!-- Results: pending -->'):
             with self.subTest(line=line):
