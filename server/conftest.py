@@ -101,6 +101,10 @@ def pytest_configure():
     from django.conf import settings
 
     settings.LEGACY_SESSION_WRITES_RAISE = True
+    # A browser test's re-seed gives the roles new salts, so its login and
+    # its first page hashed again with PBKDF2, slowly enough under load to
+    # time the login out (#430, accounts/tests/test_login_cost.py).
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 
 @pytest.fixture(autouse=True)

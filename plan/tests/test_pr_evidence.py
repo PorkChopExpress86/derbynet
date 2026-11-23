@@ -154,6 +154,53 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn('no evidence in the body: Embedded images', done.stdout)
 
+    def test_a_run_not_ended_is_no_evidence(self):
+        """#347's draft read "STILL RUNNING, the line is filled in when the
+        detached run ends", and passed (#347 retro)."""
+        for rest in ('STILL RUNNING, the line is filled in when the detached run ends',
+                     'running (see Still open)', 'Pending.', 'queued; the lead reads it',
+                     'in progress', 'Waiting'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('no evidence in the body: Embedded images', done.stdout)
+        for rest in ('25 of 25 passed (the run took 40 min)', 'runs at 17fd0994 passed',
+                     'queue-free run: 25 passed', 'Running `pytest` gives 5 passed.',
+                     'pending migrations apply cleanly (0 errors).',
+                     'waiting-room page passes 25 of 25.', 'queued runs all passed, 12 of 12.'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_line_whose_result_is_a_run_not_ended_is_refused(self):
+        """#437's draft read "Results: pending. The hand-off chain runs
+        detached", and #347's "under load: STILL RUNNING, the line is filled
+        in" (#437 retro)."""
+        for line in ('Results: pending. The hand-off chain runs detached, and the lead reads '
+                     'its exit codes.',
+                     '- `test_harness.py` under load: STILL RUNNING, the line is filled in',
+                     '**Load run:** in progress', '* Postgres: not yet run',
+                     '- Hand-off: queued (see Still open)'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'a run not ended as a result, line 10: {line.strip()}: fill in '
+                              'its result, or move it under ## Still open', done.stdout)
+        for line in ('Writers, red on master: running them all, then the tool, loses R3.',
+                     'PR 2 of 2 (D91). It adds the guides: running-a-race, timer-operation.',
+                     'Results: 25 of 25 passed; none pending.', '`Results: pending`',
+                     "Tradeoffs: pending the owner's decision on D85.",
+                     '- Follow-up: queued as #9 for later.',
+                     'Migrations: pending migrations apply cleanly (0 errors).', '- Owner: TBD',
+                     '- Hand-off: queued by `server/tools/detach.sh` at 394028ea',
+                     '```\nResults: pending\n```', '    Results: pending',
+                     '<!-- Results: pending -->'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_key_under_another_section_than_still_open_is_no_evidence(self):
         body = evidence(KEYS[1:]) + '\n## Left for later\n\n- ' + KEYS[0] + '\n'
         done = self.check(body)
@@ -189,9 +236,13 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def setUp(self):
         super().setUp()
         (self.tmp / 'runs.json').write_text('{}')
+        self.commits([PR_HEAD])
         gh = self.tmp / 'gh'
         gh.write_text(f'#!{sys.executable}\n'
                       'import json, sys\n'
+                      'if sys.argv[1] == "api" and "/pulls/421/commits" in sys.argv[2]:\n'
+                      f'    print(open({str(self.tmp / "commits.json")!r}).read())\n'
+                      '    sys.exit(0)\n'
                       'if sys.argv[1] == "api":\n'
                       f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
                       '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
@@ -206,6 +257,11 @@ class CiLoad(IssueStandIn, unittest.TestCase):
                       '    sys.exit(0)\n'
                       'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
                       f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def commits(self, shas, merges=()):
+        """PR 421's commits, oldest first; each of `merges` has two parents."""
+        (self.tmp / 'commits.json').write_text(json.dumps(
+            [{'sha': sha, 'parents': [{}, {}] if sha in merges else [{}]} for sha in shas]))
 
     def runs(self, **by_id):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
@@ -322,6 +378,32 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_body_naming_only_commits_before_the_last_is_refused(self):
+        """#347's draft named c355c7c5 and described its barrier after
+        9ae2c6a4 had changed it; the merge of master after it is no code of
+        the PR's (#347 retro)."""
+        old, last, merge = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32, PR_HEAD
+        self.commits([old, last, merge], merges=[merge])
+        for named, refused in (('c355c7c5', True), ('c355c7c', True), ('9ae2c6a4', False),
+                               ('0123456789ab', False), ('c355c7c5 and 9ae2c6a4', False),
+                               ('no commit', False), ('deadbeef', False),
+                               ('Xc355c7c5', False)):
+            with self.subTest(named=named):
+                done = self.check_at(f'Summary at {named}.\n', head=None, pr='421')
+                self.assertEqual(done.returncode, 1 if refused else 0,
+                                 done.stdout + done.stderr)
+                line = ('names commits of PR #421 only before its last that is no merge, '
+                        '9ae2c6a4 (the newest it names is c355c7c5)')
+                self.assertEqual(line in done.stdout, refused, done.stdout)
+        self.commits([old, merge], merges=[merge, old])
+        done = self.check_at('Summary at c355c7c5.\n', head=None, pr='421')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_without_pr_no_commits_are_read(self):
+        (self.tmp / 'commits.json').write_text('not json')
+        done = self.check_at('Summary at c355c7c5.\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_pr_gh_cannot_read_exits_with_its_message(self):
         done = self.check_at('', head=None, pr='999')
