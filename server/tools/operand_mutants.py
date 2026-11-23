@@ -43,7 +43,7 @@ that line of the new file. For each added line it lists:
   which no listed mutant removed (#344 retro). A registration that spans
   lines, takes its event from a variable, or sits in JavaScript inside a
   Python string (a browser test's helper) is left to hand mutants;
-- in a JavaScript file on disk, each call statement on one line right
+- in a `.js` file on disk, each call statement on one line right
   below a one-line `if (...) return` guard, moved above it (`moved`), so
   the call runs where the guard returns: #383's `carryHeldKeys()` below
   `if (!opener) return;` was moved by hand in review, and survived.
@@ -544,8 +544,8 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
                 found.append((line, 0, Mutant(path, line, kind, old, new, span)))
         for line, kind, old, new, span in conditions:
             found.append((line, 1, Mutant(path, line, kind, old, new, span)))
-        # The guard and the call are JavaScript, which no Python or CSS line is.
-        if lines is not None:
+        # JavaScript inside a Python string is left to hand mutants.
+        if lines is not None and path.endswith(".js"):
             for line, old, new, span in moved_calls(lines, starts, rows):
                 found.append((line, 0, Mutant(path, line, "moved", old, new, span)))
         found.sort(key=lambda f: (f[0], f[1]))

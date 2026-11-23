@@ -723,3 +723,15 @@ def test_a_call_on_the_first_line_or_past_the_end_moves_nowhere(tmp_path):
     (tmp_path / "a.js").write_text(js)
     diff = "+++ b/a.js\n@@ -0,0 +1 @@\n+f();\n@@ -2,0 +3 @@\n+g();\n"
     assert [m for m in om.mutants(diff, tmp_path) if m.kind == "moved"] == []
+
+
+@pytest.mark.parametrize("name", ["notes.md", "notes.txt", "test_page.py"])
+def test_a_guard_and_call_outside_a_js_file_move_nowhere(tmp_path, name):
+    """A Markdown or text file quotes such lines, and a Python string's
+    JavaScript is left to hand mutants."""
+    text = "  if (!opener) return;\n  carryHeldKeys();\n"
+    (tmp_path / name).write_text(text)
+    diff = f"+++ b/{name}\n@@ -0,0 +1,2 @@\n" + "".join(
+        f"+{x}\n" for x in text.splitlines()
+    )
+    assert [m for m in om.mutants(diff, tmp_path) if m.kind == "moved"] == []
