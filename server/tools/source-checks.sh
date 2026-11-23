@@ -85,7 +85,16 @@ cd "$(dirname "$0")/.."
 # second scratch merge to learn the pytest half passed (#312 retro).
 status=0
 if [ "${#quick[@]}" -eq 0 ]; then
-  python3 -I -m unittest discover -s ../plan/tests </dev/null || status=$?
+  # plan/tests and the plan tools parse server/'s Python 3.14 (`except A, B:`);
+  # under an older python3 three tests fail with a SyntaxError that names no
+  # cause, as on the lead's new machine, whose python3 was 3.12 (#347 retro).
+  if ! python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 14))' 2>/dev/null; then
+    echo "source-checks.sh: python3 is $(python3 --version 2>&1), and plan/tests need 3.14:" \
+      "put a 3.14 python3 first on PATH (plan/HANDOFF.md, Tools)" >&2
+    status=1
+  else
+    python3 -I -m unittest discover -s ../plan/tests </dev/null || status=$?
+  fi
 fi
 env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" \
   tests/test_php_claims.py \

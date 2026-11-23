@@ -43,14 +43,16 @@ class Plan(unittest.TestCase):
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
-         local: str = 'head', git_dir: bool = False) -> subprocess.CompletedProcess:
+         local: str = 'head', git_dir: bool = False,
+         python3: str = '') -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
     sends: the base commit; 'orphan', a new branch with no common history
     (no base); or 'missing', a commit this clone lacks. `base_files` are
     committed in the base, `delete` is removed by the change, and `local`
-    'deleted' pushes a deletion of the branch."""
+    'deleted' pushes a deletion of the branch. `python3`, when given, is the
+    text of a python3 put first on PATH."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -75,6 +77,9 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         stubs.mkdir()
         (stubs / 'uv').write_text(UV)
         (stubs / 'uv').chmod(0o755)
+        if python3:
+            (stubs / 'python3').write_text(python3)
+            (stubs / 'python3').chmod(0o755)
         env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')))
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
@@ -392,6 +397,47 @@ class TreeChanged(unittest.TestCase):
                 result = push('notes/x.md', PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn(self.CHANGED, result.stderr)
+
+
+# A python3 older than the server's 3.14, whose `except A, B:` it can't
+# parse; it notes each call that is no version probe.
+OLD_PYTHON = ('#!/bin/sh\n[ "$1" = --version ] && { echo "Python 3.12.3"; exit 0; }\n'
+              'echo "python3 $*" >>"$STUB_LOG"\nexit 1\n')
+
+
+class OldPython(unittest.TestCase):
+    """The lead's new machine had python3 3.12, where three plan tests fail
+    with a SyntaxError that names no cause (#347 retro)."""
+
+    def test_the_hook_refuses_a_python3_older_than_3_14(self):
+        for path in ('notes/x.md', 'server/tools/parity_gate.py'):
+            with self.subTest(path=path):
+                result = push(path, PASSING, python3=OLD_PYTHON)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn('pre-push: python3 is Python 3.12.3, and plan/tests need '
+                              '3.14: put a 3.14 python3 first on PATH', result.stderr)
+                self.assertNotIn('plan/tests', result.ran)
+
+    def test_source_checks_refuse_it_and_still_run_the_pytest_half(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'server' / 'tools').mkdir(parents=True)
+            shutil.copy(SOURCE_CHECKS, root / 'server' / 'tools' / 'source-checks.sh')
+            (root / 'plan' / 'tests').mkdir(parents=True)
+            (root / 'plan' / 'tests' / 'test_plan.py').write_text(PASSING)
+            for name, text in (('uv', UV), ('python3', OLD_PYTHON)):
+                (root / name).write_text(text)
+                (root / name).chmod(0o755)
+            log = root / 'ran'
+            env = {**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}', 'STUB_LOG': str(log)}
+            result = subprocess.run(['bash', 'server/tools/source-checks.sh'], cwd=root,
+                                    env=env, capture_output=True, text=True)
+            ran = log.read_text() if log.exists() else ''
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('source-checks.sh: python3 is Python 3.12.3, and plan/tests need 3.14',
+                      result.stderr)
+        self.assertNotIn('unittest', ran)
+        self.assertIn('pytest -q -p no:cacheprovider', ran)
 
 
 class GitDirUnset(unittest.TestCase):
