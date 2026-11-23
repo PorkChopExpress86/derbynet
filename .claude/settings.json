@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(plan/bin/pr-evidence *)",
+      "Bash(plan/bin/affected-tests)",
+      "Bash(plan/bin/affected-tests *)",
+      "Bash(plan/bin/issue *)",
+      "Bash(plan/bin/pr-overlap *)",
+      "Bash(plan/bin/pr-wait *)",
+      "Bash(python3 -I plan/lint-issues.py)",
+      "Bash(python3 -I plan/lint-issues.py *)",
+      "Bash(server/tools/docstring_claims.py *)",
+      "Bash(tools/docstring_claims.py *)",
+      "Bash(docker volume ls *)",
+      "Bash(plan/bin/pr-merge *)",
+      "Bash(gh pr edit *)",
+      "Bash(gh pr ready *)"
+    ]
+  }
+}
