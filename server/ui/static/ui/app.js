@@ -50,7 +50,8 @@ window.derbynet = {
 // Enter's repeats submitted the field or pressed the Close button that took
 // the focus, or reopened the sheet from its opener
 // (test_a_held_enter_on_a_sheet_opener_opens_it_once,
-// test_a_key_held_as_a_sheet_closes_opens_nothing). PHP's kiosk dashboard
+// test_an_enter_held_as_a_sheet_saves_opens_nothing,
+// test_a_space_held_as_the_mouse_saves_opens_nothing). PHP's kiosk dashboard
 // takes such a repeat: its naming dialog focuses the name field 210 ms after
 // it opens (modal.js:59), and a repeat there submits the name and closes it
 // (kiosk-dashboard.js:255, 262; #383's php-scratch probe). Enter or Space down when a
@@ -85,8 +86,11 @@ document.addEventListener('alpine:init', () => {
       const opener = this.opener;
       this.sheet = null;
       this.opener = null;
-      carryHeldKeys();
+      // No opener: no sheet was open, as on an Escape (base.html), so a key
+      // held then keeps its repeats
+      // (test_a_close_with_no_sheet_open_leaves_a_held_key_alone).
       if (!opener) return;
+      carryHeldKeys();
       setTimeout(() => {
         if (opener.isConnected) opener.focus();
         else document.dispatchEvent(new CustomEvent('ui:opener-gone', { detail: { opener } }));

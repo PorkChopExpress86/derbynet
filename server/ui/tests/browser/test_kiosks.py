@@ -1984,8 +1984,44 @@ SHEET_LOG = """() => {
 }"""
 
 
-@pytest.mark.parametrize("opener", ["name", "page", "scene editor page"])
-def test_a_held_enter_on_a_sheet_opener_opens_it_once(login, event, opener):
+@pytest.mark.parametrize(
+    ("url", "name", "opener", "body", "get", "lands", "posts"),
+    [
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="name"]',
+            "[data-name-sheet]",
+            "/kiosks/name/",
+            "#kn-name",
+            ["/kiosks/name/"],
+            id="name",
+        ),
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="page"]',
+            "[data-page-sheet]",
+            "/kiosks/page/",
+            "[data-close]",
+            [],
+            id="page",
+        ),
+        pytest.param(
+            "/kiosks/scenes/",
+            "scenes",
+            '#scene-entries [data-entry="Aux1"] [data-action="page"]',
+            "[data-page-sheet]",
+            "/kiosks/scenes/page/",
+            "[data-close]",
+            [],
+            id="scene editor page",
+        ),
+    ],
+)
+def test_a_held_enter_on_a_sheet_opener_opens_it_once(
+    login, event, url, name, opener, body, get, lands, posts
+):
     """#383: Enter goes down on a kiosk card's Name or Page button, or on
     the scene editor's Page button for Aux1, and opens its sheet. Once the
     sheet's body has loaded and the focus is in the sheet (the name field,
@@ -2000,40 +2036,8 @@ def test_a_held_enter_on_a_sheet_opener_opens_it_once(login, event, opener):
     kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = login("RaceCoordinator")
-    url, name, body, get, lands, posts = {
-        "name": (
-            "/kiosks/",
-            "kiosks",
-            "[data-name-sheet]",
-            "/kiosks/name/",
-            "#kn-name",
-            ["/kiosks/name/"],
-        ),
-        "page": (
-            "/kiosks/",
-            "kiosks",
-            "[data-page-sheet]",
-            "/kiosks/page/",
-            "[data-close]",
-            [],
-        ),
-        "scene editor page": (
-            "/kiosks/scenes/",
-            "scenes",
-            "[data-page-sheet]",
-            "/kiosks/scenes/page/",
-            "[data-close]",
-            [],
-        ),
-    }[opener]
     page.goto(url)
-    target = {
-        "name": card(page, "tv").locator('[data-action="name"]'),
-        "page": card(page, "tv").locator('[data-action="page"]'),
-        "scene editor page": page.locator(
-            '#scene-entries [data-entry="Aux1"] [data-action="page"]'
-        ),
-    }[opener]
+    target = page.locator(opener)
     htmx_settled(page)
     page.evaluate(SHEET_LOG)
     focus_on(page, target)
@@ -2087,8 +2091,44 @@ def test_a_held_enter_on_a_sheet_opener_opens_it_once(login, event, opener):
     assert [r["path"] for r in log if r.get("verb") == "post"] == posts, log
 
 
-@pytest.mark.parametrize("opener", ["name", "page", "scene editor page"])
-def test_a_save_that_swaps_the_opener_gives_the_focus_to_its_copy(login, event, opener):
+@pytest.mark.parametrize(
+    ("url", "name", "opener", "body", "save", "post", "first"),
+    [
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="name"]',
+            "[data-name-sheet]",
+            "#kn-name",
+            "/kiosks/name/",
+            ("data-kiosk", "hall"),
+            id="name",
+        ),
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="page"]',
+            "[data-page-sheet]",
+            '[data-page-choice="standings"]',
+            "/kiosks/page/",
+            ("data-kiosk", "hall"),
+            id="page",
+        ),
+        pytest.param(
+            "/kiosks/scenes/",
+            "scenes",
+            '#scene-entries [data-entry="Aux1"] [data-action="page"]',
+            "[data-page-sheet]",
+            '[data-page-choice="standings"]',
+            "/kiosks/scenes/page/",
+            ("data-entry", "Main"),
+            id="scene editor page",
+        ),
+    ],
+)
+def test_a_save_that_swaps_the_opener_gives_the_focus_to_its_copy(
+    login, event, url, name, opener, body, save, post, first
+):
     """#383: a kiosk card's Name or Page button, or the scene editor's Page
     button for Aux1, opens its sheet from the keyboard, and a save with
     Enter swaps the board or the scene's cards out of band, which removes
@@ -2102,36 +2142,9 @@ def test_a_save_that_swaps_the_opener_gives_the_focus_to_its_copy(login, event, 
     kiosk(event, "hall")
     kiosk(event, "tv", name="Main")
     page = login("RaceCoordinator")
-    url, name, body, post = {
-        "name": ("/kiosks/", "kiosks", "[data-name-sheet]", "/kiosks/name/"),
-        "page": ("/kiosks/", "kiosks", "[data-page-sheet]", "/kiosks/page/"),
-        "scene editor page": (
-            "/kiosks/scenes/",
-            "scenes",
-            "[data-page-sheet]",
-            "/kiosks/scenes/page/",
-        ),
-    }[opener]
     page.goto(url)
-    target = {
-        "name": card(page, "tv").locator('[data-action="name"]'),
-        "page": card(page, "tv").locator('[data-action="page"]'),
-        "scene editor page": page.locator(
-            '#scene-entries [data-entry="Aux1"] [data-action="page"]'
-        ),
-    }[opener]
-    save = {
-        "name": "#kn-name",
-        "page": '[data-page-choice="standings"]',
-        "scene editor page": '[data-page-choice="standings"]',
-    }[opener]
-    expect(page.locator("[data-kiosk], [data-entry]").first).to_have_attribute(
-        *{
-            "name": ("data-kiosk", "hall"),
-            "page": ("data-kiosk", "hall"),
-            "scene editor page": ("data-entry", "Main"),
-        }[opener]
-    )
+    target = page.locator(opener)
+    expect(page.locator("[data-kiosk], [data-entry]").first).to_have_attribute(*first)
 
     focus_on(page, target)
     page.keyboard.press("Enter")
@@ -2148,21 +2161,18 @@ def test_a_save_that_swaps_the_opener_gives_the_focus_to_its_copy(login, event, 
     with htmx_post(page, post):
         page.keyboard.press("Enter")
     expect(sheet(page, name)).to_be_hidden()
+    # one read: the reply's swap removed the old opener before htmx_post
+    # returned, and nothing puts it back.
     assert not old.evaluate("e => e.isConnected")
     expect(target).to_be_focused()
 
 
-@pytest.mark.parametrize("key", ["Enter", "Space"])
-def test_a_key_held_as_a_sheet_closes_opens_nothing(login, event, key):
-    """#383: in the scene editor's Add kiosk name sheet, a key is down when
-    the save closes the sheet: Enter, whose keydown in the name field saves,
-    or Space, held in the field while the mouse clicks Save. The focus goes
-    back to Add kiosk name, off any board, and the key's auto-repeat
-    keydowns land there, two for Enter and one for Space, then the keyup.
-    Neither reopens the sheet: the opener's GET is sent once in all. Before,
-    each Enter repeat clicked Add kiosk name, and Space's keyup clicked it
-    once a repeat had landed on it, as D131 found on the board."""
-    page = login("RaceCoordinator")
+def key_held_as_the_add_name_sheet_closes(page, pressed, repeats, save):
+    """In the scene editor's Add kiosk name sheet, `pressed` goes down in
+    the name field and `save(form)` then saves, closing the sheet with the
+    key still down. The focus goes back to Add kiosk name, off any board,
+    and `repeats` auto-repeat keydowns land there, then the keyup; none
+    reopens the sheet, so the opener's GET is sent once in all."""
     page.goto("/kiosks/scenes/")
     opener = page.locator('[data-action="add-name"]')
     htmx_settled(page)
@@ -2172,10 +2182,9 @@ def test_a_key_held_as_a_sheet_closes_opens_nothing(login, event, key):
     field = form.get_by_label("Kiosk name")
     expect(field).to_be_focused()
     field.fill("Hall")
-    pressed, repeats = {"Enter": ("Enter", 2), "Space": (" ", 1)}[key]
     with htmx_post(page, "/kiosks/scenes/name/"):
         page.keyboard.down(pressed)
-        {"Enter": lambda: None, "Space": form.locator("[data-submit]").click}[key]()
+        save(form)
     expect(sheet(page, "scenes")).to_be_hidden()
     expect(page.locator('#scene-entries [data-entry="Hall"]')).to_have_count(1)
     expect(opener).to_be_focused()
@@ -2185,18 +2194,41 @@ def test_a_key_held_as_a_sheet_closes_opens_nothing(login, event, key):
     page.wait_for_function("window.sheetLog.some((r) => r.what === 'keyup')")
     htmx_settled(page)
     log = page.evaluate("window.sheetLog")
-    landed = [
-        r for r in log if r["what"] in ("keydown", "keyup") and r["key"] == pressed
-    ]
-    assert [(r["what"], r["repeat"], r["inSheet"]) for r in landed][-repeats - 1 :] == [
-        ("keydown", True, False)
-    ] * repeats + [("keyup", False, False)], log
+    landed = [r for r in log if r["what"] in ("keydown", "keyup")]
+    assert [(r["what"], r["key"], r["repeat"], r["inSheet"]) for r in landed][
+        -repeats - 1 :
+    ] == [("keydown", pressed, True, False)] * repeats + [
+        ("keyup", pressed, False, False)
+    ], log
     # one read: a click on Add kiosk name sends its GET in the click's task.
     assert [r["path"] for r in log if r.get("verb") == "get"] == [
         "/kiosks/scenes/name/"
     ], log
     expect(sheet(page, "scenes")).to_be_hidden()
     expect(opener).to_be_focused()
+
+
+def test_an_enter_held_as_a_sheet_saves_opens_nothing(login, event):
+    """#383: Enter goes down in the Add kiosk name sheet's field, and its
+    keydown saves and closes the sheet. Its two auto-repeat keydowns land on
+    Add kiosk name and do not reopen the sheet. Before, each repeat clicked
+    Add kiosk name."""
+    key_held_as_the_add_name_sheet_closes(
+        login("RaceCoordinator"), "Enter", 2, lambda form: None
+    )
+
+
+def test_a_space_held_as_the_mouse_saves_opens_nothing(login, event):
+    """#383: Space is down in the Add kiosk name sheet's field while the
+    mouse clicks Save. Its one auto-repeat keydown and its keyup land on Add
+    kiosk name and do not reopen the sheet. Before, Space's keyup clicked
+    it once a repeat had landed on it, as D131 found on the board."""
+    key_held_as_the_add_name_sheet_closes(
+        login("RaceCoordinator"),
+        " ",
+        1,
+        lambda form: form.locator("[data-submit]").click(),
+    )
 
 
 def test_a_save_that_removes_the_openers_card_focuses_nothing(login, event):
@@ -2267,5 +2299,39 @@ def test_a_save_whose_reply_comes_after_close_focuses_once(login, event):
     with htmx_post(page, "/kiosks/name/"):
         held[0].continue_()
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    # one read: the reply's board swap removed the old button before
+    # htmx_post returned, and nothing puts it back.
     assert not old.evaluate("e => e.isConnected")
     expect(target).to_be_focused()
+
+
+def test_a_close_with_no_sheet_open_leaves_a_held_key_alone(login, event):
+    """A near miss for #383: D132 cancels the repeats of a key held as a
+    sheet opens or closes. Escape calls the sheets' close() on every page
+    (base.html), with a sheet open or not. Here no sheet is open: Enter goes
+    down on a button outside the board and any sheet, Escape is pressed, and
+    Enter's two auto-repeat keydowns still click the button, 3 clicks in
+    all."""
+    kiosk(event, "tv")
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(
+        """() => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.id = 'off-sheet';
+          b.dataset.clicks = '0';
+          b.addEventListener('click', () => {
+            b.dataset.clicks = String(Number(b.dataset.clicks) + 1);
+          });
+          document.querySelector('main').append(b);
+        }"""
+    )
+    counter = page.locator("#off-sheet")
+    counter.focus()
+    page.keyboard.down("Enter")
+    page.keyboard.press("Escape")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    expect(counter).to_have_attribute("data-clicks", "3")
+    expect(sheet(page, "kiosks")).to_be_hidden()

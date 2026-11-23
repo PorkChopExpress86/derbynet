@@ -262,7 +262,10 @@ function swappedInCopy(root, gone) {
 // dialog gives the focus back to nothing (modal.js:63), and the reply's
 // rebuild (kiosk-dashboard.js:99) leaves it on the page's body (#383's
 // php-scratch probe); PHP has no page dialog, only a <select> per kiosk
-// (kiosk-dashboard.js:158).
+// (kiosk-dashboard.js:158). The copy stands in for the opener, so it is
+// focused as ui.close() focuses the opener (app.js), with no preventScroll:
+// keepFocusAcrossSwaps passes it for a focus a board swap moves, which no
+// key or tap of the crew's asked for.
 document.addEventListener('ui:opener-gone', (e) => {
   const copy = swappedInCopy(document, e.detail.opener);
   if (copy) copy.focus();
