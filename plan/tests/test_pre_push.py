@@ -498,7 +498,7 @@ class CommitClosingKeyword(unittest.TestCase):
         for ref, words in (('refs/heads/issue-439', 'Closes #439'),
                            ('refs/heads/issue-0439-x', 'Closes #439'),
                            ('refs/heads/b', 'Closes #439'),
-                           ('refs/heads/x-issue-439-y', 'Closes #439'),
+                           ('refs/heads/x/refs/heads/issue-439-y', 'Closes #439'),
                            ('refs/heads/issue-4390-x', 'Closes #439'),
                            ('refs/heads/issue-439-x', 'Closes owner/repo#439'),
                            ('refs/heads/issue-439-x', 'Closes #43')):
