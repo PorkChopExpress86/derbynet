@@ -1004,3 +1004,43 @@ def test_weigh_in_screenshots_and_accessibility(login, event):
             "button", name="Close"
         ).click()
         expect(sheet(page)).to_be_hidden()
+
+
+def test_a_held_enter_adds_a_racer_and_saves_nothing_more(login, event):
+    """#400: Enter goes down in the New racer sheet's First name field with
+    Ada Lovelace typed, and adds her as 101. The reply turns the sheet into
+    her edit form, with the focus back in First name, and two auto-repeat
+    keydowns then land there and send nothing. Before, the first repeat
+    posted her edit form, an extra save of the same values (the PR's survey
+    of the sheet forms). Near miss: a fresh Enter press saves the edit form."""
+    page = open_checkin(login("RaceCoordinator"))
+    page.get_by_role("button", name="New racer").click()
+    form = sheet(page)
+    form.get_by_label("First name").fill("Ada")
+    form.get_by_label("Last name").fill("Lovelace")
+    form.get_by_label("First name").focus()
+    htmx_settled(page)
+    page.evaluate(
+        """() => {
+          const log = window.sends = [];
+          document.addEventListener('htmx:beforeSend', (e) => {
+            if (e.detail.requestConfig.verb === 'post')
+              log.push(e.detail.requestConfig.path);
+          }, true);
+          document.addEventListener('keyup', () => log.push('keyup'), true);
+        }"""
+    )
+    with htmx_post(page, "/checkin/racer/new/"):
+        page.keyboard.down("Enter")
+    expect(form.locator("[data-notice]")).to_have_text("Added 101 Ada Lovelace.")
+    ada = Racer.objects.get(event=event, first_name="Ada")
+    expect(form.get_by_label("First name")).to_be_focused()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.sends.includes('keyup')")
+    # one read: htmx sends a repeat's POST in the repeat keydown's task.
+    assert page.evaluate("window.sends") == ["/checkin/racer/new/", "keyup"]
+    with htmx_post(page, f"/checkin/racer/{ada.pk}/"):
+        page.keyboard.press("Enter")
+    assert Racer.objects.filter(event=event, first_name="Ada").count() == 1
