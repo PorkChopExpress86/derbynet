@@ -132,13 +132,16 @@ the author's word that the run is meant to be older, and the limit left:
 nothing checks that it is. D113 lets a branch skip the rerun when master's new
 commits touch nothing it reads, so a header that names the commit before a
 merge is accepted too: when `--head` is a merge commit, each commit on its
-first-parent line down to the first commit that is no merge passes
-(`merge_chain`), read from the checkout's git; nothing checks what the merged
+first-parent line down to the first commit that is no merge passes. With
+`--pr N` those are the PR's last commit that is no merge and the merges after
+it, from the one read of PR N's commits the check above makes
+(`since_last_code`, with the same limit of 100 commits); with `--head` alone,
+the checkout's git reads them (`merge_chain`). Nothing checks what the merged
 commits touched, which `plan/bin/pr-merge` does. A body with a header and no
 `--head` or `--pr` is refused for it, as a `CI load:` item is. Only a header
 line is read: prose that names an older head, such as a round's history, a
 mutant's note or a `load run:` line that names another run's head, is not. The
-sweep over the 285 bodies merged by 2026-11-20 is in the PR of #427.
+sweep over the 299 bodies merged by 2026-11-23 is in the PR of #427.
 
 Exits 1 on a key the body gives no evidence for, on a line whose result is
 a run not ended, on a body that names only
@@ -570,6 +573,15 @@ def unfinished(body: str) -> list[str]:
             if UNFINISHED.search(line)]
 
 
+def since_last_code(commits: list[dict]) -> list[str]:
+    """The SHAs of `commits` (the PR's, oldest first, as GitHub's pulls API
+    lists them) from the last that is no merge on: that commit and the merges
+    after it, which D113 lets a hand-off header name. Empty when every commit
+    is a merge."""
+    code = [i for i, c in enumerate(commits) if len(c["parents"]) == 1]
+    return [c["sha"] for c in commits[code[-1]:]] if code else []
+
+
 def stale_commits(body: str, commits: list[dict]) -> tuple[str, str] | None:
     """None when the body names no commit of `commits` (the PR's, oldest
     first, as GitHub's pulls API lists them), or names one at or after the
@@ -577,10 +589,10 @@ def stale_commits(body: str, commits: list[dict]) -> tuple[str, str] | None:
     shas = [c["sha"] for c in commits]
     tokens = set(SHA_TOKEN.findall(body))
     named = [i for i, sha in enumerate(shas) if any(sha.startswith(t) for t in tokens)]
-    code = [i for i, c in enumerate(commits) if len(c["parents"]) == 1]
-    if not named or not code or max(named) >= code[-1]:
+    recent = since_last_code(commits)
+    if not named or not recent or max(named) >= len(shas) - len(recent):
         return None
-    return shas[max(named)], shas[code[-1]]
+    return shas[max(named)], recent[0]
 
 
 def pr_commits(number: str) -> list[dict]:
@@ -643,12 +655,16 @@ def main(argv: list[str]) -> int:
         parser.error("--head, --pr, --flake-ticket and --closes go with --check")
     if not (args.issue or args.check):
         parser.error("give an issue, or --check BODY.md")
-    head = args.head
+    head, commits, chain = args.head, [], merge_chain
     if args.pr:
         real = pr_head(args.pr)
         if head and head != real:
             sys.exit(f"pr-evidence: --head {head} is not the head of PR #{args.pr}, {real}")
         head = real
+        commits = pr_commits(args.pr)
+
+        def chain(_head):
+            return since_last_code(commits)
     asked = keys(issue_body(args.issue)) if args.issue else []
     if not args.check:
         for key in asked:
@@ -680,14 +696,14 @@ def main(argv: list[str]) -> int:
         print(f"no \"Closes #{args.issue}\" or \"Part of #{args.issue}\" outside code: the "
               f"merge leaves #{args.issue} open with no link to the PR (an HTML comment, "
               "<pre>, <code>, a ~~~ fence and an indented line count as code)")
-    stale_heads = stale_headers(body, head)
+    stale_heads = stale_headers(body, head, chain)
     for line in stale_heads:
         print(f"hand-off head not the PR's, {line}")
     running = unfinished(body)
     for found in running:
         print(f"a run not ended as a result, {found}: fill in its result, or move it "
               "under ## Still open")
-    stale = stale_commits(body, pr_commits(args.pr)) if args.pr else None
+    stale = stale_commits(body, commits)
     if stale:
         print(f"names commits of PR #{args.pr} only before its last that is no merge, "
               f"{stale[1][:8]} (the newest it names is {stale[0][:8]}): describe the code "

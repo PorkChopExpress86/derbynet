@@ -241,6 +241,7 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         gh.write_text(f'#!{sys.executable}\n'
                       'import json, sys\n'
                       'if sys.argv[1] == "api" and "/pulls/421/commits" in sys.argv[2]:\n'
+                      f'    open({str(self.tmp / "commit-reads")!r}, "a").write("read\\n")\n'
                       f'    print(open({str(self.tmp / "commits.json")!r}).read())\n'
                       '    sys.exit(0)\n'
                       'if sys.argv[1] == "api":\n'
@@ -399,6 +400,23 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         self.commits([old, merge], merges=[merge, old])
         done = self.check_at('Summary at c355c7c5.\n', head=None, pr='421')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_with_pr_a_header_names_the_last_commit_before_a_merge_from_one_read(self):
+        """With --pr, the commits D113 lets a hand-off header name come from
+        the PR's commit list the stale-commit refusal reads, read once, not
+        from the checkout's git, which need not hold them (#427)."""
+        old, last = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32
+        self.commits([old, last, PR_HEAD], merges=[PR_HEAD])
+        for sha, refused in ((last, False), (last[:8], False), (PR_HEAD[:8], False),
+                             (old[:8], True)):
+            with self.subTest(sha=sha):
+                (self.tmp / 'commit-reads').write_text('')
+                done = self.check_at(fenced(f'cwd /x HEAD {sha}'), head=None, pr='421')
+                self.assertEqual(done.returncode, 1 if refused else 0,
+                                 done.stdout + done.stderr)
+                self.assertEqual(f"hand-off head not the PR's, " in done.stdout, refused,
+                                 done.stdout)
+                self.assertEqual((self.tmp / 'commit-reads').read_text(), 'read\n')
 
     def test_without_pr_no_commits_are_read(self):
         (self.tmp / 'commits.json').write_text('not json')
