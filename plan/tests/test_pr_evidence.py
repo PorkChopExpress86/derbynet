@@ -154,6 +154,53 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn('no evidence in the body: Embedded images', done.stdout)
 
+    def test_a_run_not_ended_is_no_evidence(self):
+        """#347's draft read "STILL RUNNING, the line is filled in when the
+        detached run ends", and passed (#347 retro)."""
+        for rest in ('STILL RUNNING, the line is filled in when the detached run ends',
+                     'running (see Still open)', 'Pending.', 'queued; the lead reads it',
+                     'in progress', 'Waiting'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn('no evidence in the body: Embedded images', done.stdout)
+        for rest in ('25 of 25 passed (the run took 40 min)', 'runs at 17fd0994 passed',
+                     'queue-free run: 25 passed', 'Running `pytest` gives 5 passed.',
+                     'pending migrations apply cleanly (0 errors).',
+                     'waiting-room page passes 25 of 25.', 'queued runs all passed, 12 of 12.'):
+            with self.subTest(rest=rest):
+                body = evidence(KEYS[1:]) + f'- {KEYS[0].rstrip(".")}: {rest}\n'
+                done = self.check(body)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_line_whose_result_is_a_run_not_ended_is_refused(self):
+        """#437's draft read "Results: pending. The hand-off chain runs
+        detached", and #347's "under load: STILL RUNNING, the line is filled
+        in" (#437 retro)."""
+        for line in ('Results: pending. The hand-off chain runs detached, and the lead reads '
+                     'its exit codes.',
+                     '- `test_harness.py` under load: STILL RUNNING, the line is filled in',
+                     '**Load run:** in progress', '* Postgres: not yet run',
+                     '- Hand-off: queued (see Still open)'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'a run not ended as a result, line 10: {line.strip()}: fill in '
+                              'its result, or move it under ## Still open', done.stdout)
+        for line in ('Writers, red on master: running them all, then the tool, loses R3.',
+                     'PR 2 of 2 (D91). It adds the guides: running-a-race, timer-operation.',
+                     'Results: 25 of 25 passed; none pending.', '`Results: pending`',
+                     "Tradeoffs: pending the owner's decision on D85.",
+                     '- Follow-up: queued as #9 for later.',
+                     'Migrations: pending migrations apply cleanly (0 errors).', '- Owner: TBD',
+                     '- Hand-off: queued by `server/tools/detach.sh` at 394028ea',
+                     '```\nResults: pending\n```', '    Results: pending',
+                     '<!-- Results: pending -->'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_key_under_another_section_than_still_open_is_no_evidence(self):
         body = evidence(KEYS[1:]) + '\n## Left for later\n\n- ' + KEYS[0] + '\n'
         done = self.check(body)
@@ -189,9 +236,14 @@ class CiLoad(IssueStandIn, unittest.TestCase):
     def setUp(self):
         super().setUp()
         (self.tmp / 'runs.json').write_text('{}')
+        self.commits([PR_HEAD])
         gh = self.tmp / 'gh'
         gh.write_text(f'#!{sys.executable}\n'
                       'import json, sys\n'
+                      'if sys.argv[1] == "api" and "/pulls/421/commits" in sys.argv[2]:\n'
+                      f'    open({str(self.tmp / "commit-reads")!r}, "a").write("read\\n")\n'
+                      f'    print(open({str(self.tmp / "commits.json")!r}).read())\n'
+                      '    sys.exit(0)\n'
                       'if sys.argv[1] == "api":\n'
                       f'    runs = json.load(open({str(self.tmp / "runs.json")!r}))\n'
                       '    run = runs.get(sys.argv[2].rsplit("/", 1)[1])\n'
@@ -206,6 +258,11 @@ class CiLoad(IssueStandIn, unittest.TestCase):
                       '    sys.exit(0)\n'
                       'assert sys.argv[1:4] == ["issue", "view", "61"], sys.argv\n'
                       f'print(open({str(self.tmp / "issue.md")!r}).read(), end="")\n')
+
+    def commits(self, shas, merges=()):
+        """PR 421's commits, oldest first; each of `merges` has two parents."""
+        (self.tmp / 'commits.json').write_text(json.dumps(
+            [{'sha': sha, 'parents': [{}, {}] if sha in merges else [{}]} for sha in shas]))
 
     def runs(self, **by_id):
         (self.tmp / 'runs.json').write_text(json.dumps(by_id))
@@ -322,6 +379,49 @@ class CiLoad(IssueStandIn, unittest.TestCase):
         done = self.check_at(f'- CI load: {RUN}108\n', head=HEAD, pr='421')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn(f'--head {HEAD} is not the head of PR #421, {PR_HEAD}', done.stderr)
+
+    def test_a_body_naming_only_commits_before_the_last_is_refused(self):
+        """#347's draft named c355c7c5 and described its barrier after
+        9ae2c6a4 had changed it; the merge of master after it is no code of
+        the PR's (#347 retro)."""
+        old, last, merge = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32, PR_HEAD
+        self.commits([old, last, merge], merges=[merge])
+        for named, refused in (('c355c7c5', True), ('c355c7c', True), ('9ae2c6a4', False),
+                               ('0123456789ab', False), ('c355c7c5 and 9ae2c6a4', False),
+                               ('no commit', False), ('deadbeef', False),
+                               ('Xc355c7c5', False)):
+            with self.subTest(named=named):
+                done = self.check_at(f'Summary at {named}.\n', head=None, pr='421')
+                self.assertEqual(done.returncode, 1 if refused else 0,
+                                 done.stdout + done.stderr)
+                line = ('names commits of PR #421 only before its last that is no merge, '
+                        '9ae2c6a4 (the newest it names is c355c7c5)')
+                self.assertEqual(line in done.stdout, refused, done.stdout)
+        self.commits([old, merge], merges=[merge, old])
+        done = self.check_at('Summary at c355c7c5.\n', head=None, pr='421')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_with_pr_a_header_names_the_last_commit_before_a_merge_from_one_read(self):
+        """With --pr, the commits D113 lets a hand-off header name come from
+        the PR's commit list the stale-commit refusal reads, read once, not
+        from the checkout's git, which need not hold them (#427)."""
+        old, last, merge = 'c355c7c5' + '0' * 32, '9ae2c6a4' + '0' * 32, '5e1f0b9d' + '0' * 32
+        self.commits([old, last, merge, PR_HEAD], merges=[merge, PR_HEAD])
+        for sha, refused in ((last, False), (last[:8], False), (merge[:8], False),
+                             (PR_HEAD[:8], False), (old[:8], True)):
+            with self.subTest(sha=sha):
+                (self.tmp / 'commit-reads').write_text('')
+                done = self.check_at(fenced(f'cwd /x HEAD {sha}'), head=None, pr='421')
+                self.assertEqual(done.returncode, 1 if refused else 0,
+                                 done.stdout + done.stderr)
+                self.assertEqual(f"hand-off head not the PR's, " in done.stdout, refused,
+                                 done.stdout)
+                self.assertEqual((self.tmp / 'commit-reads').read_text(), 'read\n')
+
+    def test_without_pr_no_commits_are_read(self):
+        (self.tmp / 'commits.json').write_text('not json')
+        done = self.check_at('Summary at c355c7c5.\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_a_pr_gh_cannot_read_exits_with_its_message(self):
         done = self.check_at('', head=None, pr='999')
@@ -843,6 +943,345 @@ class ClosingKeywords(IssueStandIn, unittest.TestCase):
                                       capture_output=True, text=True, env=self.env)
                 self.assertEqual(done.returncode, 1)
                 self.assertIn('Usage: plan/bin/pr-evidence', done.stderr)
+
+
+CURRENT = '19fea1fb0000000000000000000000000000beef'
+OLDER = '0badc0de0000000000000000000000000000f00d'
+
+# Each shape of hand-off header the fork's bodies paste, one line per shape,
+# from the merged PR bodies (the PR number in each comment) and the saved logs
+# under ~/.cache/derbynet-drafts. `{sha}` takes the head the header names.
+HEADER_SHAPES = {
+    'cwd HEAD': 'cwd /home/specter/dev/projects/derbynet-wt-366/server HEAD {sha}',  # #393
+    'cwd: HEAD: changed': 'cwd: /home/specter/dev/projects/derbynet-wt-414/server HEAD: {sha} changed: 0',  # #428
+    '# HEAD': '# HEAD {sha}',  # #386
+    '# cwd HEAD load': '# cwd .../server HEAD {sha} load 20.93',  # #433
+    'HEAD:': 'HEAD: {sha}',  # #365
+    'HEAD status': 'HEAD {sha} status: 0 changes',  # #416
+    'head (tools/detach.sh)': 'head {sha}',  # server/tools/detach.sh's line
+    'cwd head;': 'cwd /home/specter/dev/projects/derbynet-wt-65/server head {sha}; deviations.json broken',  # #404
+    'worktree head;': 'worktree /home/specter/dev/projects/derbynet-431-oracle head {sha}; uncommitted: no',  # #462
+    'cwd run head': 'cwd /home/specter/.cache/derbynet-drafts/442 run 44643454086 head {sha} (PR files at 79ae178a)',  # #467
+    'cwd= HEAD=': 'cwd=/home/specter/dev/projects/derbynet-wt-retro-307/server HEAD={sha}',  # a saved log
+    'cwd: wt HEAD:': 'cwd: ~/dev/projects/derbynet  wt HEAD: {sha}',  # #333
+    'cwd tree head': 'cwd /home/specter/dev/projects/derbynet-wt-371 tree /tmp/wt head {sha}',  # a saved log
+    'cwd: WT: HEAD:': 'cwd: /x/derbynet-wt-59 WT: /x/derbynet-wt-59 HEAD: {sha} changed: 0',  # a saved log
+    '$ HEAD': '$ HEAD {sha}',
+    '> HEAD': '> HEAD {sha}',
+    'indented head': '    head {sha}',
+}
+
+
+def fenced(header, caption='Hand-off, committed head:'):
+    return f'{caption}\n\n```\n{header}\n== uv run pytest\n3 passed\n```\n'
+
+
+class HandOffHeads(IssueStandIn, unittest.TestCase):
+    """A hand-off header names a head the PR's is a prefix of (or that an
+    abbreviated `--head` is a prefix of) and says of no edits on top, or
+    carries `[before run]`, or names the commit before a merge at the head
+    (#427). The
+    cases call `TOOL.stale_headers` in process (plan/AGENT-BRIEF.md); the
+    command line runs in `test_the_command_line_refuses_and_names_the_line`."""
+
+    def stale(self, body, head=CURRENT, chain=lambda head: []):
+        return TOOL.stale_headers(body, head, chain)
+
+    def test_a_header_at_the_head_passes_in_each_shape(self):
+        for name, shape in HEADER_SHAPES.items():
+            with self.subTest(name):
+                self.assertEqual(self.stale(fenced(shape.format(sha=CURRENT))), [])
+
+    def test_an_older_header_is_refused_in_each_shape_and_names_its_line(self):
+        for name, shape in HEADER_SHAPES.items():
+            with self.subTest(name):
+                header = shape.format(sha=OLDER)
+                found = self.stale(fenced(header))
+                self.assertEqual(len(found), 1, found)
+                self.assertTrue(
+                    found[0].startswith(f"line 4: {header.strip()}: the PR's head is {CURRENT}"), found)
+
+    def test_a_header_sha_that_is_a_prefix_of_the_head_passes_from_7_digits(self):
+        for n in (7, 8, 12, 39, 40):
+            with self.subTest(n=n):
+                self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:n]}')), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:12].upper()}')), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=CURRENT.upper()), [])
+
+    def test_an_abbreviated_head_passes_a_longer_header_for_the_same_commit(self):
+        for n in (8, 12, 40):
+            with self.subTest(n=n):
+                self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:n]}'), head=CURRENT[:8]), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=CURRENT[:8].upper()), [])
+        for sha in (OLDER, CURRENT[:7] + 'f' + CURRENT[8:]):
+            with self.subTest(sha=sha):
+                self.assertEqual(len(self.stale(fenced(f'HEAD {sha}'), head=CURRENT[:8])), 1)
+
+    def test_a_sha_that_is_no_prefix_of_the_head_is_refused_at_each_end(self):
+        """Near misses: the last digit of a 40-digit sha, the 7th of a 7-digit
+        one, a longer sha that leaves the head's digits at its 13th."""
+        wrong_last = CURRENT[:39] + ('0' if CURRENT[39] != '0' else '1')
+        wrong_seventh = CURRENT[:6] + ('0' if CURRENT[6] != '0' else '1')
+        for sha in (wrong_last, wrong_seventh, CURRENT[:12] + 'ff'):
+            with self.subTest(sha=sha):
+                self.assertEqual(len(self.stale(fenced(f'HEAD {sha}'))), 1)
+
+    def test_fewer_than_7_or_more_than_40_digits_is_no_header(self):
+        self.assertEqual(self.stale(fenced('HEAD 0bad0c')), [])
+        self.assertEqual(len(self.stale(fenced('HEAD 0bad0c0'))), 1)
+        self.assertEqual(len(self.stale(fenced('HEAD ' + OLDER))), 1)
+        self.assertEqual(self.stale(fenced('HEAD ' + OLDER + '0')), [])
+
+    def test_a_line_that_only_names_a_head_is_no_header(self):
+        """Prose, a round's history, git's own words and the load lock's line
+        for another run's head are not the pasted run's header."""
+        for line in (
+                f"Round 1's head {OLDER}, before the review.",
+                f'- Red, head {OLDER}: 20 of 20 failed.',
+                f'The mutants ran at HEAD {OLDER} in a detached worktree.',
+                f'HEAD is now at {OLDER} The settle stops a page',
+                f'HEAD detached at {OLDER}',
+                f'commit {OLDER}',
+                f'abcdef0 (HEAD -> master) {OLDER}',
+                'load run: tools/pytest-under-load.sh holds /home/x/load-run.lock (pid 7, since '
+                f'2026-11-18 23:44:44; cwd /x/server; head {OLDER}; args -m browser)',
+                f'pid 7, since 2026-11-18 23:44:44; cwd /x/server; head {OLDER}; args -m browser',
+                f'Place 2 in line, behind: pid 7 cwd /x head {OLDER}',
+                f'ahead {OLDER}',
+                f'cwd /x/server and the ahead {OLDER}',
+                f'headers {OLDER}',
+                'head unknown',
+        ):
+            with self.subTest(line=line):
+                self.assertEqual(self.stale(fenced(line)), [])
+                self.assertEqual(self.stale(line + '\n'), [])
+
+    def test_a_header_outside_a_fence_is_read_too(self):
+        self.assertEqual(len(self.stale(f'Hand-off:\n\nHEAD {OLDER}\n')), 1)
+        self.assertEqual(len(self.stale(f'cwd /x/server HEAD {OLDER}\n')), 1)
+
+    def test_each_header_in_a_fence_is_checked(self):
+        body = f'x\n\n```\ncwd /x HEAD {CURRENT}\n...\ncwd /y HEAD {OLDER}\n```\n'
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
+
+    def test_the_marker_on_the_header_line_passes_it(self):
+        for header in (f'# HEAD {OLDER} [before run]', f'# HEAD {OLDER}  ([Before Run], master)',
+                       f'cwd /x HEAD {OLDER} [BEFORE RUN]'):
+            with self.subTest(header=header):
+                self.assertEqual(self.stale(fenced(header)), [])
+
+    def test_the_marker_on_the_caption_above_the_fence_passes_every_header_in_it(self):
+        body = (f'<details><summary>[before run] the test on master</summary>\n\n```\n'
+                f'cwd /x HEAD {OLDER}\n1 failed\ncwd /x HEAD {OLDER[:9]}\n```\n</details>\n')
+        self.assertEqual(self.stale(body), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {OLDER}', caption='**Reproduction** [before run]:')), [])
+        self.assertEqual(self.stale(f'[before run] on master:\n\nHEAD {OLDER}\n'), [])
+
+    def test_a_marker_that_is_not_the_header_line_or_the_line_above_its_fence_does_not_count(self):
+        """Below the fence, inside it on another line, two captions up, in
+        the caption of another fence, or the words alone without brackets."""
+        for body in (
+                fenced(f'HEAD {OLDER}') + '[before run]\n',
+                f'x\n\n```\n[before run]\nHEAD {OLDER}\n```\n',
+                f'[before run]\nHand-off:\n\n```\nHEAD {OLDER}\n```\n',
+                fenced(f'HEAD {OLDER}', caption='A before run, a reproduction on master:'),
+                fenced(f'HEAD {OLDER}', caption='before run'),
+                fenced(f'HEAD {OLDER}', caption='(before run)'),
+                f'[before run]\n\n```\nHEAD {CURRENT}\n```\n\nHand-off:\n\n```\nHEAD {OLDER}\n```\n',
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(len(self.stale(body)), 1)
+
+    def test_a_marked_fence_leaves_the_next_fence_checked(self):
+        body = (f'[before run]\n```\nHEAD {OLDER}\n```\n```\nHEAD {OLDER}\n```\n'
+                f'[before run] again\n\n```\nHEAD {OLDER}\n```\n')
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
+
+    def test_a_fence_ends_at_a_bare_line_of_as_many_backticks_and_a_header_after_it_is_read(self):
+        """The caption of the first fence reaches a header after a shorter
+        fence line and after one with an info string, both inside it; the
+        header after its close is outside and has no caption of its own."""
+        body = (f'[before run]\n````\n```\nHEAD {OLDER}\n````text\nHEAD {OLDER}\n```\n'
+                f'HEAD {OLDER}\n````\nHEAD {OLDER}\n')
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 10'])
+
+    def test_a_tilde_fence_takes_its_caption_as_a_backtick_fence_does(self):
+        self.assertEqual(self.stale(f'[before run] on master:\n\n~~~\nHEAD {OLDER}\n~~~\n'), [])
+        self.assertEqual(self.stale(f'[before run]\n~~~text\n```\nHEAD {OLDER}\n~~~\n'), [])
+        body = f'[before run]\n~~~\nHEAD {OLDER}\n~~~\n~~~\nHEAD {OLDER}\n~~~\n'
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
+
+    def test_a_marked_header_line_captions_no_header_below_it(self):
+        for body in (f'HEAD {OLDER} [before run]\nHEAD {OLDER}\n',
+                     f'HEAD {OLDER} [before run]\n\nHEAD {OLDER}\n',
+                     f'HEAD {OLDER} [before run]\n```\nHEAD {OLDER}\n```\n'):
+            with self.subTest(body=body):
+                found = self.stale(body)
+                self.assertEqual(len(found), 1, found)
+                self.assertFalse(found[0].startswith('line 1:'), found)
+
+    def test_a_header_with_edits_on_top_of_its_commit_is_refused_at_the_head_too(self):
+        """The run read edits no commit holds, as the fork's merged bodies
+        wrote it (the PR number in each comment), so no head can be right."""
+        for tail in (
+                '+ staged round-2 edits',  # #393
+                '(+ staged: the two new cases)',  # #393
+                'plus the uncommitted fix round',  # #327
+                '+ working tree',  # #376
+                '+ untracked testing/zz-probe-356.sh',  # #361
+                'with uncommitted changes',  # #456
+                '(probe testing/zz-probe-406.sh uncommitted; PHP unchanged)',  # #410
+                '+ scratch edit:',  # #416
+        ):
+            with self.subTest(tail=tail):
+                header = f'cwd /x HEAD {CURRENT} {tail}'
+                found = self.stale(fenced(header))
+                self.assertEqual(len(found), 1, found)
+                self.assertTrue(found[0].startswith(
+                    f'line 4: {header}: the run read edits no commit holds'), found)
+                self.assertEqual(self.stale(fenced(f'cwd /x HEAD {OLDER} {tail} [before run]')), [])
+
+    def test_a_header_that_says_there_were_no_edits_passes(self):
+        for tail in ('; uncommitted: 0 files', '; uncommitted: no', 'dirty=0 port 18399',
+                     'changed: 0', 'status: 0 changes', 'load 19.41 18.95 16.63',
+                     '(no uncommitted changes)', 'uncommitted: none', '0 uncommitted files',
+                     'nothing staged', 'staged: none', '(committed, git status clean: 0 files)'):
+            with self.subTest(tail=tail):
+                self.assertEqual(self.stale(fenced(f'cwd /x HEAD {CURRENT} {tail}')), [])
+
+    def test_a_marker_inside_a_fence_does_not_caption_a_header_after_it(self):
+        body = f'x\n\n```\n[before run]\n```\nHEAD {OLDER}\n'
+        self.assertEqual([f.split(':')[0] for f in self.stale(body)], ['line 6'])
+
+    def test_no_head_refuses_an_unmarked_header_and_passes_the_rest(self):
+        found = self.stale(fenced(f'HEAD {CURRENT}'), head=None)
+        self.assertEqual(found, [f'line 4: HEAD {CURRENT}: no --head or --pr to check it at'])
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT}'), head=''), found)
+        self.assertEqual(self.stale(fenced(f'HEAD {OLDER} [before run]'), head=None), [])
+        self.assertEqual(self.stale('No header here.\n', head=None), [])
+
+    def test_a_header_naming_the_commit_before_a_merge_at_the_head_passes(self):
+        asked = []
+
+        def chain(head):
+            asked.append(head)
+            return ['aaaaaaa1' + '0' * 32, OLDER]
+
+        self.assertEqual(self.stale(fenced(f'HEAD {OLDER}'), chain=chain), [])
+        self.assertEqual(self.stale(fenced('HEAD aaaaaaa1'), chain=chain), [])
+        self.assertEqual(asked, [CURRENT, CURRENT])
+        other = self.stale(fenced(f'HEAD {OLDER[:6]}f{OLDER[7:]}'), chain=chain)
+        self.assertEqual(len(other), 1, other)
+
+    def test_the_merge_chain_is_read_only_for_a_header_not_at_the_head(self):
+        def chain(head):
+            raise AssertionError('git read for a body whose headers are at the head')
+
+        self.assertEqual(self.stale(fenced(f'HEAD {CURRENT[:10]}'), chain=chain), [])
+        self.assertEqual(self.stale(fenced(f'HEAD {OLDER} [before run]'), chain=chain), [])
+        self.assertEqual(self.stale('No header.\n', chain=chain), [])
+
+    def merged_repo(self):
+        """A repository whose branch took two merges of master: the shas of
+        `work`, the branch's commit, `master_one`, `merge_one` and `merge_two`."""
+        repo = self.tmp / 'repo'
+        repo.mkdir()
+
+        def run(*args):
+            # No GIT_DIR from a pre-push hook, and no global git config.
+            env = {'PATH': os.environ['PATH'], 'HOME': str(self.tmp)}
+            done = subprocess.run(
+                ['git', '-C', str(repo), '-c', 'user.name=t', '-c', 'user.email=t@example.com',
+                 '-c', 'commit.gpgsign=false', *args],
+                capture_output=True, text=True, env=env)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return done.stdout.strip()
+
+        run('init', '-q', '-b', 'master')
+        run('commit', '-q', '--allow-empty', '-m', 'base')
+        run('checkout', '-q', '-b', 'branch')
+        run('commit', '-q', '--allow-empty', '-m', 'branch work')
+        work = run('rev-parse', 'HEAD')
+        run('checkout', '-q', 'master')
+        run('commit', '-q', '--allow-empty', '-m', 'master one')
+        master_one = run('rev-parse', 'HEAD')
+        run('commit', '-q', '--allow-empty', '-m', 'master two')
+        master_two = run('rev-parse', 'HEAD')
+        run('checkout', '-q', 'branch')
+        run('merge', '-q', '--no-ff', '-m', 'merge one', master_one)
+        merge_one = run('rev-parse', 'HEAD')
+        run('merge', '-q', '--no-ff', '-m', 'merge two', master_two)
+        merge_two = run('rev-parse', 'HEAD')
+        return repo, {'work': work, 'master_one': master_one, 'merge_one': merge_one,
+                      'merge_two': merge_two}
+
+    def test_the_merge_chain_is_the_first_parents_down_to_the_first_non_merge(self):
+        repo, sha = self.merged_repo()
+        work, merge_one, merge_two = sha['work'], sha['merge_one'], sha['merge_two']
+        root = str(repo)
+        self.assertEqual(TOOL.merge_chain(merge_two, root), [merge_one, work])
+        self.assertEqual(TOOL.merge_chain(merge_one, root), [work])
+        self.assertEqual(TOOL.merge_chain(work, root), [])
+        self.assertEqual(TOOL.merge_chain('0' * 40, root), [])
+
+    def test_the_merge_chain_reads_the_checkout_without_a_hooks_git_dir(self):
+        """Under a pre-push hook GIT_DIR names another repository, as
+        `defined_names` is tested; the checkout's own commits are read."""
+        head = subprocess.run(['git', '-C', str(PR_EVIDENCE.parent), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True).stdout.strip()
+        with tempfile.TemporaryDirectory() as tmp, \
+                unittest.mock.patch.dict(os.environ, {'GIT_DIR': str(Path(tmp) / 'nowhere')}):
+            self.assertIsInstance(TOOL.merge_chain(head), list)
+            seen = []
+
+            def run(argv, **kwargs):
+                seen.append(kwargs['env'])
+                return subprocess.CompletedProcess(argv, 1, '', '')
+
+            with unittest.mock.patch.dict(os.environ, {'HOME': '/home/x'}), \
+                    unittest.mock.patch.object(TOOL.subprocess, 'run', run):
+                TOOL.merge_chain(head)
+        self.assertEqual(seen[0]['HOME'], '/home/x')
+        self.assertNotIn('GIT_DIR', seen[0])
+
+    def test_the_command_line_refuses_and_names_the_line(self):
+        body = evidence(KEYS) + '\n' + fenced(f'cwd /x HEAD {OLDER}', caption='Hand-off:')
+        line = body.splitlines().index(f'cwd /x HEAD {OLDER}') + 1
+        done = self.check(body, '--head', CURRENT)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f"hand-off head not the PR's, line {line}: cwd /x HEAD {OLDER}: the PR's head is "
+                      f'{CURRENT}', done.stdout)
+        for ok in (fenced(f'cwd /x HEAD {CURRENT}'),
+                   fenced(f'cwd /x HEAD {OLDER[:9]}', '[before run]')):
+            done = self.check(evidence(KEYS) + '\n' + ok, '--head', CURRENT)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = self.check(evidence(KEYS) + '\n' + fenced(f'cwd /x HEAD {CURRENT}'))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('no --head or --pr to check it at', done.stdout)
+        done = self.check(evidence(KEYS))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        done = self.check(evidence(KEYS) + '\n' + fenced(f'cwd /x HEAD {CURRENT}'),
+                          '--head', CURRENT[:8])
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_the_command_line_reads_the_merge_chain_of_a_merge_head_from_the_checkout(self):
+        """Without --pr, the commit before a merge at --head comes from the
+        git of the checkout the tool sits in, here a copy of it in a repository
+        whose head is a merge."""
+        repo, sha = self.merged_repo()
+        tool = repo / 'plan' / 'bin' / 'pr-evidence'
+        tool.parent.mkdir(parents=True)
+        shutil.copy(PR_EVIDENCE, tool)
+        for named, refused in (('work', False), ('merge_one', False), ('master_one', True)):
+            for short in (False, True):
+                with self.subTest(named=named, short=short):
+                    at = sha['merge_two'][:8] if short else sha['merge_two']
+                    (self.tmp / 'body.md').write_text(fenced(f'cwd /x HEAD {sha[named][:10]}'))
+                    done = subprocess.run(
+                        [sys.executable, '-I', str(tool), '--check', str(self.tmp / 'body.md'),
+                         '--head', at], capture_output=True, text=True, env=self.env)
+                    self.assertEqual(done.returncode, 1 if refused else 0,
+                                     done.stdout + done.stderr)
 
 
 if __name__ == '__main__':

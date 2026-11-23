@@ -350,16 +350,24 @@ class TestingCases(unittest.TestCase):
 TESTING_FALLBACK = ['legacy_api/tests/test_testing_scripts.py', 'tests/test_golden_inputs.py']
 
 
-def testing_targets(files, path):
-    """What cover_testing maps testing/`path` to in a git repository of
-    `files`, repository path -> text, and testing/`path`."""
+@contextlib.contextmanager
+def git_repo(files):
+    """A temporary git repository with `files`, repository path -> text,
+    staged: the root the rules read when they ask git which files exist."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        for rel, text in {f'testing/{path}': '', **files}.items():
+        for rel, text in files.items():
             (root / rel).parent.mkdir(parents=True, exist_ok=True)
             (root / rel).write_text(text)
         for argv in (['init', '-q'], ['add', '-A']):
             subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        yield root
+
+
+def testing_targets(files, path):
+    """What cover_testing maps testing/`path` to in a git repository of
+    `files`, repository path -> text, and testing/`path`."""
+    with git_repo({f'testing/{path}': '', **files}) as root:
         plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
         TOOL.cover_testing(plan, TOOL.Tree(root), f'testing/{path}')
         return [t for _rule, _note, targets in plan.covers[f'testing/{path}']
@@ -497,14 +505,10 @@ class TestingNames(unittest.TestCase):
                     'shared-nested': {'path', 'relative'}}
         files = {f'server/tests/test_{kind}_{style}.py'.replace('-', '_'): f'X = "{cite(rel)}"\n'
                  for kind, (rel, _) in kinds.items() for style, cite in styles.items()}
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for rel in [*files, *(f'testing/{r}' for r, _ in kinds.values()),
-                        *(o for _, others in kinds.values() for o in others)]:
-                (root / rel).parent.mkdir(parents=True, exist_ok=True)
-                (root / rel).write_text(files.get(rel, ''))
-            for argv in (['init', '-q'], ['add', '-A']):
-                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        repo = {rel: files.get(rel, '')
+                for rel in [*files, *(f'testing/{r}' for r, _ in kinds.values()),
+                            *(o for _, others in kinds.values() for o in others)]}
+        with git_repo(repo) as root:
             tree, got = TOOL.Tree(root), {}
             for kind, (rel, _) in kinds.items():
                 plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
@@ -536,18 +540,12 @@ class TestingReaders(unittest.TestCase):
         """A top-level script maps only through the rows that list it, a
         `.sh` with no shebang included; a file no row lists and no test
         names maps to the fallback alone; no rule adds an empty entry."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for rel, text in {'server/tests/file_kinds.py': self.KINDS,
-                              'server/tests/test_pipefail_pipes.py': '',
-                              'server/legacy_api/tests/test_testing_scripts.py': '',
-                              'testing/queryj': '#!/bin/bash\n',
-                              'testing/steps.sh': 'echo\n',
-                              'testing/notes': 'plain\n'}.items():
-                (root / rel).parent.mkdir(parents=True, exist_ok=True)
-                (root / rel).write_text(text)
-            for argv in (['init', '-q'], ['add', '-A']):
-                subprocess.run(['git', *argv], cwd=root, env=git_env(), check=True)
+        with git_repo({'server/tests/file_kinds.py': self.KINDS,
+                       'server/tests/test_pipefail_pipes.py': '',
+                       'server/legacy_api/tests/test_testing_scripts.py': '',
+                       'testing/queryj': '#!/bin/bash\n',
+                       'testing/steps.sh': 'echo\n',
+                       'testing/notes': 'plain\n'}) as root:
             tree, got = TOOL.Tree(root), {}
             for name in ('queryj', 'steps.sh', 'notes'):
                 plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
@@ -656,6 +654,142 @@ class TestingReaders(unittest.TestCase):
                                            'or imports what names it'])
         self.assertEqual([t for _r, _n, ts in plan.covers['testing/faces'] for t in ts],
                          TESTING_FALLBACK)
+
+
+def rules_and_targets(files, path):
+    """Each entry's rule and targets that map_file gives `path` in a git
+    repository of `files`, repository path -> text, and `path` itself."""
+    with git_repo({path: '', **files}) as root:
+        plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+        TOOL.map_file(plan, TOOL.Tree(root), path)
+        return [(rule, targets) for rule, _note, targets in plan.covers[path]]
+
+
+class OutsideTesting(unittest.TestCase):
+    """#471: a check that lists every file of a kind reads those files
+    outside testing/ too, and #462 mapped only testing/ paths to it."""
+
+    KINDS = (REPO / 'server' / 'tests' / 'file_kinds.py').read_text()
+    SCRIPT_TESTS = ('tests/test_arithmetic_operands.py', 'tests/test_pipefail_pipes.py',
+                    'tests/test_subshell_state.py')
+
+    def stand_in(self, *tests):
+        return {'server/tests/file_kinds.py': self.KINDS,
+                **{f'server/{t}': '' for t in tests}}
+
+    def test_a_script_outside_testing_maps_to_the_checks_that_list_shell_files(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        self.assertEqual(rules_and_targets(files, 'server/tools/detach.sh'),
+                         [('server-tools', []), ('kind-readers', list(self.SCRIPT_TESTS))])
+
+    def test_a_guide_outside_testing_maps_to_the_check_of_exec_d_commands(self):
+        files = self.stand_in('tests/test_docker_checks.py')
+        got = rules_and_targets(files, 'docs/database.md')
+        self.assertEqual([r for r in got if r[0] == 'kind-readers'],
+                         [('kind-readers', ['tests/test_docker_checks.py'])])
+
+    def test_a_file_no_row_lists_maps_to_no_reader(self):
+        """A picture is no script and no file a command is written in; a
+        file with no shebang and no suffix is no script."""
+        files = self.stand_in(*self.SCRIPT_TESTS, 'tests/test_docker_checks.py')
+        files['installer/script'] = 'no shebang\n'
+        self.assertEqual(rules_and_targets(files, 'artwork/logo.png'), [('fallback', [])])
+        self.assertEqual(rules_and_targets(files, 'installer/script'), [('fallback', [])])
+
+    def test_a_row_whose_test_the_tree_lacks_maps_nothing(self):
+        files = self.stand_in('tests/test_pipefail_pipes.py')
+        self.assertEqual(rules_and_targets(files, 'installer/run.sh'),
+                         [('kind-readers', ['tests/test_pipefail_pipes.py']), ('fallback', [])])
+
+    def test_a_reader_adds_a_target_but_leaves_the_app_tests_to_the_fallback(self):
+        """A source check that lists the file says nothing of what the file
+        does: server/ui/middleware.py still runs the tests of its app."""
+        files = self.stand_in('tests/test_docker_checks.py', 'ui/tests/test_x.py')
+        self.assertEqual(rules_and_targets(files, 'server/ui/middleware.py'),
+                         [('ui-python', []), ('kind-readers', ['tests/test_docker_checks.py']),
+                          ('fallback', ['ui/tests'])])
+
+    def test_a_script_outside_server_still_leaves_the_rest_to_ci(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        self.assertEqual(rules_and_targets(files, 'installer/run.sh'),
+                         [('kind-readers', list(self.SCRIPT_TESTS)), ('fallback', [])])
+
+    def test_a_guide_at_the_top_is_docs_only_beside_the_reader_it_gets(self):
+        """cover_docs says the file has no pytest target of its own, and the
+        check that execs its commands is listed after it. The tool runs as a
+        subprocess on the real tree because the PR body pastes its text."""
+        out = section(run('plan/README.md', root=REPO), 'plan/README.md')
+        self.assertIn('  [docs] docs only: no pytest target of its own.', out)
+        self.assertIn('  [kind-readers] a source check that reads every file of its kind '
+                      '(KIND_READERS)\n      tests/test_docker_checks.py', out)
+        self.assertLess(out.index('[docs]'), out.index('[kind-readers]'))
+
+    def test_a_testing_file_is_mapped_once(self):
+        files = self.stand_in(*self.SCRIPT_TESTS)
+        files['testing/timer-stand-in/curl'] = '#!/bin/bash\n'
+        got = rules_and_targets(files, 'testing/timer-stand-in/curl')
+        self.assertEqual(got, [('kind-readers', list(self.SCRIPT_TESTS))])
+
+    def test_the_hand_off_lists_the_checks_the_source_checks_run(self):
+        """test_docker_checks.py and the pipe linters are in
+        tools/source-checks.sh, which every hand-off runs, so the printed
+        commands leave them out and one line names them. Each shows under its
+        file, is named in that line, and is no word of a printed command. The
+        tool runs as a subprocess on the real tree because the PR body pastes
+        its text."""
+        cases = {'server/tools/detach.sh': self.SCRIPT_TESTS[1:],
+                 'docs/database.md': ('tests/test_docker_checks.py',)}
+        shown = {}
+        for path, tests in cases.items():
+            out = run(path, root=REPO)
+            line = next(ln for ln in out.splitlines()
+                        if ln.startswith('tools/source-checks.sh runs these'))
+            shown[path] = {test: (f'      {test}\n' in section(out, path) + '\n',
+                                  test in line, test in commands(out).split())
+                           for test in tests}
+        self.assertEqual(shown, {path: {test: (True, True, False) for test in tests}
+                                 for path, tests in cases.items()})
+
+    def test_a_tree_without_a_rows_module_skips_the_row_for_a_file_outside_testing(self):
+        """A head from before server/tests/file_kinds.py, which a flake
+        ticket's run reads with --stdin (ci-load.yml), has the pipe linter and
+        no module listing its files. A file outside testing/ maps to the rest
+        and one line names the module. A tree that lacks the rows' tests too
+        prints no such line. A testing/ file, alone or beside such a file,
+        still stops the tool with #431's message."""
+        tree = {**TREE, 'server/tests/test_pipefail_pipes.py': ''}
+        out = run('server/racing/models.py', 'server/racing/services/heats.py', tree=tree)
+        self.assertEqual([ln for ln in out.splitlines() if ln.startswith('This tree lacks')],
+                         ['This tree lacks server/tests/file_kinds.py, so a changed file '
+                          'outside testing/ maps to none of the checks whose KIND_READERS '
+                          'row lists its files with it (an older head, #471).'])
+        self.assertNotIn('[kind-readers]', out)
+        self.assertNotIn('This tree lacks', run('server/racing/models.py', tree=TREE))
+        stopped = []
+        for files in (('testing/notes',), ('server/racing/models.py', 'testing/notes')):
+            with self.assertRaises(AssertionError) as refused:
+                run(*files, tree=tree)
+            stopped.append('cannot load server/tests/file_kinds.py' in str(refused.exception))
+        self.assertEqual(stopped, [True, True])
+
+    def test_each_kind_of_file_a_row_lists_outside_testing_maps_to_its_test(self):
+        """In the real tree, each row's function lists files outside testing/
+        in several folders: one file of each folder, a top-level file alone,
+        maps to the row's test."""
+        tree, misses, seen = TOOL.Tree(REPO), [], set()
+        for row in TOOL.KIND_READERS:
+            for path in sorted(tree.listed(row)):
+                folder = Path(path).parts[0]
+                if path.startswith('testing/') or not tree.exists(row.test) \
+                        or (row.test, row.selector, folder) in seen:
+                    continue
+                seen.add((row.test, row.selector, folder))
+                plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+                TOOL.map_file(plan, tree, path)
+                if row.test not in {t for _r, _n, ts in plan.covers[path] for t in ts}:
+                    misses.append(f'{path}: {row.test}')
+        self.assertEqual(misses, [])
+        self.assertGreater(len(seen), 25)
 
 
 class TestFile(unittest.TestCase):
@@ -1109,6 +1243,24 @@ class BeforeTheHandOff(unittest.TestCase):
                           '<the node ids of the tests that call its helpers>\n',
                           before_hand_off(out))
         self.assertNotIn('mutate.py', commands(out))
+
+    def test_a_changed_conftest_lists_its_claims_and_its_helpers_mutants(self):
+        """D123 counts a conftest's claims, and mutate.py takes a conftest as
+        a test file. #347's diff changed the browser conftest and
+        test_harness.py, the tool named only test_harness.py, review counted
+        26 unlisted claims where the fix round found 32, and the table had no
+        rows for the conftest's `_intercepted` (#347 retro)."""
+        out = run('server/ui/tests/browser/conftest.py', 'server/ui/tests/test_dashboard.py')
+        files = 'ui/tests/browser/conftest.py ui/tests/test_dashboard.py'
+        self.assertIn(f'  uv run python tools/docstring_claims.py {files}\n',
+                      before_hand_off(out))
+        self.assertIn(f'  uv run python tools/docstring_claims.py --check <the PR body draft> '
+                      f'{files}\n', before_hand_off(out))
+        self.assertIn('  uv run python tools/mutate.py --listed --file '
+                      'ui/tests/browser/conftest.py -- ', before_hand_off(out))
+        self.assertIn('[everything] a shared conftest', out)
+        out = run('server/ui/tests/gone/conftest.py')
+        self.assertNotIn('Before the first hand-off run', out)
 
     def test_a_changed_source_file_lists_its_operand_mutants(self):
         for path in ('server/awards/editing.py', 'server/ui/static/ui/kiosk.css',
@@ -3675,7 +3827,7 @@ class RealTree(unittest.TestCase):
         self.assertNotIn('[role-gates]', section(out, 'server/awards/editing.py'))
 
     def test_a_test_file_passes_on_what_it_imports(self):
-        """#371 retro: the six kiosk files that import open_kiosk from
+        """#371 retro: the kiosk files that import open_kiosk from
         test_kiosk_pages.py ran nothing when it changed, and
         test_database_check.py, which imports SERVICE_VIOLATIONS from
         test_invariants.py, nothing when core/tests/db.py changed."""

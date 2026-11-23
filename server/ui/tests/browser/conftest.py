@@ -539,12 +539,12 @@ def stop_timers(tab):
             pass
 
 
-def stop_sending(tab):
-    """Stop every frame of `tab` but the main frame sending fetch and
-    XMLHttpRequest requests; the main frame's stop sends the barrier
-    (`_barrier`)."""
+def stop_sending(tab, but=None):
+    """Stop every frame of `tab` but the frame `but` sending fetch and
+    XMLHttpRequest requests. The settle passes the main frame, whose stop
+    sends the barrier (`_barrier`)."""
     for frame in tab.frames:
-        if frame == tab.main_frame:
+        if frame == but:
             continue
         try:
             frame.evaluate(STOP_SENDING, None)
@@ -555,8 +555,21 @@ def stop_sending(tab):
 def close_tab(page, tab):
     """Close a second tab of `page`'s context, such as the camera or a
     kiosk, once its polls have stopped and its requests are answered. A tab
-    closed with a request out fails the test (`InFlight.page_closed`)."""
+    closed with a request out fails the test (`InFlight.page_closed`).
+
+    Stopping the timers leaves the callbacks that send on no timer: the
+    camera's `onicecandidate` and `onnegotiationneeded` post a message
+    (camera-signaling.js), and a reply's handler can send again. So
+    STOP_SENDING runs in every frame of the tab, and the settle's block
+    (`block_sending`) then fails every other request the tab makes until
+    it closes. The wait is for the server's
+    replies to the requests sent before (#409:
+    `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
+    `test_close_tab_stops_a_loop_the_block_would_fail`,
+    `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
+    stop_sending(tab)
+    block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
         tab.wait_for_timeout(50)
@@ -568,27 +581,51 @@ def close_tab(page, tab):
 SETTLE_BARRIER = "/settle-barrier"
 
 
+def _intercepted(page) -> bool:
+    """Whether Playwright already intercepts `page`'s requests: a route on
+    the page or on its context turns it on (Playwright 1.64's
+    `needsRequestInterception`). Read from Playwright's own route lists,
+    which are private, with no default: a release that renames them fails
+    here instead of guessing."""
+    return bool(page._impl_obj._routes or page.context._impl_obj._routes)
+
+
 def _barrier(page):
     """Wait until Playwright has reported the requests `page` sent before
     its timers stopped. A `request` event can reach Python after the
     evaluate that sent it returns, so the drain found the set empty with a
     poll's last request out (#224 retro, 1 run in 50 under load;
     `test_the_settle_drains_a_request_sent_as_it_stops`). The barrier is a
-    fetch sent after the stop, answered 204 here; its end is reported after
+    fetch sent after the stop, and its end must reach Python by the path
+    the page's own requests take
+    (`test_the_barrier_follows_a_fetch_sent_before_it`): through Chromium's
+    Fetch domain where a route already has Playwright intercepting, so a
+    route answers it there. Elsewhere a URL block on a CDP session of its
+    own fails it, and the session stays open until the context closes. A
+    route there turned the interception on and off at each settle, and a
+    document that committed as it turned on sent its requests, the
+    barrier's among them, to the server with no `request` event (#347,
+    gap 1: `test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts`).
+    So its end follows
     the earlier fetch's start (the same test). STOP_SENDING sends it, and
     then stops the main frame's fetch and XMLHttpRequest in the same task."""
     if not page.url.startswith("http"):
         return
-    page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
-    try:
-        with page.expect_event(
-            "requestfinished",
-            lambda r: r.url.endswith(SETTLE_BARRIER),
-            timeout=InFlight.TIMEOUT_MS,
-        ):
-            page.evaluate(STOP_SENDING, SETTLE_BARRIER)
-    finally:
-        page.unroute(f"**{SETTLE_BARRIER}")
+    if _intercepted(page):
+        page.route(f"**{SETTLE_BARRIER}", lambda route: route.fulfill(status=204))
+        end = "requestfinished"
+    else:
+        session = page.context.new_cdp_session(page)
+        session.send("Network.enable")
+        session.send("Network.setBlockedURLs", {"urls": [f"*{SETTLE_BARRIER}"]})
+        end = "requestfailed"
+    with page.expect_event(
+        end,
+        lambda r: r.url.endswith(SETTLE_BARRIER),
+        timeout=InFlight.TIMEOUT_MS,
+    ):
+        page.barrier_sent = True
+        page.evaluate(STOP_SENDING, SETTLE_BARRIER)
 
 
 # Playwright's failure texts for a request `block_sending` blocked: by its
@@ -597,18 +634,24 @@ BLOCKED = ("inspector", "net::ERR_BLOCKED_BY_CLIENT")
 
 
 def block_sending(page):
-    """Make Chromium block every later request of `page`, for the rest of
-    its life: an image, a beacon, a frame made after STOP_SENDING, and a
-    navigation, whose own request only the Fetch block stops
+    """Make Chromium block every later request of `page`, the settle's
+    page or a tab `close_tab` closes, for the rest of its life: an image, a
+    beacon, a frame made after STOP_SENDING, and a navigation, whose own
+    request only the Fetch block stops
     (`test_the_settle_blocks_what_the_stops_leave`). The block ends with its
     CDP session (#409, PR #424), so the session stays open on the page and
-    closes with its context. A blocked request fails at once, so every new
-    document and frame gets STOP_SENDING first: a fetch of theirs never
-    fails into a handler that would send again. A page that loads an
-    image again on its error would spin, the block failing each load at
-    once; no script under `ui/static/ui/` sets an image's `onerror`."""
+    closes with it (`test_close_tab_closes_a_tab_that_keeps_sending`). A
+    blocked request fails at once, so every new document and frame gets
+    STOP_SENDING first: a fetch of theirs never fails into a handler that
+    would send again. A page that loads an image again on its error would
+    spin, the block failing each load at once; no script under
+    `ui/static/ui/` sets an image's `onerror`."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
+    # Before the first send: Playwright hands the page's events over while
+    # a send waits, so a failure the block causes then must find the page
+    # blocked (#451, test_a_request_the_block_fails_while_it_starts_is_no_page_error).
+    page.blocker = blocker
     blocker.send("Network.enable")
     blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
     blocker.on(
@@ -619,7 +662,6 @@ def block_sending(page):
         ),
     )
     blocker.send("Fetch.enable", {"patterns": [{"resourceType": "Document"}]})
-    page.blocker = blocker
 
 
 def _settle(page) -> list[str]:
@@ -637,7 +679,7 @@ def _settle(page) -> list[str]:
             close_tab(page, tab)
     if not getattr(page, "blocker", None):
         stop_timers(page)
-        stop_sending(page)
+        stop_sending(page, but=page.main_frame)
         _barrier(page)
         block_sending(page)
     return page.in_flight.drain(page)
@@ -718,6 +760,12 @@ def page(browser, live_server, size, page_errors):
 
     def request_failed(request):
         if request.failure in BLOCKED and getattr(page, "blocker", None):
+            return
+        if (
+            request.failure == BLOCKED[0]
+            and request.url.endswith(SETTLE_BARRIER)
+            and getattr(page, "barrier_sent", False)
+        ):
             return
         page_errors.add(f"request failed: {request.url} {request.failure}")
 

@@ -6,6 +6,7 @@ slideshow Configure sheet showing what was saved (C20), the parity boxes of
 
 import json
 import re
+from contextlib import nullcontext
 from datetime import timedelta
 
 import pytest
@@ -24,7 +25,7 @@ from ui.tests.browser.conftest import (
     htmx_settled,
     shoot,
 )
-from ui.tests.browser.helpers import bound, ready
+from ui.tests.browser.helpers import MAX_SWAPS, bound, ready
 
 ADDRESSES = ("kiosk1-test46", "kiosk2-test46", "kiosk3-test46")
 ABORTED_POLL = r"request failed: \S*/kiosks/board/\S* net::ERR_ABORTED$"
@@ -72,11 +73,6 @@ def _polls_may_be_cut_short(page_errors, thumbnail_aborts):
     editor with thumbnails and changes it, or lets a kiosk go quiet, which
     swaps them (`thumbnail_aborts`)."""
     page_errors.allow(ABORTED_POLL)
-
-
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
 
 
 def kiosk(event, address, **fields) -> Kiosk:
@@ -147,11 +143,12 @@ def test_a_scene_switch_still_shows_after_three_polls(login, event):
     expect(page.locator('#kiosk-board button[aria-pressed="true"]')).to_have_count(1)
 
 
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_three_fake_kiosks_follow_a_scene_tapped_on_the_phone(login, event):
     """The steps of `testing/test-scenes.sh`: the kiosks check in and get
     identify, are named, and then each scene tapped gives each named kiosk
     its page, read back through `query=poll.kiosk`."""
-    phone_only(page := login("RaceCoordinator"))
+    page = login("RaceCoordinator")
     for address in ADDRESSES:
         assert poll_kiosk(page, address)["page"] == "kiosks/identify.kiosk"
     open_dashboard(page)
@@ -492,6 +489,165 @@ def test_a_tap_while_a_poll_is_out_is_not_lost(login, event):
     expect(scene_button(page, welcome)).to_have_attribute("aria-pressed", "true")
 
 
+def test_a_tap_follows_a_card_a_poll_swaps_while_bound_waits(login, event):
+    """A poll's reply swaps the board just after `bound()` first resolves a
+    card's Page button to an element (#425). htmx's cleanup of the
+    swapped-out button deletes its `initHash`, so a wait on that element
+    alone never ends; `tap()` follows the button to the card swapped in,
+    clicks it only once htmx has bound it, and opens its Page sheet, under
+    the new name.
+
+    The control stands in for the locator and lets the held poll through
+    the first time `bound()` asks it for an element, so the swap lands
+    inside the real `tap()` on every run. htmx binds a swapped-in button
+    at once (`defaultSettleDelay` 0), so the test unbinds the new one, has
+    htmx bind it again only when `bound()` asks for the button again, and
+    records whether the click found it bound."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    page_button = card(page, "tv").locator('[data-action="page"]')
+    unbind_and_watch_the_click = """() => {
+      const button = document.querySelector(
+        '#kiosk-board [data-kiosk="tv"] [data-action="page"]');
+      delete button['htmx-internal-data'].initHash;
+      document.addEventListener('click', (e) => {
+        const control = e.target.closest('[hx-get]');
+        window.clickedBound = !!(control['htmx-internal-data'] || {}).initHash;
+      }, {capture: true, once: true});
+    }"""
+
+    class SwapThenRebind:
+        resolves = 0
+
+        def __getattr__(self, name):
+            return getattr(page_button, name)
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = page_button.element_handle()
+            if self.resolves == 1:
+                polls = hold_the_polls(page, stretch=False)
+                Kiosk.objects.filter(address="tv").update(name="Lobby")
+                polls.wait_for(1)
+                polls.answer(0)
+                polls.end()
+                assert not handle.evaluate("e => e.isConnected"), "no swap"
+                page.evaluate(unbind_and_watch_the_click)
+            elif self.resolves == 2:
+                handle.evaluate("e => htmx.process(e)")
+            return handle
+
+    control = SwapThenRebind()
+    tap(page, control)
+    assert page.evaluate("window.clickedBound") is True, "clicked before the bind"
+    assert control.resolves == 2, "bound() took the button before and after the swap"
+    expect(page.locator("#sheet-kiosks-title")).to_have_text("Page for Lobby")
+    ready(page, sheet(page, "kiosks").locator("[data-page-sheet]"))
+
+
+# A control outside the board, so no poll swaps it; htmx binds it only when
+# a test asks.
+STAND_IN = """() => {
+  const control = document.createElement('button');
+  control.id = 'stand-in';
+  control.setAttribute('hx-get', '/');
+  document.body.append(control);
+}"""
+
+
+@pytest.mark.parametrize(
+    ("swaps", "outcome"),
+    [
+        (MAX_SWAPS, nullcontext()),
+        (
+            MAX_SWAPS + 1,
+            pytest.raises(
+                AssertionError,
+                match=f"swapped out {MAX_SWAPS + 1} times and never bound",
+            ),
+        ),
+    ],
+    ids=["at-the-cap", "past-the-cap"],
+)
+def test_bound_follows_swaps_up_to_its_cap(login, event, swaps, outcome):
+    """`bound()` takes a control's element again after each swap, up to
+    MAX_SWAPS swaps, and past them fails naming the swaps (#466 review).
+    The control swaps the stand-in out each time `bound()` takes its
+    element, `swaps` times, and then has htmx bind the element it gives."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapEachResolve:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            handle.evaluate(
+                "e => e.replaceWith(e.cloneNode(true))"
+                if self.resolves <= swaps
+                else "e => htmx.process(e)"
+            )
+            return handle
+
+    control = SwapEachResolve()
+    with outcome:
+        bound(page, control)
+    assert control.resolves == MAX_SWAPS + 1, "bound() stopped taking elements"
+
+
+def test_bound_waits_on_the_element_swapped_in(login, event):
+    """After a swap, `bound()` waits on the element swapped in, and a
+    timeout there names the swap (#466 review). The control swaps the
+    stand-in out the first time `bound()` takes its element and shortens
+    Playwright's timeout the next time; htmx never binds the element
+    swapped in, so the outcome does not depend on the timeout's length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    stand_in = page.locator("#stand-in")
+
+    class SwapOnce:
+        resolves = 0
+
+        def element_handle(self):
+            self.resolves += 1
+            handle = stand_in.element_handle()
+            if self.resolves == 1:
+                handle.evaluate("e => e.replaceWith(e.cloneNode(true))")
+            else:
+                page.set_default_timeout(1_000)
+            return handle
+
+    with pytest.raises(
+        AssertionError,
+        match="showed no element htmx bound within Playwright's timeout, after 1 swaps",
+    ):
+        bound(page, SwapOnce())
+    page.set_default_timeout(30_000)  # Playwright's default
+
+
+@pytest.mark.parametrize(
+    "selector", ["#stand-in", "#no-such-control"], ids=["never-bound", "never-shown"]
+)
+def test_bound_names_the_control_it_timed_out_on(login, event, selector):
+    """A control htmx never binds, or a control the page never shows, fails
+    `bound()` with a message naming the control once Playwright's timeout
+    passes, not Playwright's own (#466 review). Nothing here binds later,
+    so the test shortens Playwright's timeout and the outcome does not
+    depend on its length."""
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(STAND_IN)
+    page.set_default_timeout(1_000)
+    with pytest.raises(
+        AssertionError,
+        match=rf"bound\(\): .*'{selector}'.* showed no element htmx bound "
+        "within Playwright's timeout, after 0 swaps",
+    ):
+        bound(page, page.locator(selector))
+    page.set_default_timeout(30_000)  # Playwright's default
+
+
 # ----- a press that spans a board swap (D102, #344) --------------------------
 
 # The page's own record of a press, in the order the page saw it: each
@@ -630,7 +786,7 @@ def press(page, control):
 
 def touch(page):
     """A CDP session for touches, which Playwright sends only whole
-    (`tap()`). At the phone's size, where the context has touch."""
+    (`tap()`)."""
     return page.context.new_cdp_session(page)
 
 
@@ -748,13 +904,14 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     polls.end()
 
 
+@pytest.mark.sizes("phone", reason="touch input is checked at the phone's size only")
 def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     """A touch on a scene button across the same reply. Chromium hit-tests
     a touch's click again, so the unheld board loses no touch (the PR's
     probe, on PHP's page too); the hold still waits for the click, which a
     touch sends after its pointerup and pointerout, before it applies the
     board (D102)."""
-    phone_only(page := login("RaceCoordinator"))
+    page = login("RaceCoordinator")
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene(event, "Racing")
@@ -776,17 +933,28 @@ def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     polls.end()
 
 
-@pytest.mark.parametrize("cancel", ["moved off", "pointercancel"])
+@pytest.mark.parametrize(
+    "cancel",
+    [
+        "moved off",
+        pytest.param(
+            "pointercancel",
+            marks=pytest.mark.sizes(
+                "phone",
+                reason="touch input is checked at the phone's size only",
+            ),
+        ),
+    ],
+)
 def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, cancel):
     """Two polls answer while the pointer is down on a scene button, the
     first renaming the kiosk Lobby and the second Hall. The press is then
     cancelled, by moving the mouse off the button or by a pointercancel (a
     touch the browser takes for a scroll), and the board swaps once, to
-    Hall (D102). No scene is posted. The pointercancel is a real touch's,
-    so it runs at the phone's size only."""
+    Hall (D102). No scene is posted. The `moved off` case runs at both
+    sizes; the `pointercancel` case, a touch, is marked to the phone's size
+    only."""
     page = login("RaceCoordinator")
-    if cancel == "pointercancel":
-        phone_only(page)
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene(event, "Racing")
@@ -883,24 +1051,69 @@ def move_off(page):
     page.mouse.move(box["x"] + 2, box["y"] + box["height"] / 2)
 
 
+# The timers a click's listeners set wait until the next pointerdown has been
+# handled, then run: the order a click's timer that runs late gives (#455).
+# Once only: later clicks' timers run as usual, and so does a timer set
+# outside a click, such as the board poll's. `window.lateTimers` counts those
+# parked, records when each ran, and the pointerdown that let them go: its
+# timeStamp and its button's scene.
+LATE_CLICK_TIMERS = """() => {
+  const real = window.setTimeout;
+  const late = window.lateTimers = {parked: 0, ran: [], down: null};
+  const parked = [];
+  window.setTimeout = function (fn, ms, ...rest) {
+    if (window.event?.type === 'click') {
+      parked.push(() => fn(...rest));
+      late.parked += 1;
+      return 0;
+    }
+    return real.call(window, fn, ms, ...rest);
+  };
+  window.addEventListener('pointerdown', (e) => {
+    window.setTimeout = real;
+    late.down = {at: e.timeStamp, scene: e.target.closest('button')?.dataset.scene};
+    for (const run of parked) real(() => { late.ran.push(performance.now()); run(); });
+  }, {once: true});
+}"""
+
+
 def test_a_press_during_a_taps_request_still_taps(login, event):
     """The mouse taps Identify while a poll's reply is held, so the held
     board waits for Identify's POST, which its route holds. While that POST
     is out, the mouse goes down on Welcome, and Identify's reply then comes:
     its board waits under the new press, and so does the board held before
-    (D102). Welcome's POST still goes out."""
+    (D102). Welcome's POST still goes out. The release Identify's click
+    defers runs only after Welcome's pointerdown (`LATE_CLICK_TIMERS`), and
+    leaves Welcome's press holding: before #455 it ended that press, and
+    Identify's board swapped in under it. The test sets a timer of its own
+    outside a click, which the forcing must leave alone, as it leaves the
+    board poll's."""
     kiosk(event, "tv", name="Main")
     page = open_dashboard(login("RaceCoordinator"))
-    welcome = scene_button(page, scene(event, "Welcome"))
+    welcomed = scene(event, "Welcome")
+    welcome = scene_button(page, welcomed)
     posts = held_at_route(page, "**/kiosks/identify/**")
     polls = a_press_spans_a_swap(page, event, page.locator(IDENTIFY_BUTTON))
+    page.evaluate(LATE_CLICK_TIMERS)
+    page.evaluate("setTimeout(() => {})")
     page.mouse.up()
     wait_for_held(page, posts, "Identify POST")
     press(page, welcome)
+    # one read: mouse.down() returns once the page has handled its pointerdown.
+    log = board_log(page)
+    second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    late = page.evaluate("window.lateTimers")
+    assert late["down"] == {"at": log[second]["at"], "scene": str(welcomed.pk)}, (
+        late,
+        log,
+    )
+    assert late["parked"] == 1, late
     posts[0].continue_()
     wait_for_done(page, "/kiosks/identify/")
     log = board_log(page)
-    second = [i for i, r in enumerate(log) if r["what"] == "down"][1]
+    late = page.evaluate("window.lateTimers")
+    assert len(late["ran"]) == 1, late
+    assert late["ran"][0] > log[second]["at"], (late, log)
     assert swaps_since(log, second) == [], log
     with htmx_post(page, "/kiosks/scene/"):
         page.mouse.up()
@@ -941,16 +1154,30 @@ def test_a_change_from_a_sheet_swaps_its_board_at_once(login, event):
     """With no press on, a change's board out of band swaps in with its
     reply (#344): the kiosk named from its sheet shows on the board while
     every poll is held. Held to the request's end instead, the board never
-    showed the name (#344's round-5 mutant)."""
+    showed the name (#344's round-5 mutant).
+
+    The board polls every `state.POLL_SECONDS` while no sheet is open
+    (`derbynet.pollable`), so a poll goes out before the tap and again once
+    the sheet closes; the test waits for each. The hold starts once the
+    sheet is open, and nothing after the reply waits for htmx to settle,
+    which waits on the held poll's `.htmx-request` (#437). Each wait is
+    bounded as `next_polls` is, and a poll comes no later than
+    `state.POLL_SECONDS` after its start: its slack is that bound less
+    `state.POLL_SECONDS`."""
     kiosk(event, "tv")
     page = open_dashboard(login("RaceCoordinator"))
-    polls = hold_the_polls(page)
+    with page.expect_request(lambda r: "/kiosks/board/" in r.url, timeout=10_000):
+        pass
     tap(page, card(page, "tv").locator('[data-action="name"]'))
     form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    polls = hold_the_polls(page)
     form.locator('[data-name-chips] button[data-value="Main"]').click()
     expect(form.get_by_label("Name for this kiosk")).to_have_value("Main")
-    with htmx_post(page, "/kiosks/name/"):
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/kiosks/name/" in r.url
+    ):
         form.locator("[data-submit]").click()
+    polls.wait_for(1)
     expect(sheet(page, "kiosks")).to_be_hidden()
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Main")
     assert polls.answered() == 0, board_log(page)
@@ -1107,13 +1334,14 @@ def test_a_second_tap_that_aborts_a_taps_request_still_posts(
     polls.end()
 
 
+@pytest.mark.sizes("phone", reason="touch input is checked at the phone's size only")
 def test_a_second_finger_keeps_the_hold(login, event):
     """A finger is down on Racing when a poll's reply (Lobby) comes, and a
     second finger then goes down on Welcome. The second pointerdown keeps
     the board held for the newer press (#344 review); the touch's cancel
-    then releases it, and the board swaps once, to Lobby. At the phone's
-    size, where the context has touch."""
-    phone_only(page := login("RaceCoordinator"))
+    then releases it, and the board swaps once, to Lobby. Checked at the
+    phone's size only."""
+    page = login("RaceCoordinator")
     kiosk(event, "tv", name="Main")
     open_dashboard(page)
     racing = scene_button(page, scene(event, "Racing"))
@@ -1739,3 +1967,371 @@ def test_a_press_off_the_board_controls_holds_nothing(login, event, where):
     page.mouse.move(1, 1)
     page.mouse.up()
     polls.end()
+
+
+# Each key event with whether it went to an element inside a sheet, and
+# each htmx request sent: what a held key did as a sheet opened or closed
+# (#383). The kiosk dashboard and the scene editor both record it.
+SHEET_LOG = """() => {
+  const log = window.sheetLog = [];
+  const key = (e) => log.push({what: e.type, key: e.key, repeat: e.repeat,
+    inSheet: !!e.target.closest('[data-sheet]')});
+  document.addEventListener('keydown', key, true);
+  document.addEventListener('keyup', key, true);
+  document.addEventListener('htmx:beforeSend', (e) => log.push({
+    what: 'send', verb: e.detail.requestConfig.verb,
+    path: e.detail.requestConfig.path.split('?')[0]}), true);
+}"""
+
+
+@pytest.mark.parametrize(
+    ("url", "name", "opener", "body", "get", "lands", "posts"),
+    [
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="name"]',
+            "[data-name-sheet]",
+            "/kiosks/name/",
+            "#kn-name",
+            ["/kiosks/name/"],
+            id="name",
+        ),
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="page"]',
+            "[data-page-sheet]",
+            "/kiosks/page/",
+            "[data-close]",
+            [],
+            id="page",
+        ),
+        pytest.param(
+            "/kiosks/scenes/",
+            "scenes",
+            '#scene-entries [data-entry="Aux1"] [data-action="page"]',
+            "[data-page-sheet]",
+            "/kiosks/scenes/page/",
+            "[data-close]",
+            [],
+            id="scene editor page",
+        ),
+    ],
+)
+def test_a_held_enter_on_a_sheet_opener_opens_it_once(
+    login, event, url, name, opener, body, get, lands, posts
+):
+    """#383: Enter goes down on a kiosk card's Name or Page button, or on
+    the scene editor's Page button for Aux1, and opens its sheet. Once the
+    sheet's body has loaded and the focus is in the sheet (the name field,
+    or the Close button of a page picker, which has no field), two
+    auto-repeat keydowns land in the sheet and do nothing: no POST, the
+    opener's GET sent once, the sheet still open and the focus where the
+    sheet put it. Before, a repeat submitted the name or pressed Close
+    (#369's Spec probe). Near misses: a button put in the sheet counts 3
+    clicks for an Enter held on it with two repeats, since that press began
+    in the sheet; and a fresh Enter press then does what Enter does there,
+    saving the name or closing the picker."""
+    kiosk(event, "hall")
+    kiosk(event, "tv", name="Main")
+    page = login("RaceCoordinator")
+    page.goto(url)
+    target = page.locator(opener)
+    htmx_settled(page)
+    page.evaluate(SHEET_LOG)
+    focus_on(page, target)
+    page.keyboard.down("Enter")
+    ready(page, sheet(page, name).locator(body))
+    landed = sheet(page, name).locator(lands)
+    expect(landed).to_be_focused()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.sheetLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = page.evaluate("window.sheetLog")
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 2, log
+    assert all(r["inSheet"] for r in repeats), log
+    # one read: a submit or a Close click would have sent its POST or
+    # closed the sheet before keyboard.down() returned.
+    assert [(r["verb"], r["path"]) for r in log if r["what"] == "send"] == [
+        ("get", get)
+    ], log
+    expect(sheet(page, name)).to_be_visible()
+    expect(landed).to_be_focused()
+
+    page.evaluate(
+        """n => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.id = 'in-sheet';
+          b.dataset.clicks = '0';
+          b.addEventListener('click', () => {
+            b.dataset.clicks = String(Number(b.dataset.clicks) + 1);
+          });
+          document.querySelector(`[data-sheet="${n}"]`).append(b);
+        }""",
+        name,
+    )
+    counter = page.locator("#in-sheet")
+    counter.focus()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    expect(counter).to_have_attribute("data-clicks", "3")
+
+    landed.focus()
+    page.keyboard.press("Enter")
+    expect(sheet(page, name)).to_be_hidden()
+    htmx_settled(page)
+    log = page.evaluate("window.sheetLog")
+    assert [r["path"] for r in log if r.get("verb") == "post"] == posts, log
+
+
+@pytest.mark.parametrize(
+    ("url", "name", "opener", "body", "save", "post", "first"),
+    [
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="name"]',
+            "[data-name-sheet]",
+            "#kn-name",
+            "/kiosks/name/",
+            ("data-kiosk", "hall"),
+            id="name",
+        ),
+        pytest.param(
+            "/kiosks/",
+            "kiosks",
+            '#kiosk-board [data-kiosk="tv"] [data-action="page"]',
+            "[data-page-sheet]",
+            '[data-page-choice="standings"]',
+            "/kiosks/page/",
+            ("data-kiosk", "hall"),
+            id="page",
+        ),
+        pytest.param(
+            "/kiosks/scenes/",
+            "scenes",
+            '#scene-entries [data-entry="Aux1"] [data-action="page"]',
+            "[data-page-sheet]",
+            '[data-page-choice="standings"]',
+            "/kiosks/scenes/page/",
+            ("data-entry", "Main"),
+            id="scene editor page",
+        ),
+    ],
+)
+def test_a_save_that_swaps_the_opener_gives_the_focus_to_its_copy(
+    login, event, url, name, opener, body, save, post, first
+):
+    """#383: a kiosk card's Name or Page button, or the scene editor's Page
+    button for Aux1, opens its sheet from the keyboard, and a save with
+    Enter swaps the board or the scene's cards out of band, which removes
+    the opener. When the sheet closes, the focus goes to the swapped-in
+    copy of the opener, matched as D127 matches a control: the same name,
+    value, data-action and card (data-kiosk on the dashboard, data-entry in
+    the scene editor). An unnamed second kiosk's card comes first on the
+    board, and Main's entry before Aux1's, each with the same buttons.
+    Before, the focus fell to the page's body. Near miss: Close swaps
+    nothing, and the focus goes back to the opener itself."""
+    kiosk(event, "hall")
+    kiosk(event, "tv", name="Main")
+    page = login("RaceCoordinator")
+    page.goto(url)
+    target = page.locator(opener)
+    expect(page.locator("[data-kiosk], [data-entry]").first).to_have_attribute(*first)
+
+    focus_on(page, target)
+    page.keyboard.press("Enter")
+    ready(page, sheet(page, name).locator(body))
+    sheet(page, name).locator("[data-close]").focus()
+    page.keyboard.press("Enter")
+    expect(sheet(page, name)).to_be_hidden()
+    expect(target).to_be_focused()
+
+    old = target.element_handle()
+    page.keyboard.press("Enter")
+    form = ready(page, sheet(page, name).locator(body))
+    form.locator(save).focus()
+    with htmx_post(page, post):
+        page.keyboard.press("Enter")
+    expect(sheet(page, name)).to_be_hidden()
+    # one read: the reply's swap removed the old opener before htmx_post
+    # returned, and nothing puts it back.
+    assert not old.evaluate("e => e.isConnected")
+    expect(target).to_be_focused()
+
+
+def key_held_as_the_add_name_sheet_closes(page, pressed, repeats, save):
+    """In the scene editor's Add kiosk name sheet, `pressed` goes down in
+    the name field and `save(form)` then saves, closing the sheet with the
+    key still down. The focus goes back to Add kiosk name, off any board,
+    and `repeats` auto-repeat keydowns land there, then the keyup; none
+    reopens the sheet, so the opener's GET is sent once in all."""
+    page.goto("/kiosks/scenes/")
+    opener = page.locator('[data-action="add-name"]')
+    htmx_settled(page)
+    page.evaluate(SHEET_LOG)
+    tap(page, opener)
+    form = ready(page, sheet(page, "scenes").locator("[data-add-name-sheet]"))
+    field = form.get_by_label("Kiosk name")
+    expect(field).to_be_focused()
+    field.fill("Hall")
+    with htmx_post(page, "/kiosks/scenes/name/"):
+        page.keyboard.down(pressed)
+        save(form)
+    expect(sheet(page, "scenes")).to_be_hidden()
+    expect(page.locator('#scene-entries [data-entry="Hall"]')).to_have_count(1)
+    expect(opener).to_be_focused()
+    for _ in range(repeats):
+        page.keyboard.down(pressed)
+    page.keyboard.up(pressed)
+    page.wait_for_function("window.sheetLog.some((r) => r.what === 'keyup')")
+    htmx_settled(page)
+    log = page.evaluate("window.sheetLog")
+    landed = [r for r in log if r["what"] in ("keydown", "keyup")]
+    assert [(r["what"], r["key"], r["repeat"], r["inSheet"]) for r in landed][
+        -repeats - 1 :
+    ] == [("keydown", pressed, True, False)] * repeats + [
+        ("keyup", pressed, False, False)
+    ], log
+    # one read: a click on Add kiosk name sends its GET in the click's task.
+    assert [r["path"] for r in log if r.get("verb") == "get"] == [
+        "/kiosks/scenes/name/"
+    ], log
+    expect(sheet(page, "scenes")).to_be_hidden()
+    expect(opener).to_be_focused()
+
+
+def test_an_enter_held_as_a_sheet_saves_opens_nothing(login, event):
+    """#383: Enter goes down in the Add kiosk name sheet's field, and its
+    keydown saves and closes the sheet. Its two auto-repeat keydowns land on
+    Add kiosk name and do not reopen the sheet. Before, each repeat clicked
+    Add kiosk name."""
+    key_held_as_the_add_name_sheet_closes(
+        login("RaceCoordinator"), "Enter", 2, lambda form: None
+    )
+
+
+def test_a_space_held_as_the_mouse_saves_opens_nothing(login, event):
+    """#383: Space is down in the Add kiosk name sheet's field while the
+    mouse clicks Save. Its one auto-repeat keydown and its keyup land on Add
+    kiosk name and do not reopen the sheet. Before, Space's keyup clicked
+    it once a repeat had landed on it, as D131 found on the board."""
+    key_held_as_the_add_name_sheet_closes(
+        login("RaceCoordinator"),
+        " ",
+        1,
+        lambda form: form.locator("[data-submit]").click(),
+    )
+
+
+def test_a_save_that_removes_the_openers_card_focuses_nothing(login, event):
+    """A near miss for #383: in the scene editor, Hall is a kiosk name only
+    the first scene uses. Its card's Page button opens the picker from the
+    keyboard, and No page in this scene, chosen with Enter, takes Hall out
+    of every scene, so the save's reply drops its card. The sheet closes
+    with no copy of the opener to focus: the focus stays on the page's body,
+    and the page reports no script error (the harness's page errors)."""
+    SceneKiosk.objects.create(
+        event=event,
+        scene=scene(event, "Welcome"),
+        kiosk_name="Hall",
+        page="kiosks/welcome.kiosk",
+    )
+    page = login("RaceCoordinator")
+    page.goto("/kiosks/scenes/")
+    hall = page.locator('#scene-entries [data-entry="Hall"]')
+    focus_on(page, hall.locator('[data-action="page"]'))
+    page.keyboard.press("Enter")
+    form = ready(page, sheet(page, "scenes").locator("[data-page-sheet]"))
+    form.locator('[data-page-choice=""]').focus()
+    with htmx_post(page, "/kiosks/scenes/page/"):
+        page.keyboard.press("Enter")
+    expect(sheet(page, "scenes")).to_be_hidden()
+    expect(hall).to_have_count(0)
+    expect(page.locator("body")).to_be_focused()
+
+
+def test_a_save_whose_reply_comes_after_close_focuses_once(login, event):
+    """A near miss for #383: the tv card's Name sheet saves Lobby with
+    Enter, and its POST is held at its route while Close closes the sheet,
+    so the focus goes back to the Name button itself. The reply then closes
+    the sheet again, with no opener left to give the focus to, and swaps
+    the board: D127 gives the focus to the swapped-in Name button, and the
+    page reports no script error (the harness's page errors). The wait for
+    the save's POST to go out is bounded at 10 s, as `HeldPolls.wait_for`
+    bounds a poll's: htmx sends it in the Enter keydown's task, so the slack
+    is 10 s less that task."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = card(page, "tv").locator('[data-action="name"]')
+    held = []
+    page.route(
+        "**/kiosks/name/",
+        lambda route: (
+            held.append(route) if route.request.method == "POST" else route.continue_()
+        ),
+    )
+    focus_on(page, target)
+    page.keyboard.press("Enter")
+    form = ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    field = form.get_by_label("Name for this kiosk")
+    expect(field).to_be_focused()
+    field.fill("Lobby")
+    page.keyboard.press("Enter")
+    page.wait_for_function(
+        "!!document.querySelector('[data-name-sheet] form.htmx-request')",
+        timeout=10_000,
+    )
+    sheet(page, "kiosks").locator("[data-close]").click()
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    expect(target).to_be_focused()
+    # The route's handler runs in Playwright's dispatch, which the calls
+    # above have given a turn since the request went out.
+    assert len(held) == 1
+    old = target.element_handle()
+    with htmx_post(page, "/kiosks/name/"):
+        held[0].continue_()
+    expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
+    # one read: the reply's board swap removed the old button before
+    # htmx_post returned, and nothing puts it back.
+    assert not old.evaluate("e => e.isConnected")
+    expect(target).to_be_focused()
+
+
+def test_a_close_with_no_sheet_open_leaves_a_held_key_alone(login, event):
+    """A near miss for #383: D132 cancels the repeats of a key held as a
+    sheet opens or closes. Escape calls the sheets' close() on every page
+    (base.html), with a sheet open or not. Here no sheet is open: Enter goes
+    down on a button outside the board and any sheet, Escape is pressed, and
+    Enter's two auto-repeat keydowns still click the button, 3 clicks in
+    all."""
+    kiosk(event, "tv")
+    page = open_dashboard(login("RaceCoordinator"))
+    page.evaluate(
+        """() => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.id = 'off-sheet';
+          b.dataset.clicks = '0';
+          b.addEventListener('click', () => {
+            b.dataset.clicks = String(Number(b.dataset.clicks) + 1);
+          });
+          document.querySelector('main').append(b);
+        }"""
+    )
+    counter = page.locator("#off-sheet")
+    counter.focus()
+    page.keyboard.down("Enter")
+    page.keyboard.press("Escape")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    expect(counter).to_have_attribute("data-clicks", "3")
+    expect(sheet(page, "kiosks")).to_be_hidden()
