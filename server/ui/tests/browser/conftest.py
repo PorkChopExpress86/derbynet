@@ -539,15 +539,26 @@ def stop_timers(tab):
             pass
 
 
-def stop_sending(tab, but=None):
-    """Stop every frame of `tab` but the frame `but` sending fetch and
-    XMLHttpRequest requests. The settle passes the main frame, whose stop
-    sends the barrier (`_barrier`)."""
+# Makes every later beacon and navigation but a step through history do
+# nothing, for `close_tab`: sent between its stop and its block, either one
+# can reach the server after the tab closes, and under load the `beacon`
+# case of `test_close_tab_closes_a_tab_that_keeps_sending` and
+# `test_close_tab_closes_a_tab_that_keeps_navigating` then fail (#409).
+STOP_BEACONS_AND_NAVIGATIONS = """() => {
+  navigator.sendBeacon = () => true;
+  navigation.addEventListener('navigate', (event) => event.preventDefault());
+}"""
+
+
+def stop_sending(tab, but=None, script=STOP_SENDING):
+    """Run `script`, STOP_SENDING unless named, in every frame of `tab` but
+    the frame `but`. The settle passes the main frame, whose stop sends the
+    barrier (`_barrier`)."""
     for frame in tab.frames:
         if frame == but:
             continue
         try:
-            frame.evaluate(STOP_SENDING, None)
+            frame.evaluate(script, None)
         except Exception:  # noqa: BLE001, S110 - a detached frame sends nothing
             pass
 
@@ -560,15 +571,16 @@ def close_tab(page, tab):
     Stopping the timers leaves the callbacks that send on no timer: the
     camera's `onicecandidate` and `onnegotiationneeded` post a message
     (camera-signaling.js), and a reply's handler can send again. So
-    STOP_SENDING runs in every frame of the tab, and the settle's block
-    (`block_sending`) then fails every other request the tab makes until
-    it closes. The wait is for the server's replies to the requests sent
-    before (#409:
+    STOP_SENDING and STOP_BEACONS_AND_NAVIGATIONS run in every frame of the
+    tab, and the settle's block (`block_sending`) then fails every other
+    request the tab makes until it closes. The wait is for the server's
+    replies to the requests sent before (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
     `test_close_tab_stops_a_loop_the_block_would_fail`,
     `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
     stop_sending(tab)
+    stop_sending(tab, script=STOP_BEACONS_AND_NAVIGATIONS)
     block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):

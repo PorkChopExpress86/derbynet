@@ -34,7 +34,7 @@ TEARDOWN = (
     " == []&#10;  &#10;  " + REQUEST_FAILED.replace("'", "&apos;") + "&quot;"
 )
 # The traceback's last line at the `page` fixture's teardown assert.
-TEARDOWN_END = "ui/tests/browser/conftest.py:791: AssertionError"
+TEARDOWN_END = "ui/tests/browser/conftest.py:803: AssertionError"
 HARNESS_TRACEBACK = (
     "        yield page\n"
     "        try:\n"
