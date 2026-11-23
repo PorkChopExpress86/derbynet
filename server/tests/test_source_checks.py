@@ -25,7 +25,8 @@ SIGN = re.compile(r"^import ast\b|\.rglob\(", re.M)
 LISTED = re.compile(r"^\s+([\w/]+\.py)(?:::\w+)?\s*\\$", re.M)
 
 # Each module that carries the sign but needs a database (its tests, or the
-# module-wide `django_db` mark, set one up) or walks a folder a test wrote.
+# module-wide `django_db` mark, set one up), walks a folder a test wrote, or
+# parses only the text its own tests write.
 EXEMPT = {
     "legacy_api/tests/test_junk_parameters.py": "django_db; fuzzes handler constants",
     "legacy_api/tests/test_read_only_event.py": "django_db; walks an event's folder",
@@ -33,6 +34,8 @@ EXEMPT = {
     "media/tests/test_photo_races.py": "django_db; walks the photo folders",
     "media/tests/test_photo_routes.py": "django_db; walks the photo folders",
     "racing/engine/tests/test_speed_awards_parity.py": "a golden parity replay",
+    # Its sweep parses the lines it builds, with ast as the oracle (#449).
+    "tests/test_operand_mutants.py": "a tool's tests; reads no source",
     "transfer/tests/test_crash_safety.py": "django_db; walks the data folder",
     "transfer/tests/test_fixtures.py": "django_db; walks the data folder",
     "transfer/tests/test_import_rules.py": "django_db; walks the data folder",

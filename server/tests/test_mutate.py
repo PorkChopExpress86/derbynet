@@ -565,6 +565,7 @@ def test_a_python_mutant_that_does_not_parse_is_refused(project):
     run = mutate(project, "a < b", "a < b)", "test_mod.py::test_runs_lazily")
     assert run.returncode == 2, run.stdout + run.stderr
     assert "the mutant does not parse as Python (line 2" in run.stderr
+    assert "build --old and --new from a file or a heredoc" in run.stderr
     assert "passed" not in run.stdout and "failed" not in run.stdout, "no test runs"
     assert (project / "mod.py").read_text() == MODULE
 
@@ -874,6 +875,36 @@ def test_listed_names_an_error_with_pytests_last_lines_and_exits_2(project):
     assert "\n    ERROR: not found: " in run.stdout
     assert "2 listed: 0 KILLED, 0 SURVIVED, 0 REFUSED, 2 ERROR" in run.stdout
     assert run.returncode == 2
+
+
+def test_listed_refuses_a_mutant_that_does_not_parse_and_names_its_line(project):
+    """#417 retro's listing offered `key=lambda node: node.lineno` for a
+    `max()`, which made `return key=...`: its tests failed at collection,
+    and the row read ERROR with no line named (#449). The listing no
+    longer offers it, so a stand-in listing does."""
+    module = MODULE + "\n\ndef low(a, b):\n    return min(a, b)\n"
+    commit(project, module)
+    patch = (
+        "import dataclasses\n"
+        "listing = mutate._listing()\n"
+        "real = listing.mutants\n"
+        "listing.mutants = lambda diff, root: [\n"
+        "    dataclasses.replace(m, new='key=lambda node: node.lineno')\n"
+        "    for m in real(diff, root)[:1]\n"
+        "]\n"
+    )
+    tool = wrapped(project, patch, "listed", "test_mod.py::test_the_bound")
+    out, err = tool.communicate(timeout=60)
+    assert tool.returncode == 2, out + err
+    row = out.splitlines()[0]
+    assert row.startswith(
+        "REFUSED   mod.py:10  min  min(a, b)  ->  key=lambda node: node.lineno"
+        "  (the mutant does not parse as Python (line 10: "
+    ), out
+    assert "heredoc" not in row, "a listed mutant's text comes from no shell"
+    assert "1 listed: 0 KILLED, 0 SURVIVED, 1 REFUSED, 0 ERROR" in out
+    assert len(out.splitlines()) == 3, f"no pytest output: {out}"
+    assert (project / "mod.py").read_text() == module
 
 
 @pytest.mark.parametrize(

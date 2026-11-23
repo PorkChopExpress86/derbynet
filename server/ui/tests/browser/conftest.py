@@ -633,6 +633,10 @@ def block_sending(page):
     once; no script under `ui/static/ui/` sets an image's `onerror`."""
     page.add_init_script(f"({STOP_SENDING})(null)")
     blocker = page.context.new_cdp_session(page)
+    # Before the first send: Playwright hands the page's events over while
+    # a send waits, so a failure the block causes then must find the page
+    # blocked (#451, test_a_request_the_block_fails_while_it_starts_is_no_page_error).
+    page.blocker = blocker
     blocker.send("Network.enable")
     blocker.send("Network.setBlockedURLs", {"urls": ["*"]})
     blocker.on(
@@ -643,7 +647,6 @@ def block_sending(page):
         ),
     )
     blocker.send("Fetch.enable", {"patterns": [{"resourceType": "Document"}]})
-    page.blocker = blocker
 
 
 def _settle(page) -> list[str]:

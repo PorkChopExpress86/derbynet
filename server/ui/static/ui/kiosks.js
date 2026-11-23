@@ -73,6 +73,9 @@ function holdBoardUnderPress(board, bound) {
   let keyed = false;
   let timer = null;
   let held = null;
+  // Counts the presses, so a release deferred a task ends only the press it
+  // was set for (#455): a newer press in between keeps the hold.
+  let presses = 0;
 
   function apply() {
     if (held === null || pressed || board.querySelector('.htmx-request')) return;
@@ -91,7 +94,13 @@ function holdBoardUnderPress(board, bound) {
     apply();
   }
 
+  function releaseLater() {
+    const press = presses;
+    setTimeout(() => { if (presses === press) release(); });
+  }
+
   function hold(control) {
+    presses += 1;
     pressed = control;
     clearTimeout(timer);
     timer = setTimeout(release, bound());
@@ -124,8 +133,7 @@ function holdBoardUnderPress(board, bound) {
     if (!keyed) return;
     keyed = false;
     if (pointing) return;
-    const control = pressed;
-    setTimeout(() => { if (pressed === control) release(); });
+    releaseLater();
   }, true);
   document.addEventListener('pointerup', () => { down = false; }, true);
   // Board controls hold text only (board.html), so a pointerout while the
@@ -137,7 +145,7 @@ function holdBoardUnderPress(board, bound) {
     if (!keyed) release();
   }, true);
   document.addEventListener('click', (e) => {
-    if (pressed && pressed.contains(e.target)) setTimeout(release, 0);
+    if (pressed && pressed.contains(e.target)) releaseLater();
   });
   document.addEventListener('htmx:afterRequest', (e) => {
     if (e.detail.xhr.status === 0) held = null;

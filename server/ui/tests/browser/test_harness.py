@@ -495,6 +495,40 @@ def test_a_blocked_request_before_the_settle_is_a_page_error(page, page_errors, 
     page_errors.errors.clear()
 
 
+def test_a_request_the_block_fails_while_it_starts_is_no_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """Playwright hands the page's events over while a CDP send waits for
+    its reply, so a request the URL block fails can reach the page errors
+    before `block_sending` returns: a thumbnail's kiosk.css and logo, on a
+    board swapped in as the settle ran (#451). Here an image is loaded, and
+    its failure waited for, as soon as the URL block's send returns."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    new_session = page.context.new_cdp_session
+    failures = []
+
+    def session_that_fails_an_image(target):
+        session = new_session(target)
+        send = session.send
+
+        def send_then_fail_an_image(method, params=None):
+            reply = send(method, params)
+            if method == "Network.setBlockedURLs":
+                with page.expect_event("requestfailed") as failed:
+                    page.evaluate("() => { new Image().src = '/held-request?early'; }")
+                failures.append(failed.value.failure)
+            return reply
+
+        session.send = send_then_fail_an_image
+        return session
+
+    monkeypatch.setattr(page.context, "new_cdp_session", session_that_fails_an_image)
+    assert _settle(page) == []
+    assert failures == [BLOCKED[0]]
+    assert page_errors.errors == []
+
+
 def test_the_block_outlasts_the_settle(page, event):
     """The block ends with its CDP session (#409, PR #424), so the session
     stays open after the settle returns: an image the page asks for later
