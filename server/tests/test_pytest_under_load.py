@@ -196,49 +196,60 @@ def wait_until(condition, what, seconds=60):
         time.sleep(0.1)
 
 
-# The slowest step a load run takes on the way to its rerun or its end is
-# a pytest start, the first run's or the rerun's, in seconds, as #463's
-# reproduction timed it under load (that PR's body has the output). A wait
-# over several steps gives each STEP_S from the last step seen: a single
-# bound over the first run's start and the rerun's failed every rerun test
-# there.
-SLOWEST_PYTEST_START_S = 48
-STEP_S = 5 * SLOWEST_PYTEST_START_S
+# The slowest load run of a rerun test #463 records, in seconds: on #455's
+# push, at a load average of about 24, load_run_of's single bound over every
+# step of the run, its two pytest starts among them, ran out at 120 s. One
+# step may take all of it, so a wait over several steps gives each step
+# STEP_S from the step before, twice that (#463).
+SLOWEST_RUN_S = 120
+STEP_S = 2 * SLOWEST_RUN_S
 
 
 def load_run_steps(out, run_dir):
     """The steps a load run with its output in `out` and its results in
     `run_dir` prints or writes on the way to its end, as (step, check)."""
     return (
-        ("its `Under load` line", lambda: "Under load (" in out.read_text()),
-        ("its first run's junit file", (run_dir / "junit.xml").exists),
-        ("its `Rerunning` line", lambda: "Rerunning the failed" in out.read_text()),
-        ("its rerun's junit file", (run_dir / "rerun-junit.xml").exists),
+        ("the `Under load` line", lambda: "Under load (" in out.read_text()),
+        ("the first run's junit file", (run_dir / "junit.xml").exists),
+        ("the `Rerunning` line", lambda: "Rerunning the failed" in out.read_text()),
+        ("the rerun's junit file", (run_dir / "rerun-junit.xml").exists),
     )
 
 
+def assert_reran(tmp_path):
+    """load_run_of's run in `tmp_path` printed and wrote every step of a
+    rerun; the message names the first it ended without (#463)."""
+    out = tmp_path / "out"
+    for step, check in load_run_steps(out, tmp_path / "run"):
+        assert check(), (
+            f"the script ended without {step}; it printed:\n{out.read_text()}"
+        )
+
+
 def wait_through(run, out, what, done, steps=()):
-    """Wait for `done()` while the script `run` lives, its output in `out`,
-    giving each of `steps` it passes on the way STEP_S from the last step
-    seen. Fails at once when the script exits first, and names `what` it
-    waited for and the last step seen (#463)."""
-    seen = "its start"
+    """Wait for `done()`, the `what`, while the script `run` lives, its output
+    in `out`. `steps` are what the script prints or writes on the way, in
+    order, as (step, check): each gets STEP_S from the one before it, and
+    the `what` gets STEP_S from the last. A failed wait names the step that
+    did not come and the last one that did: at once when the script exits
+    first, and STEP_S after that last step otherwise (#463)."""
+    seen = "the script's start"
     pending = list(steps)
     deadline = time.monotonic() + STEP_S
     while not done():
-        for step, check in [s for s in pending if s[1]()]:
-            pending.remove((step, check))
-            seen = step
+        while pending and pending[0][1]():
+            seen = pending.pop(0)[0]
             deadline = time.monotonic() + STEP_S
+        missing = pending[0][0] if pending else f"the {what}"
         if run.poll() is not None and not done():
             raise AssertionError(
-                f"the script exited {run.returncode} before the {what}, after"
+                f"the script exited {run.returncode} before {missing}, after"
                 f" {seen}; it printed:\n{out.read_text()}"
             )
         if time.monotonic() > deadline:
             raise AssertionError(
-                f"no {what} within {STEP_S} s of {seen}; the script printed:\n"
-                f"{out.read_text()}"
+                f"{missing} did not come within {STEP_S} s of {seen}; the script"
+                f" printed:\n{out.read_text()}"
             )
         time.sleep(0.1)
 
@@ -305,7 +316,7 @@ def test_a_wait_gives_each_step_its_own_bound(tmp_path, monkeypatch):
     assert clock.now >= 4 * gap > 3 * STEP_S
 
 
-def test_a_step_past_its_bound_names_the_last_step_seen(tmp_path, monkeypatch):
+def test_a_step_past_its_bound_names_it_and_the_step_before(tmp_path, monkeypatch):
     clock = fake_clock(monkeypatch)
     out = tmp_path / "out"
     out.write_text("Under load\n")
@@ -313,8 +324,8 @@ def test_a_step_past_its_bound_names_the_last_step_seen(tmp_path, monkeypatch):
     with pytest.raises(AssertionError) as raised:
         wait_through(FakeRun(), out, "rerun", lambda: False, steps)
     assert str(raised.value) == (
-        f"no rerun within {STEP_S} s of its first step; the script printed:\n"
-        "Under load\n"
+        f"its second step did not come within {STEP_S} s of its first step;"
+        " the script printed:\nUnder load\n"
     )
     assert 1 + STEP_S < clock.now < 2 + STEP_S
 
@@ -323,12 +334,12 @@ def test_a_script_that_exits_first_is_named_at_once(tmp_path, monkeypatch):
     clock = fake_clock(monkeypatch)
     out = tmp_path / "out"
     out.write_text("pytest exited 1\n")
-    steps = [("its first step", at(clock, 1))]
+    steps = [("its first step", at(clock, 1)), ("its second step", lambda: False)]
     with pytest.raises(AssertionError) as raised:
         wait_through(FakeRun(polls=20), out, "rerun", lambda: False, steps)
     assert str(raised.value) == (
-        "the script exited 1 before the rerun, after its first step; it printed:\n"
-        "pytest exited 1\n"
+        "the script exited 1 before its second step, after its first step;"
+        " it printed:\npytest exited 1\n"
     )
     assert clock.now < 3
 
@@ -2001,6 +2012,7 @@ def test_a_network_change_alone_reruns_and_a_clean_rerun_passes_the_run(tmp_path
     first run's log, junit file and status stay as they were (#373)."""
     code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR))
     assert code == 0, out
+    assert_reran(tmp_path)
     run_dir = tmp_path / "run"
     assert "1 failed, 1 passed" in (run_dir / "pytest.log").read_text()
     assert 'failures="1"' in (run_dir / "junit.xml").read_text()
@@ -2013,14 +2025,6 @@ def test_a_network_change_alone_reruns_and_a_clean_rerun_passes_the_run(tmp_path
     ) in out
     assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
     assert out.rstrip().endswith("the script exits 0 (D122)")
-
-
-def test_a_run_that_reruns_passes_every_step_its_waits_watch(tmp_path):
-    """A step whose check never matches what the script prints or writes
-    would leave the wait's bound running from the step before (#463)."""
-    load_run_of(tmp_path, once(PAGE_LOAD_ERROR))
-    steps = load_run_steps(tmp_path / "out", tmp_path / "run")
-    assert [step for step, check in steps if not check()] == []
 
 
 def test_a_flake_ticket_s_run_keeps_pytest_s_status_after_a_clean_rerun(tmp_path):
@@ -2080,6 +2084,7 @@ def test_a_clean_rerun_with_no_veth_count_keeps_pytest_s_status(
     """A veth count of 0, or one not read, keeps pytest's status; the rerun
     still runs and is reported (#373)."""
     code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR), journalctl=journalctl)
+    assert_reran(tmp_path)
     assert code == 1, out
     assert re.search(r"^rerun exited 0; log: ", out, re.M), out
     assert (
@@ -2191,7 +2196,7 @@ def start_held_rerun(tmp_path):
         tmp_path / "held.out",
         "start of the rerun's stub",
         (folder / "rerunning").exists,
-        load_run_steps(tmp_path / "held.out", tmp_path / "held-run"),
+        load_run_steps(tmp_path / "held.out", tmp_path / "held-run")[:3],
     )
     return run, lock
 
@@ -2226,9 +2231,9 @@ def test_a_signal_during_the_rerun_stops_it_and_frees_the_lock(tmp_path, signals
         rerun = int((tmp_path / "held" / "rerunning").read_text())
         for name in signals:
             os.kill(run.pid, getattr(signal, f"SIG{name}"))
-        assert wait_ended(run, tmp_path / "held.out") == 143
+        assert run.wait(timeout=30) == 143
         assert free(lock)
-        wait_until(lambda: not alive(rerun), "the rerun's pytest gone", STEP_S)
+        wait_until(lambda: not alive(rerun), "the rerun's pytest gone", 10)
     finally:
         finish(tmp_path, run)
 
@@ -2245,7 +2250,7 @@ def test_a_sigkill_during_the_rerun_frees_the_lock_for_the_next_run(tmp_path):
         assert alive(rerun)
         second = start(tmp_path, "second", lock, go=True, loops=0)
         out = tmp_path / "second.out"
-        steps = load_run_steps(out, tmp_path / "second-run")
+        steps = load_run_steps(out, tmp_path / "second-run")[:2]
         assert wait_ended(second, out, steps) == 0
         assert "Waiting" not in out.read_text()
     finally:
