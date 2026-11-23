@@ -136,7 +136,9 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertRegex(done.stdout, r"closes another issue, \w{8} '#415 retro: the matcher', "
                                       r'line 3: Closes #399')
-        self.assertIn('backticks', done.stderr)
+        self.assertIn('reword the commit', done.stderr)
+        self.assertNotIn('backticks', done.stderr,
+                         "GitHub's reading of a quoted keyword in a commit message is unverified")
         self.assertIn('--closes N', done.stderr)
 
     def test_the_same_message_in_backticks_passes(self):
@@ -324,12 +326,20 @@ class Sweep(unittest.TestCase):
                               env={**os.environ, 'GH': '/bin/false'})
         self.assertEqual(done.returncode, 2, done.stderr)
 
+    def no_gh(self) -> dict:
+        """A fake gh with no PR: a guard that let the run through would get
+        an answer, never the real gh."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        return {**os.environ, **fake_gh(tmp, {'list': [], 'pr': {}, 'events': {}})}
+
     def test_sweep_takes_a_positive_whole_number(self):
         """`--sweep 0` would read every PR, as `[-0:]` slices all of them."""
         for bad in ('0', '-1', '1.5', 'x'):
             with self.subTest(bad=bad):
                 done = subprocess.run([sys.executable, '-I', str(COMMIT_CLOSES),
-                                       f'--sweep={bad}'], capture_output=True, text=True)
+                                       f'--sweep={bad}'], capture_output=True, text=True,
+                                      env=self.no_gh())
                 self.assertEqual(done.returncode, 2, done.stderr)
                 self.assertIn('takes a whole number of PRs', done.stderr)
 
@@ -337,7 +347,8 @@ class Sweep(unittest.TestCase):
         for other in (('--closes', '5'), ('--base', 'master'), ('--head', 'HEAD')):
             with self.subTest(other=other):
                 done = subprocess.run([sys.executable, '-I', str(COMMIT_CLOSES), '--sweep', '1',
-                                       *other], capture_output=True, text=True)
+                                       *other], capture_output=True, text=True,
+                                      env=self.no_gh())
                 self.assertEqual(done.returncode, 2, done.stderr)
                 self.assertIn('--sweep takes no other option', done.stderr)
 

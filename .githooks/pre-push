@@ -93,10 +93,12 @@ EOF
 changed=
 pushed=
 shas=()
-while read -r _ local_sha _ remote_sha; do
+refs=()
+while read -r _ local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
   pushed=1
   shas+=("$local_sha")
+  refs+=("$remote_ref")
   if [ "$remote_sha" = "$ZERO" ]; then
     base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
               || git merge-base "$local_sha" master 2>/dev/null || true)"
@@ -132,25 +134,37 @@ done
 # refused here, before git sends the commit and before the slow checks, where
 # pr-merge would run only once the commit is on GitHub; `pr-evidence --check`
 # reads the PR body only (#439, #415 retro). It reads `git log`, about a second.
-# DERBYNET_PUSH_CLOSES="64 65" names the issues the push closes on purpose.
-# With no origin/master, every commit no remote-tracking branch has is read.
+# DERBYNET_PUSH_CLOSES="64 65" names the issues the push closes on purpose,
+# and a ref pushed as issue-<n>-<slug> may close its ticket, n, as the PR
+# body may. Neither origin/master nor local master is read, unless the push
+# is to master itself: a stale origin/master behind local master read
+# master's own `fixes #64` and `Closes #316` again (#439 review). With no
+# origin/master, every commit no remote-tracking branch has is read.
 # The tool is the one beside this hook, not the pushed tree's: core.hooksPath
 # names the main clone's .githooks, so a push from a branch cut before the
 # tool existed runs this hook against a tree that lacks it. A missing tool
 # fails the push.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-base_args=()
-if git rev-parse -q --verify origin/master >/dev/null; then
-  base_args=(--base origin/master)
-fi
 closes_args=()
 for issue in ${DERBYNET_PUSH_CLOSES:-}; do
   closes_args+=(--closes "$issue")
 done
-for sha in ${shas[@]+"${shas[@]}"}; do
-  echo "pre-push: plan/bin/commit-closes $sha" >&2
-  python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${base_args[@]+"${base_args[@]}"} \
-    ${closes_args[@]+"${closes_args[@]}"} --head "$sha"
+for i in ${shas[@]+"${!shas[@]}"}; do
+  ref="${refs[$i]}"
+  args=()
+  if git rev-parse -q --verify origin/master >/dev/null; then
+    args=(--base origin/master)
+    if [ "$ref" != refs/heads/master ] \
+        && git rev-parse -q --verify refs/heads/master >/dev/null; then
+      args+=(--base refs/heads/master)
+    fi
+  fi
+  if [[ $ref =~ ^refs/heads/issue-([1-9][0-9]*)- ]]; then
+    args+=(--closes "${BASH_REMATCH[1]}")
+  fi
+  echo "pre-push: plan/bin/commit-closes ${shas[$i]} ($ref)" >&2
+  python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${args[@]+"${args[@]}"} \
+    ${closes_args[@]+"${closes_args[@]}"} --head "${shas[$i]}"
 done
 # The checks read the working tree, so an edit while they run tests a tree
 # that is no commit: #373's implementer edited network_changed.py during the

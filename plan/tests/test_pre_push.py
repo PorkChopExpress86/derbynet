@@ -47,7 +47,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          local: str = 'head', git_dir: bool = False, message: str = 'change',
          environ: dict | None = None, base_message: str = 'base',
          origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
-         checked_out: str = 'head') -> subprocess.CompletedProcess:
+         checked_out: str = 'head', ahead: str | None = None,
+         ref: str = 'refs/heads/b') -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -61,7 +62,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
     core.hooksPath does, while the pushed tree holds none of the tools,
     `pushed_before` makes the pushed commit the head of a remote-tracking
     branch other than origin/master, and `checked_out` 'base' leaves the base
-    commit checked out while the head is pushed."""
+    commit checked out while the head is pushed. The change is committed on
+    branch b, cut from master; `ahead` is the message of a commit on local
+    master atop the base, as a pull leaves it when origin/master is stale,
+    which b is cut from. `ref` is the ref pushed to."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -107,8 +111,11 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         base = git('rev-parse', 'HEAD')
         if origin:
             git('update-ref', 'refs/remotes/origin/master', base)
-        if remote == 'orphan':
-            git('checkout', '-q', '--orphan', 'b')
+        if ahead is not None:
+            (repo / 'ahead.txt').write_text('ahead\n')
+            git('add', '.')
+            git('commit', '-q', '-m', ahead)
+        git('checkout', '-q', *(('--orphan',) if remote == 'orphan' else ('-b',)), 'b')
         for name in (changed,) if isinstance(changed, str) else changed:
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -131,7 +138,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         hook_env = {**env, 'GIT_DIR': str(repo / '.git')} if git_dir else env
         result = subprocess.run(
             hook, cwd=repo, env=hook_env,
-            input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
+            input=f'refs/heads/b {head if local == "head" else "0" * 40} {ref} '
                   f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
@@ -462,6 +469,42 @@ class CommitClosingKeyword(unittest.TestCase):
         closed upstream's issues long ago."""
         result = push('notes/x.md', PASSING, base_message='Fixes #1', origin=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_commit_on_local_master_is_not_read_when_origin_master_is_stale(self):
+        """A pull that leaves origin/master behind local master: master's own
+        `Closes #316.` (4f7e0dff on the fork) came with the branch, and the
+        push of the branch passes (#439 review)."""
+        result = push('notes/x.md', PASSING, origin=True, ahead='Upstream\n\nCloses #316.')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_keyword_on_the_branch_atop_a_stale_origin_master_is_refused(self):
+        result = push('notes/x.md', PASSING, origin=True, ahead='Clean', message='Fixes #2')
+        self.refused(result, 'Fixes #2')
+
+    def test_a_push_to_master_reads_local_master(self):
+        """Local master is the commit pushed, so it is no base."""
+        result = push('notes/x.md', PASSING, origin=True, ahead='Upstream\n\nCloses #316.',
+                      ref='refs/heads/master')
+        self.refused(result, 'Closes #316')
+
+    def test_the_ticket_a_branch_names_may_be_closed(self):
+        """pr-evidence --check lets the ticket's own keyword through in a PR
+        body; the hook takes the ticket from `issue-<n>-` in the pushed ref."""
+        result = push('notes/x.md', PASSING, origin=True, message='Closes #439.',
+                      ref='refs/heads/issue-439-commit-closing-keyword')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_ref_that_names_no_ticket_closes_none(self):
+        for ref, words in (('refs/heads/issue-439', 'Closes #439'),
+                           ('refs/heads/issue-0439-x', 'Closes #439'),
+                           ('refs/heads/b', 'Closes #439'),
+                           ('refs/heads/x-issue-439-y', 'Closes #439'),
+                           ('refs/heads/issue-4390-x', 'Closes #439'),
+                           ('refs/heads/issue-439-x', 'Closes owner/repo#439'),
+                           ('refs/heads/issue-439-x', 'Closes #43')):
+            with self.subTest(ref=ref, words=words):
+                result = push('notes/x.md', PASSING, origin=True, message=words, ref=ref)
+                self.refused(result, words)
 
     def test_a_commit_no_remote_has_is_read_when_there_is_no_origin_master(self):
         self.refused(push('notes/x.md', PASSING, base_message='Fixes #1'), 'Fixes #1')

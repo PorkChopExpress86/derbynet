@@ -25,8 +25,9 @@ Exits 1 on a refusal, naming each commit and line, and 2 when git can't read a
 revision or `--sweep`'s gh fails. `--closes` takes N or #N, as it does for pr-evidence.
 
 .githooks/pre-push runs it on each ref pushed, before any other check and
-before git sends the commits: `DERBYNET_PUSH_CLOSES="64 65"` names the
-issues the push closes on purpose. The hook, not `pr-merge`, is where it runs
+before git sends the commits, with origin/master and local master as bases:
+`DERBYNET_PUSH_CLOSES="64 65"` names the issues the push closes on purpose,
+and a ref pushed as issue-<n>-<slug> may close its ticket. The hook, not `pr-merge`, is where it runs
 because `pr-merge` runs after the commits are on GitHub, where only a force
 push can mend one. `git push --no-verify`, a clone whose `core.hooksPath` is
 unset and an edit made on github.com skip the hook.
@@ -59,8 +60,7 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIX = ("reword the commit before pushing it (`git commit --amend`, or `git rebase -i` for "
        "an older one), or name an issue the push closes on purpose with --closes N or "
-       "DERBYNET_PUSH_CLOSES=\"N ...\". A keyword in backticks passes, though GitHub's "
-       "reading of one in a commit message is unverified (#439)")
+       "DERBYNET_PUSH_CLOSES=\"N ...\" (#439)")
 
 
 def load_matcher():
