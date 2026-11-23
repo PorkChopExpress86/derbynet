@@ -172,6 +172,28 @@ class PrEvidence(IssueStandIn, unittest.TestCase):
                 done = self.check(body)
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
+    def test_a_line_whose_result_is_a_run_not_ended_is_refused(self):
+        """#437's body read "Results: pending. The hand-off chain runs
+        detached", and #457's "- Hand-off: queued by ..." (#437 retro)."""
+        for line in ('Results: pending. The hand-off chain runs detached, and the lead reads '
+                     'its exit codes.',
+                     '- Hand-off: queued by `server/tools/detach.sh` at 394028ea',
+                     '- `test_harness.py` under load: STILL RUNNING',
+                     '**Load run:** in progress', '* Postgres: not yet run', 'Results: TBD'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'a run not ended as a result, line 10: {line.strip()}: fill in '
+                              'its result, or move it under ## Still open', done.stdout)
+        for line in ('Writers, red on master: running them all, then the tool, loses R3.',
+                     'PR 2 of 2 (D91). It adds the guides: running-a-race, timer-operation.',
+                     'Results: 25 of 25 passed; none pending.', '`Results: pending`',
+                     '```\nResults: pending\n```', '    Results: pending',
+                     '<!-- Results: pending -->'):
+            with self.subTest(line=line):
+                done = self.check(evidence(KEYS) + '\n' + line + '\n')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_key_under_another_section_than_still_open_is_no_evidence(self):
         body = evidence(KEYS[1:]) + '\n## Left for later\n\n- ' + KEYS[0] + '\n'
         done = self.check(body)
