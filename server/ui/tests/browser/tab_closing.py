@@ -9,14 +9,11 @@ from contextlib import contextmanager
 
 from django.core.signals import request_finished, request_started
 
-# The latest that a request a closed tab had sent reached the live server
-# after `tab.close()` returned, under load (PR #424's late-arrival probe).
-LATEST_ARRIVAL_MS = 70
-# What `after_close` waits past that. The wait is a window that sees a late
-# request, not a deadline a passing test must meet: a longer wait sees
-# more, never less, and costs its length in every test that reads it.
-AFTER_CLOSE_SLACK_MS = 230
-AFTER_CLOSE_MS = LATEST_ARRIVAL_MS + AFTER_CLOSE_SLACK_MS
+# How long `after_close` watches for a request that reaches the server
+# late. It is a window that sees a late request, not a deadline a passing
+# test must meet: a longer wait sees more, never less, and costs its length
+# in every test that reads it.
+AFTER_CLOSE_MS = 300
 
 
 class AtTheServer:
@@ -46,9 +43,7 @@ class AtTheServer:
 
     def after_close(self, page) -> tuple[int, int]:
         """The requests in hand now, and those started in the next
-        `AFTER_CLOSE_MS = LATEST_ARRIVAL_MS + AFTER_CLOSE_SLACK_MS`: a request
-        a closed tab sent reaches the server within the first term, under
-        load, and the second is the margin past the latest seen."""
+        `AFTER_CLOSE_MS`."""
         in_hand, started = self.started - self.finished, self.started
         page.wait_for_timeout(AFTER_CLOSE_MS)
         # One read after the wait: the point is that nothing more arrived.
