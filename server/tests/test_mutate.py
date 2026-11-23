@@ -109,6 +109,50 @@ def test_a_killed_mutant_exits_0_and_the_file_is_restored(project):
     assert (project / "mod.py").read_text() == MODULE
 
 
+def test_the_verdict_comes_before_pytest_s_output_too(project):
+    """#463's round kept `grep ... | head -6` of the tool's output, which held
+    pytest's `E` lines and cut the verdict after them (#463 retro)."""
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    lines = run.stdout.splitlines()
+    assert lines[0] == lines[-1], run.stdout
+    assert lines[0].startswith("KILLED  mod.py")
+
+
+@pytest.mark.parametrize(
+    "order, spared",
+    [
+        (
+            ["test_other", "test_the_bound"],
+            "1 passed with the mutant in: test_mod.py::test_other",
+        ),
+        (["test_the_bound", "test_other"], "1 not run after the first failure (-x)"),
+    ],
+)
+def test_a_kill_names_the_tests_that_did_not_kill_it(project, order, spared):
+    """#463's `true` mutant read KILLED on a run of `..F`, and the
+    implementer and the reviewer nearly took each test it named for a kill
+    (#463 retro)."""
+    ids = [f"test_mod.py::{name}" for name in order]
+    run = mutate(project, "a < b", "a <= b", *ids)
+    assert run.returncode == 0, run.stdout + run.stderr
+    last = run.stdout.splitlines()[-1]
+    assert last == f"KILLED  mod.py: 'a < b' -> 'a <= b'  ({spared})"
+
+
+def test_a_kill_under_q_names_no_unrun_count(project):
+    """`-q` drops pytest's `collected N items` line, so no count of the tests
+    `-x` left unrun can be read."""
+    ids = ["test_mod.py::test_the_bound", "test_mod.py::test_other"]
+    run = mutate(project, "a < b", "a <= b", "-q", *ids)
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.stdout.splitlines()[-1] == "KILLED  mod.py: 'a < b' -> 'a <= b'"
+
+
+def test_a_kill_by_its_only_test_names_no_other(project):
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    assert run.stdout.splitlines()[-1] == "KILLED  mod.py: 'a < b' -> 'a <= b'"
+
+
 HELPER_TESTS = """\
 from mod import bound
 
@@ -1602,3 +1646,39 @@ def test_after_a_sigkill_the_guard_copy_is_left_and_the_next_run_goes_on(
     assert run.returncode == 0, run.stdout + run.stderr
     assert run.stdout.splitlines()[-1].startswith("KILLED  mod.py")
     assert list(folder.iterdir()) == left
+
+
+STRAY_TEST = """\
+import subprocess
+from pathlib import Path
+
+from mod import twice
+
+
+def test_leaves_a_sleep():
+    sleep = subprocess.Popen(["sleep", "1000"], start_new_session=True)
+    Path("stray").write_text(str(sleep.pid))
+    assert twice() == 2
+"""
+
+
+def test_a_process_the_run_left_running_is_named_and_killed(project):
+    """#463's hang mutants left load scripts asleep, each in a session of
+    its own, seen only with `pgrep -fa 'sleep 100000'` (#463 retro)."""
+    (project / "test_stray.py").write_text(STRAY_TEST)
+    subprocess.run([*GIT, "add", "."], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "stray"], cwd=project, check=True)
+    run = mutate(project, "1 + 1", "1 + 2", "test_stray.py::test_leaves_a_sleep")
+    pid = int((project / "stray").read_text())
+    last = run.stdout.splitlines()[-1]
+    assert last.startswith("KILLED  mod.py"), run.stdout + run.stderr
+    assert last.endswith(f"(left 1 processes running, now killed: {pid} sleep)")
+    assert (
+        not Path(f"/proc/{pid}").exists()
+        or "Z" in (Path(f"/proc/{pid}/stat").read_text().split()[2])
+    )
+
+
+def test_a_run_that_leaves_nothing_names_nothing(project):
+    run = mutate(project, "a < b", "a <= b", "test_mod.py::test_the_bound")
+    assert "left" not in run.stdout.splitlines()[-1]
