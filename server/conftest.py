@@ -88,9 +88,23 @@ def pytest_terminal_summary(terminalreporter, config):
 
 
 def pytest_configure():
+    """SIGINT and SIGQUIT get a terminal run's handling, though pytest may
+    have started ignoring them, as a `&` job of a non-interactive bash does
+    under pytest-under-load.sh and hold-load-lock.sh: the commands a test
+    starts inherit an ignore, and bash cannot trap one (#311, #407;
+    tests/test_signals_at_default.py)."""
+    import signal
+
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+
     from django.conf import settings
 
     settings.LEGACY_SESSION_WRITES_RAISE = True
+    # A browser test's re-seed gives the roles new salts, so its login and
+    # its first page hashed again with PBKDF2, slowly enough under load to
+    # time the login out (#430, accounts/tests/test_login_cost.py).
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 
 @pytest.fixture(autouse=True)

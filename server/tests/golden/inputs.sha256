@@ -1,5 +1,5 @@
-3a3b3b61e6fe69da1e8cff6a1da5818dd95d10ca1c5dbda3165a4b131573f33b  server/tests/golden/capture/capture-http.sh
-7a3006a6b1fa93f5c4b0706f7b3b7dc4fcea31df701593a737ee3a84b3233310  server/tests/golden/capture/import-page.cjs
+b7de4d93187c245b7e91eba835bf6affb220fdedba3ca57759a45a87a9b4f6df  server/tests/golden/capture/capture-http.sh
+77ff8ae68513fd1dd80da6cba2770b77709872351e00bb56ca603b456ba33297  server/tests/golden/capture/import-page.cjs
 2e361ad008d5122d8d58e731f9ada17d38188634778278036d2788953e78a4b6  server/tests/golden/capture/normalize.mjs
 dd840e3915aa115c67b0bafda5e0be6ceee1ed61d537e830006467c184f66d9f  server/tests/golden/capture/recorder.mjs
 fef3a20b72ee7b9ebd579b498564b767386d5b8ed99e9b71da43827c2f458961  server/tests/golden/capture/scenarios/00-setup.sh
@@ -13,9 +13,9 @@ c1fcafd23ff32eeb08bf7e69a4a4af8b6e63a9010e1e98488475ddd5f3b0f6d2  server/tests/g
 dfc661381104edd8cce15b911198ccc39da31f37365ff71ea8bca0cf449836c4  server/tests/golden/capture/scenarios/08-suite-scripts.sh
 8e5b87ded146fa730be9bf222bc873142b8079add8db984c6877a9ead7ed3f21  server/tests/golden/capture/scenarios/09-replay.sh
 4c3d8c381650d74782ba3436499f64ed2ea223c8b587669cdaa27a41eb1a023f  server/tests/golden/capture/scenarios/10-kiosks.sh
-6b54e91105bc6b6550635f59686dfb83cf379d949e5b1668425e655978689be0  server/tests/golden/capture/scenarios/11-reschedule-quirks.sh
+95e621a63e7ce5e100f1cf021b443090ee080b99052f01e261ab21ccfe8e137d  server/tests/golden/capture/scenarios/11-reschedule-quirks.sh
 de198e0a5b4dda095564ba951a0cecf06974d3712d119af35a06a4b16a2f9a42  server/tests/golden/capture/scenarios/12-standings-quirks.sh
-09368d410e245006564c63346f8adfe0254df71e08e163378b94a9c561865d58  server/tests/golden/capture/scenarios/13-heat-state.sh
+da7e638a3f7e950a279bee232faf60777fa2ed7c80ff8d4f7c25a53a5e18c781  server/tests/golden/capture/scenarios/13-heat-state.sh
 69c8d16f23dcbcbc9b5f303ab486c9fdb23f2ad2c94be1436daa76064ab99109  server/tests/golden/capture/scenarios/14-race-day-6-lanes.sh
 36793dd091c0db6e87c8f9925ea26ef2230bacda6d3567a77c2f7416a0f3e138  server/tests/golden/capture/scenarios/15-racers.sh
 81f4c2a3990f73c5cc10b6d16fe6ed0fdc26359e6c2b90509196d125340107fc  server/tests/golden/capture/scenarios/16-poll-results.sh

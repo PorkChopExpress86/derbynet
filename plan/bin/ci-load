@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""Plans and sums a CI load run (.github/workflows/ci-load.yml, #415): a
+head's repeats under load, split across GitHub's runners so they run at once
+rather than one after another under the laptop's load lock.
+
+Usage: plan/bin/ci-load inputs SHA LOOPS_PER_CPU WORKERS
+       plan/bin/ci-load plan [--per-shard N] [--flake-ticket] [--count N] [--workers N] [--script PATH] < AFFECTED_TESTS_OUTPUT
+       plan/bin/ci-load font FONT FAMILY
+       plan/bin/ci-load sample LOG [--every SECONDS]
+       plan/bin/ci-load summary PLAN.json SHARDS_DIR SHA
+
+`inputs` checks the workflow's inputs before the head is checked out: SHA a
+full 40-character SHA, LOOPS_PER_CPU and WORKERS empty or a whole number from
+1 to 99. It prints them as GITHUB_OUTPUT lines, LOOPS_PER_CPU 2 when empty,
+or a `::error::` line and exits 1.
+
+`plan` reads what `plan/bin/affected-tests` printed for the head and writes
+the plan as JSON: each load command, the shards it splits into, and each line
+it skipped. A load command is a line whose words are an optional
+`DERBYNET_BROWSER_FONT="..."` and then `tools/pytest-under-load.sh`; its
+`--count N` splits into shards of at most `--per-shard` (default 5), the
+counts summing to N, each shard keeping the command's other arguments and
+its font. Any other line that runs `tools/pytest-under-load.sh` or
+`tools/hold-load-lock.sh`, such as D133's DejaVu Sans run once with no load,
+is no load command: the plan lists it as skipped, with the reason.
+`--flake-ticket` adds the script's `--flake-ticket` (D122) to each shard.
+`--count N` replaces each command's count, and `--workers N` the N after
+each `-n`, for a trial run of the workflow: its run is named a trial, which
+pr-evidence does not accept. `--script PATH` names the head's
+pytest-under-load.sh: a script from before D122 (2026-11-16) has no
+`--flake-ticket`, and no rerun for it to turn off, so `plan --flake-ticket`
+refuses it, exits 1 and says to merge master into the branch (#421). A plan
+of more than 256 shards, GitHub's matrix limit, is refused.
+
+`font` checks a shard's font before its run: a command that names no FONT
+(empty) must find FAMILY, what `fc-match sans-serif` gives, to be Noto Sans,
+the laptop's `system-ui` font; it prints a `::error::` line and exits 1
+otherwise. A named font is the browser conftest's to check.
+
+`sample` appends `HH:MM:SS` (UTC) and /proc/loadavg to LOG every 10 s
+until a SIGTERM, which ends it with status 0; it starts no child, so nothing
+outlives it.
+
+`summary` reads each shard's folder under SHARDS_DIR (`shard-<command>-<n>`,
+holding `status`, the script's exit code, and `junit.xml`) and prints the
+run's summary as Markdown: the head SHA, each command, its count and its
+shards' results. The verdict of a shard is the script's exit code, since
+D122 can pass a run whose junit holds failures; junit gives the counts. It
+exits 1 when any shard failed or left no status, or when no load command ran.
+"""
+
+import argparse
+import json
+import re
+import shlex
+import signal
+import sys
+import time
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+SCRIPT = 'tools/pytest-under-load.sh'
+HOLDER = 'tools/hold-load-lock.sh'
+FONT = re.compile(r'DERBYNET_BROWSER_FONT=(.*)')
+SHA = re.compile(r'[0-9a-f]{40}')
+SMALL = re.compile(r'[1-9][0-9]?')
+MAX_SHARDS = 256
+# The case pytest-under-load.sh's option parser gained with D122.
+FLAKE_CASE = '--flake-ticket)'
+
+
+def split_count(total, per_shard):
+    """Counts of at most per_shard that sum to total, as even as can be."""
+    shards = -(-total // per_shard)
+    base, extra = divmod(total, shards)
+    return [base + 1 if i < extra else base for i in range(shards)]
+
+
+def parse_line(line):
+    """(font, args) for a load command line, else None. font is None for
+    the default font; args are the script's arguments."""
+    try:
+        words = shlex.split(line)
+    except ValueError:
+        return None
+    font = None
+    if words and FONT.fullmatch(words[0]):
+        font = FONT.fullmatch(words[0])[1]
+        words = words[1:]
+    if not words or words[0] != SCRIPT:
+        return None
+    return font, words[1:]
+
+
+def count_at(args):
+    """The index of the N after `--count`, the form affected-tests prints,
+    or None."""
+    for i, word in enumerate(args[:-1]):
+        if word == '--count':
+            return i + 1
+    return None
+
+
+def inputs(sha, loops_per_cpu, workers):
+    """The GITHUB_OUTPUT lines for the workflow's inputs; ValueError names a
+    wrong one."""
+    if not SHA.fullmatch(sha):
+        raise ValueError(f"sha must be a full 40-character SHA, not {sha!r}")
+    for name, value in (('loops_per_cpu', loops_per_cpu), ('workers', workers)):
+        if value and not SMALL.fullmatch(value):
+            raise ValueError(f'{name} must be a whole number from 1 to 99, not {value!r}')
+    return [f'sha={sha}', f'loops_per_cpu={loops_per_cpu or 2}', f'workers={workers}']
+
+
+def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
+         script_text=None):
+    commands, shards, skipped = [], [], []
+    if flake_ticket and script_text is not None and FLAKE_CASE not in script_text:
+        raise ValueError("this head's pytest-under-load.sh has no --flake-ticket (D122), "
+                         "so the run is no flake ticket's evidence: merge master into "
+                         'the branch first')
+    for raw in text.splitlines():
+        line = raw.strip()
+        parsed = parse_line(line)
+        if parsed is None:
+            if SCRIPT in line or HOLDER in line:
+                skipped.append({'line': line, 'why': 'no load command: it does not '
+                                'start with tools/pytest-under-load.sh (D133 runs '
+                                'DejaVu Sans once, with no load, under '
+                                'tools/hold-load-lock.sh)'})
+            continue
+        font, args = parsed
+        if flake_ticket:
+            args = ['--flake-ticket', *args]
+        if workers is not None:
+            args = [str(workers) if before == '-n' else a
+                    for before, a in zip(['', *args], args)]
+        at = count_at(args)
+        if trial_count is not None:
+            if at is None:
+                args, at = [*args, '--count', ''], len(args) + 1
+            args[at] = str(trial_count)
+        total = int(args[at]) if at is not None else 1
+        index = len(commands)
+        commands.append({'index': index, 'line': line, 'font': font, 'count': total})
+        for n, count in enumerate(split_count(total, per_shard)):
+            shard_args = list(args)
+            if at is not None:
+                shard_args[at] = str(count)
+            shards.append({'name': f'shard-{index}-{n}', 'command': index, 'shard': n,
+                           'font': font or '', 'count': count,
+                           'args': shard_args})
+    if len(shards) > MAX_SHARDS:
+        raise ValueError(f'{len(shards)} shards, more than the {MAX_SHARDS} jobs a '
+                         'GitHub matrix takes: raise per_shard')
+    return {'commands': commands, 'shards': shards, 'skipped': skipped}
+
+
+def font_error(font, family):
+    """Why a shard's font is wrong, or None."""
+    if not font and family != 'Noto Sans':
+        return f'the default font is {family!r}, not Noto Sans as on the laptop'
+    return None
+
+
+def sample(log, every=10.0):
+    """Appends the load average to log every `every` seconds, for ever."""
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    with open(log, 'a', encoding='utf-8') as out:
+        while True:
+            with open('/proc/loadavg', encoding='utf-8') as f:
+                out.write(f'{time.strftime("%H:%M:%S", time.gmtime())} {f.read().strip()}\n')
+            out.flush()
+            time.sleep(every)
+
+
+def junit_counts(path):
+    """(tests, failures, errors, skipped) summed over a junit file's suites."""
+    root = ET.parse(path).getroot()
+    sums = [0, 0, 0, 0]
+    for suite in root.iter('testsuite'):
+        for i, key in enumerate(('tests', 'failures', 'errors', 'skipped')):
+            sums[i] += int(suite.get(key, 0))
+    return tuple(sums)
+
+
+def summary(the_plan, shards_dir, sha):
+    out = [f'## CI load at {sha}', '']
+    failed = not the_plan['shards']
+    if failed:
+        out.append('No load command: affected-tests printed no '
+                   '`tools/pytest-under-load.sh` line for this head.')
+    for command in the_plan['commands']:
+        out += [f'### `{command["line"]}`', '',
+                f'Count {command["count"]}, '
+                f'font {command["font"] or "default (Noto Sans, as the laptop)"}.', '',
+                '| Shard | Count | Exit | Tests | Failures | Errors | Skipped |',
+                '|---|---|---|---|---|---|---|']
+        totals = [0, 0, 0, 0]
+        for shard in the_plan['shards']:
+            if shard['command'] != command['index']:
+                continue
+            folder = Path(shards_dir) / shard['name']
+            status_file = folder / 'status'
+            status = status_file.read_text().strip() if status_file.exists() else 'none'
+            junit = folder / 'junit.xml'
+            counts = junit_counts(junit) if junit.exists() else None
+            if status != '0':
+                failed = True
+            if counts:
+                totals = [a + b for a, b in zip(totals, counts)]
+            cells = [str(c) for c in counts] if counts else ['no junit'] * 4
+            out.append(f'| {shard["name"]} | {shard["count"]} | {status} | '
+                       + ' | '.join(cells) + ' |')
+        out.append('| total | {} | | {} | {} | {} | {} |'.format(command['count'], *totals))
+        out.append('')
+    for skip in the_plan['skipped']:
+        out += [f'Skipped `{skip["line"]}`: {skip["why"]}.', '']
+    out.append('Result: ' + ('failed' if failed else 'passed') + '. CI load is extra '
+               'evidence until the owner amends D85; it does not replace local load runs.')
+    return '\n'.join(out) + '\n', failed
+
+
+def positive(text):
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f'{value} is not at least 1')
+    return value
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog='plan/bin/ci-load', usage=__doc__.split('\n\n')[1].removeprefix('Usage: '))
+    actions = parser.add_subparsers(dest='action', required=True)
+    checking = actions.add_parser('inputs')
+    for name in ('sha', 'loops_per_cpu', 'workers'):
+        checking.add_argument(name)
+    # No abbreviations: a misspelt --flake-ticket must not pass as one.
+    planning = actions.add_parser('plan', allow_abbrev=False)
+    planning.add_argument('--per-shard', type=positive, default=5)
+    planning.add_argument('--flake-ticket', action='store_true')
+    planning.add_argument('--count', type=positive)
+    planning.add_argument('--workers', type=positive)
+    planning.add_argument('--script', type=Path)
+    fonts = actions.add_parser('font')
+    fonts.add_argument('font')
+    fonts.add_argument('family')
+    sampling = actions.add_parser('sample', allow_abbrev=False)
+    sampling.add_argument('log', type=Path)
+    sampling.add_argument('--every', type=float, default=10.0)
+    summing = actions.add_parser('summary')
+    summing.add_argument('plan_file', type=Path)
+    summing.add_argument('shards_dir', type=Path)
+    summing.add_argument('sha')
+    args = parser.parse_args(argv)
+    try:
+        if args.action == 'inputs':
+            print('\n'.join(inputs(args.sha, args.loops_per_cpu, args.workers)))
+        elif args.action == 'plan':
+            script = args.script.read_text() if args.script else None
+            the_plan = plan(sys.stdin.read(), args.per_shard, args.flake_ticket, args.count,
+                            args.workers, script)
+            print(json.dumps(the_plan))
+        elif args.action == 'font':
+            print(f'fc-match sans-serif: {args.family}; the command\'s font: '
+                  f'{args.font or "default"}')
+            why = font_error(args.font, args.family)
+            if why:
+                raise ValueError(why)
+        elif args.action == 'sample':
+            sample(args.log, args.every)
+        else:
+            text, failed = summary(json.loads(args.plan_file.read_text()), args.shards_dir,
+                                   args.sha)
+            sys.stdout.write(text)
+            return 1 if failed else 0
+    except ValueError as why:
+        print(f'::error::{why}')
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

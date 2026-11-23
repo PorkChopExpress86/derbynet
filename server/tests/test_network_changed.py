@@ -6,6 +6,7 @@ runs the script on them."""
 import ast
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -44,7 +45,7 @@ HARNESS_TRACEBACK = (
     f"E         {REQUEST_FAILED}\n"
     "E         Use -v to get more diff\n"
     "\n"
-    "ui/tests/browser/conftest.py:614: AssertionError"
+    "ui/tests/browser/conftest.py:708: AssertionError"
 )
 SUMMARY = (
     "=== short test summary info ===\n"
@@ -90,12 +91,21 @@ def every_item(*items, count=None):
         f" first extra item: {items[0]}\n"
         "E         Use -v to get more diff\n"
         "\n"
-        "ui/tests/browser/conftest.py:614: AssertionError"
+        "ui/tests/browser/conftest.py:708: AssertionError"
     )
 
 
 FIRST_ITEM = REQUEST_FAILED.removeprefix("Left contains one more item: ")
 SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
+# Chromium's console error for each resource that failed, which names no
+# URL: a load run of #366 listed one after each failed request (REAL_366
+# below).
+CONSOLE_ITEM = "'console: Failed to load resource: net::ERR_NETWORK_CHANGED'"
+
+
+def listing(*items):
+    """The harness's teardown <error> listing `items`, one per line."""
+    return failure(message=TEARDOWN, text=every_item(*items), tag="error")
 
 
 @pytest.mark.parametrize(
@@ -111,6 +121,9 @@ SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
             message=TEARDOWN, text=every_item(FIRST_ITEM, SECOND_ITEM), tag="error"
         ),
         failure(message=TEARDOWN, text=HARNESS_TRACEBACK + "\n\n", tag="error"),
+        listing(FIRST_ITEM, CONSOLE_ITEM, SECOND_ITEM, CONSOLE_ITEM),
+        listing(CONSOLE_ITEM, FIRST_ITEM),
+        listing(FIRST_ITEM, SECOND_ITEM, CONSOLE_ITEM),
     ],
     ids=[
         "page-load",
@@ -121,6 +134,9 @@ SECOND_ITEM = f"'{SECOND} net::ERR_NETWORK_CHANGED'"
         "https",
         "harness-every-item",
         "harness-trailing-blank-lines",
+        "every-item-each-request-with-its-console-line",
+        "every-item-console-line-first",
+        "every-item-fewer-console-lines-than-requests",
     ],
 )
 def test_a_changed_network_is_rerun(element):
@@ -194,9 +210,16 @@ def harness(**change):
         harness(
             text="E       AssertionError: 3 page errors, one per line:\n"
             f"E         {FIRST_ITEM}\nE         {SECOND_ITEM}\n\n"
-            "ui/tests/browser/conftest.py:614: AssertionError"
+            "ui/tests/browser/conftest.py:708: AssertionError"
         ),
         harness(text=every_item(FIRST_ITEM, count=0)),
+        listing(CONSOLE_ITEM),
+        listing(FIRST_ITEM, CONSOLE_ITEM, CONSOLE_ITEM),
+        listing(FIRST_ITEM, CONSOLE_ITEM.replace("CHANGED'", "CHANGEDX'")),
+        listing(FIRST_ITEM, CONSOLE_ITEM.replace("CHANGED'", "ABORTED'")),
+        listing(FIRST_ITEM, CONSOLE_ITEM.replace("'console: ", "'pageerror: ")),
+        listing(FIRST_ITEM, CONSOLE_ITEM.replace("'console", "'x console")),
+        listing(FIRST_ITEM, CONSOLE_ITEM.replace("'", "")),
         harness(
             text=every_item(FIRST_ITEM, SECOND_ITEM).replace(
                 "one per line:", "one per line: (cut)"
@@ -239,6 +262,13 @@ def harness(**change):
         "every-item-fewer-than-counted",
         "every-item-fewer-than-counted-at-the-end",
         "every-item-none-counted",
+        "console-line-alone",
+        "more-console-lines-than-requests",
+        "console-line-longer-error",
+        "console-line-other-error",
+        "console-line-as-a-page-error",
+        "console-line-not-first",
+        "console-line-unquoted",
         "every-item-header-with-text-after",
         "one-item-with-text-after",
         "request-failed-not-raised",
@@ -248,11 +278,14 @@ def harness(**change):
 def test_another_failure_is_not_rerun(element):
     args, reason = nc.rerun_args(junit(element), SUMMARY, [])
     assert args is None
-    assert reason == (
+    first, *named = reason.splitlines()
+    assert first == (
         "1 of 1 failures and errors are not a changed network"
         " (a Playwright net::ERR_NETWORK_CHANGED, or the browser harness's"
         " teardown naming one): no rerun, and the status stays pytest's."
     )
+    assert len(named) == 1
+    assert named[0].startswith(f"  {ET.fromstring(element).tag} c::t0: ")
 
 
 def test_one_other_failure_among_changed_networks_is_not_rerun():
@@ -354,6 +387,93 @@ def test_the_harness_teardown_with_a_later_item_not_a_changed_network_starts_no_
     args, reason = nc.rerun_args(found, log, [])
     assert args is None
     assert reason.startswith("1 of 1 failures and errors are not")
+
+
+# The page errors one teardown of #366's load run 11 listed: each failed
+# request beside Chromium's console line for it.
+REAL_366 = [
+    "request failed: http://localhost:45757/static/ui/kiosk/derbynet-300.png"
+    " net::ERR_NETWORK_CHANGED",
+    "console: Failed to load resource: net::ERR_NETWORK_CHANGED",
+    "request failed: http://localhost:45757/static/ui/kiosk-now-racing.js"
+    " net::ERR_NETWORK_CHANGED",
+    "console: Failed to load resource: net::ERR_NETWORK_CHANGED",
+]
+# A page error run 07 listed after app.js failed to load (366-load-07).
+PAGE_ERROR = "pageerror: Cannot read properties of undefined (reading 'modal')"
+
+
+def test_the_real_teardown_with_console_lines_beside_its_requests_reruns(tmp_path):
+    """#366's runs 07, 11 and 15 listed a console line after each failed
+    request: the real teardown, run by pytest on run 11's page errors
+    alone, reruns. Run 11 itself starts none, since its call failures are
+    no changed network (test_the_refusal_names_each_failure_by_its_test)."""
+    found, log = teardown_junit(tmp_path, REAL_366)
+    args, reason = nc.rerun_args(found, log, [])
+    assert reason == ""
+    assert args == ["-n", "0", "ui/tests/browser/test_x.py"]
+
+
+def test_the_real_teardown_with_a_page_error_names_it(tmp_path):
+    found, log = teardown_junit(tmp_path, [*REAL_366, PAGE_ERROR])
+    args, reason = nc.rerun_args(found, log, [])
+    assert args is None
+    assert reason.splitlines()[1] == (
+        "  error ui.tests.browser.test_x::test_x: failed on teardown with"
+        ' "AssertionError: 5 page errors, one per line:; first item not a'
+        f" changed network: {PAGE_ERROR!r}"
+    )
+
+
+def test_the_refusal_names_each_failure_by_its_test():
+    """The refusal names each failure that is not a changed network, and
+    says when its test also failed on one, which pytest writes as a second
+    <testcase> of the same name."""
+    call = '<failure message="AssertionError: count 0&#10;Actual value: 0"/>'
+    found = (
+        "<testsuites><testsuite>"
+        f'<testcase classname="k" name="test_w[a]">{call}</testcase>'
+        f'<testcase classname="k" name="test_w[a]">{listing(*map(repr, REAL_366))}'
+        "</testcase>"
+        '<testcase classname="k" name="test_v">'
+        '<failure message="TimeoutError: x"/></testcase>'
+        '<testcase classname="k" name="test_u">'
+        f"{listing(CONSOLE_ITEM)}</testcase>"
+        f"{failure(message='Error: y')}"
+        "</testsuite></testsuites>"
+    )
+    args, reason = nc.rerun_args(found, SUMMARY, [])
+    assert args is None
+    assert reason.splitlines() == [
+        "4 of 5 failures and errors are not a changed network (a Playwright"
+        " net::ERR_NETWORK_CHANGED, or the browser harness's teardown naming"
+        " one): no rerun, and the status stays pytest's.",
+        "  failure k::test_w[a]: AssertionError: count 0;"
+        " its test also failed on a changed network",
+        "  failure k::test_v: TimeoutError: x",
+        "  failure (no test): Error: y",
+        '  error k::test_u: failed on teardown with "AssertionError: assert'
+        " ['request fai...WORK_CHANGED'] == []; first item not a changed"
+        " network: none, but more console lines than failed requests",
+    ]
+
+
+def test_a_changed_network_in_no_testcase_shares_no_test_with_another_failure():
+    """A failure outside every <testcase> has no test to share, so a
+    changed network there leaves another such failure named alone."""
+    found = (
+        "<testsuites><testsuite>"
+        f"{failure(message=PAGE_LOAD)}{failure(message='Error: y')}"
+        "</testsuite></testsuites>"
+    )
+    args, reason = nc.rerun_args(found, SUMMARY, [])
+    assert args is None
+    assert reason.splitlines() == [
+        "1 of 2 failures and errors are not a changed network (a Playwright"
+        " net::ERR_NETWORK_CHANGED, or the browser harness's teardown naming"
+        " one): no rerun, and the status stays pytest's.",
+        "  failure (no test): Error: y",
+    ]
 
 
 def test_no_junit_no_parse_no_failure_and_no_summary_are_not_rerun():

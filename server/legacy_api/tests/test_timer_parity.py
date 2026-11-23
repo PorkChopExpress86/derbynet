@@ -3,15 +3,30 @@
 byte with Django's ids written as PHP's.
 
 The scenario's transcripts share one race, so they run in order in one test.
+`capture/scenarios/13-heat-state.sh`'s Q17 transcripts are replayed the same
+way, against the Q17 deviation it writes with `WRITE_DEVIATIONS=1` (#65).
+`test_classid_through_a_timer_test` replays no capture: it pins Django's
+current-heat through a timer test, where PHP's classid differs (C4, #406).
 """
 
+import json
+import os
+from typing import NamedTuple
 from urllib.parse import parse_qsl, quote, urlencode
 
 import pytest
 from django.test import Client
 
 from legacy_api.tests.php_http import as_php_body, translate
-from legacy_api.tests.test_race_control_parity import Scenario
+from legacy_api.tests.test_race_control_parity import (
+    Scenario,
+    active_event,
+    assert_listed,
+    listed_claim,
+    write_deviations,
+)
+from racing.models import Round
+from roster.models import Group
 
 pytestmark = pytest.mark.django_db
 
@@ -187,3 +202,211 @@ def run_timer_scenario() -> TimerScenario:
 def test_timer_transcripts_match_php(event):
     s = run_timer_scenario()
     assert s.mismatches() == []
+
+
+# ----- capture/scenarios/13-heat-state.sh, its Q17 cases -----------------------
+
+ZEROES = "http/timer/zeroes-on-the-lanes-in-use.http"
+TIMER_TEST = "http/timer/zeroes-in-a-timer-test.http"
+
+
+def heat_state_case(s: TimerScenario, racers: int = 6, mask: int = 0):
+    """`heat_state_case` of the scenario: a fresh event, Wolves checked in,
+    round 1 scheduled, and a new Timer login."""
+    s.reset()
+    s.post_ok(f"action=settings.write&unused-lane-mask={mask}&n-lanes=4")
+    for i in range(1, racers + 1):
+        s.import_racer(
+            f"firstname=First10{i}&lastname=Last10{i}&carnumber=10{i}&partition=Wolves"
+        )
+    s.post_ok("action=racer.bulk&who=all&what=checkin")
+    s.learn_rows()
+    s.post_ok("action=schedule.generate&roundid=1")
+    s.log_in_timer_again()
+
+
+def run_zeroes(client=None) -> TimerScenario:
+    """Three Wolves on lanes 2 and 4 (mask 5), each FINISHED from a fresh
+    event; then six Wolves and a timer test that leaves lanes 3 and 4 out
+    (tt-mask 12)."""
+    s = TimerScenario()
+    s.scenario(ZEROES)
+    for finished, poll in (
+        ("finished-zeroes-and-places-on-lanes-2-and-4", "poll-after-zeroes-and-places"),
+        ("finished-zeroes-on-lanes-2-and-4", "poll-after-zeroes"),
+    ):
+        heat_state_case(s, racers=3, mask=5)
+        s.post_ok("action=heat.select&roundid=1&now_racing=1")
+        s.timer_msg(finished)
+        s.coord(poll)
+    s.scenario(TIMER_TEST)
+    heat_state_case(s)
+    s.post_ok("action=timer.test&tt-mask=12")
+    s.timer_msg("finished-zeroes-on-the-tested-lanes")
+    s.coord("timer-test-after-zeroes")
+    return s
+
+
+SCENARIOS = {"zeroes": run_zeroes}
+
+# quirk: (reason, scenario, {fixture: [exchange names]}, expected file name)
+DEVIATIONS = {
+    "Q17": (
+        "PHP's is_all_zeroes() wants a time on every lane up to the lane count."
+        " Django reads only the lanes the heat schedules, or in a timer test the"
+        " lanes its mask leaves in (#65, Q17). On lanes 2 and 4, the only lanes"
+        " in use, PHP writes zero times as heat 1's result and stages heat 2;"
+        " Django stops racing on heat 1 and writes nothing. That is new for zero"
+        " times with places (001, 002); without places Django already stopped"
+        " on master, through D42's false-start rule (003, 004). In a timer test"
+        " that leaves lanes 3 and 4 out, PHP stores zero times on lanes 1 and 2"
+        " as the test's result; Django stops the test. That poll's current-heat"
+        ' classid is "" in PHP and null in Django: C4, which Q2 fixes. After a'
+        " timer-test result, PHP's advance_heat assigns in its condition"
+        " (website/inc/autoadvance.inc:138), so it writes ClassID from round"
+        ' -100, which has no row, and stores "". Django writes ClassID only on'
+        " next-up or a change of round (Q2), and here never advances, since"
+        " Q17 stops the test (test_classid_through_a_timer_test, #406).",
+        "zeroes",
+        {
+            ZEROES: [
+                "001 finished-zeroes-and-places-on-lanes-2-and-4",
+                "002 poll-after-zeroes-and-places",
+                "003 finished-zeroes-on-lanes-2-and-4",
+                "004 poll-after-zeroes",
+            ],
+            TIMER_TEST: [
+                "001 finished-zeroes-on-the-tested-lanes",
+                "002 timer-test-after-zeroes",
+            ],
+        },
+        None,
+    ),
+}
+DEVIATION_CLAIM = listed_claim(DEVIATIONS)
+
+
+def test_zeroes_on_the_lanes_in_use_give_the_q17_deviation(event):
+    s = run_zeroes()
+    assert s.mismatches() == []
+
+
+def test_every_listed_deviation_is_a_reply_these_scenarios_make():
+    assert_listed(DEVIATIONS, SCENARIOS)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WRITE_DEVIATIONS"), reason="writes the Q17 entry"
+)
+def test_write_timer_deviations(event):
+    write_deviations(DEVIATIONS, SCENARIOS)
+
+
+# ----- current-heat's classid through a timer test (#406) ------------------------
+
+CURRENT_HEAT_POLLS = (
+    "poll.coordinator",
+    "poll.timer.test",
+    "poll&values=current-heat",
+    "poll.results",
+)
+
+
+class CurrentHeat(NamedTuple):
+    classid: int | None
+    round: int | None
+    roundid: int | None
+    heat: int | None
+
+
+def current_heats(s: TimerScenario, step: str) -> list[tuple[str, str, CurrentHeat]]:
+    """`current-heat` in each poll that carries it."""
+    rows = []
+    for query in CURRENT_HEAT_POLLS:
+        heat = json.loads(s.client.get(f"/action.php?query={query}").content)[
+            "current-heat"
+        ]
+        rows.append(
+            (
+                step,
+                query,
+                CurrentHeat(
+                    classid=heat["classid"],
+                    round=heat["round"],
+                    roundid=heat["roundid"],
+                    heat=heat["heat"],
+                ),
+            )
+        )
+    return rows
+
+
+def identified_timer_case(s: TimerScenario):
+    """`heat_state_case`, and a timer that has sent HELLO and IDENTIFIED."""
+    heat_state_case(s)
+    s.timer("message=HELLO")
+    s.timer("message=IDENTIFIED&lane_count=4")
+
+
+def test_classid_through_a_timer_test(event):
+    """Q2 fixes C4: a timer-test advance is `next` within round -100, so
+    Django leaves ClassID as it was, where PHP's `advance_heat` writes ""
+    (`website/inc/autoadvance.inc:138`) and keeps it after the test ends.
+    Every poll that carries current-heat sends the classid from before the
+    test: the round's class after a heat.select (A), and null with no heat
+    ever selected (B). The test heat moves the heat on, so the advance ran.
+    After the test, A's round is 1 where PHP's is null, since PHP's
+    get_running_round() looks the round up by that "" classid and finds no
+    row (`website/inc/data.inc:236-243`)."""
+    s = TimerScenario()
+    got = []
+
+    identified_timer_case(s)
+    s.post_ok("action=heat.select&roundid=1&now_racing=1")
+    got += current_heats(s, "A1 heat selected")
+    s.post_ok("action=timer.test&tt-mask=0")
+    got += current_heats(s, "A2 test started")
+    s.timer("message=FINISHED&lane1=3.1&lane2=3.2&lane3=3.3&lane4=3.4")
+    got += current_heats(s, "A3 after a test heat")
+    s.post_ok("action=timer.test&test-mode=0")
+    got += current_heats(s, "A4 test ended")
+    s.post_ok("action=heat.select&heat=next")
+    got += current_heats(s, "A5 next heat")
+    wolves = Group.objects.get(event=active_event(), name="Wolves").pk
+    round1 = Round.objects.get(event=active_event()).pk
+
+    identified_timer_case(s)
+    got += current_heats(s, "B1 no heat selected")
+    s.post_ok("action=timer.test&tt-mask=12")
+    got += current_heats(s, "B2 test started")
+    s.timer("message=FINISHED&lane1=3.1&lane2=3.2")
+    got += current_heats(s, "B3 after a test heat")
+    s.post_ok("action=timer.test&test-mode=0")
+    got += current_heats(s, "B4 test ended")
+
+    steps = [
+        (
+            "A1 heat selected",
+            CurrentHeat(classid=wolves, round=1, roundid=round1, heat=1),
+        ),
+        ("A2 test started", CurrentHeat(classid=wolves, round=1, roundid=-100, heat=2)),
+        (
+            "A3 after a test heat",
+            CurrentHeat(classid=wolves, round=1, roundid=-100, heat=3),
+        ),
+        ("A4 test ended", CurrentHeat(classid=wolves, round=1, roundid=round1, heat=1)),
+        ("A5 next heat", CurrentHeat(classid=wolves, round=1, roundid=round1, heat=2)),
+        (
+            "B1 no heat selected",
+            CurrentHeat(classid=None, round=None, roundid=-1, heat=None),
+        ),
+        ("B2 test started", CurrentHeat(classid=None, round=1, roundid=-100, heat=1)),
+        (
+            "B3 after a test heat",
+            CurrentHeat(classid=None, round=1, roundid=-100, heat=2),
+        ),
+        ("B4 test ended", CurrentHeat(classid=None, round=None, roundid=-1, heat=None)),
+    ]
+    assert got == [
+        (step, query, heat) for step, heat in steps for query in CURRENT_HEAT_POLLS
+    ]

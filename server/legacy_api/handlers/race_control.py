@@ -76,10 +76,19 @@ def _fields(ctx: LegacyContext) -> list[tuple[str, str]]:
 # ----- heats ---------------------------------------------------------------------
 
 
+# current-heat's classid during and after a timer test (#406).
+TIMER_TEST_CLASSID = (
+    "Q2: a timer-test heat leaves ClassID as it was, so current-heat's classid"
+    " stays the one from before the test, during it and after (fixes #64 C4)."
+    " PHP's advance_heat writes ClassID from round -100, which has no row"
+    ' (autoadvance.inc:138), so its classid is "" from the first test heat on,'
+    " and once the test ends its round is null too (data.inc:236-243)."
+)
 # Every reply that carries `current-heat`: the coordinator payload and the polls.
 PAYLOAD_DIVERGENCES = (
     "R3: with no current heat after a round stops being current, classid and"
     " heat are null; PHP reports the -1 that set_current_heat(-1, -1) wrote.",
+    TIMER_TEST_CLASSID,
 )
 # Where the racers of a reinstated heat show their places again.
 REINSTATE_DIVERGENCES = (
@@ -245,6 +254,9 @@ def schedule_unschedule(ctx: LegacyContext) -> None:
     permission=Perm.CONTROL_RACE,
     divergences=PAYLOAD_DIVERGENCES
     + (
+        "Q3: a bye in the round's first heat takes a racer of a heat the"
+        " squeeze removes, so the chart can have one heat fewer than PHP's"
+        " (#65).",
         "Q5: a dry run leaves racing on.",
         "Q20, Q21, Q25: the charts and failures #20 decided.",
         "R6: `trace` adds no `adjuster`; `timing` holds 0 seconds.",

@@ -19,9 +19,11 @@ PR_WAIT = Path(__file__).resolve().parent.parent / 'bin' / 'pr-wait'
 FAKE_GH = '''#!{python}
 import subprocess, sys
 args = sys.argv[1:]
+if args[:1] == ['api']:
+    sys.exit()  # no workflow run on the head (plan/bin/rejected-workflows)
 if args[2:3] != [{pr!r}]:
     sys.exit('pr-wait named ' + ' '.join(args[2:3]))
-if args[:2] == ['pr', 'view'] and 'headRefOid' in args:
+if args[:2] == ['pr', 'view'] and 'headRefOid,headRefName' in args:
     print('abc123')
 elif args[:2] == ['pr', 'checks']:
     jq = args[args.index('--jq') + 1]
@@ -92,6 +94,28 @@ class PrWait(unittest.TestCase):
         done = self.wait([check('pending', 'lint'),
                           check('pass', 'leg (php)', 'parity', 'push')])
         self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+
+    def test_a_bound_that_is_no_whole_number_is_refused_by_name(self):
+        """Bash drops a command whose arithmetic fails and goes on (#417
+        retro); only set -u stopped a `5m` here before."""
+        (self.tmp / 'checks.json').write_text(json.dumps([check('pending', 'lint')]))
+        gh = self.tmp / 'gh'
+        gh.write_text(FAKE_GH.format(python=sys.executable, pr='7',
+                                     checks=str(self.tmp / 'checks.json')))
+        gh.chmod(0o755)
+        for timeout, push, named in [('5m', '5', "--timeout-min takes a whole number of minutes, not '5m'"),
+                                     ('-1', '5', "--timeout-min takes a whole number of minutes, not '-1'"),
+                                     ('08', '5', "--timeout-min takes a whole number of minutes, not '08'"),
+                                     ('0', '1m', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '1m'"),
+                                     ('0', '-1', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '-1'"),
+                                     ('0', '08', "PR_WAIT_PUSH_MIN takes a whole number of minutes, not '08'")]:
+            with self.subTest(timeout=timeout, push=push):
+                done = subprocess.run(['bash', str(PR_WAIT), '7', '--timeout-min', timeout],
+                                      env={**os.environ, 'GH': str(gh), 'PR_WAIT_PUSH_MIN': push},
+                                      capture_output=True, text=True, timeout=60)
+                # 4, not 1: a caller reads 1 as a red check.
+                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+                self.assertEqual(done.stderr, f'pr-wait: {named}\n')
 
 
 # Answers each `pr view` with the next head in HEADS, and the last for

@@ -162,16 +162,13 @@ PAGES = (
 )
 
 
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("test_wider_windows_keep_the_one_line_title covers the desktop")
-
-
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 @pytest.mark.parametrize("key", PAGES)
 def test_a_long_title_shows_whole_in_the_banner_on_a_phone(page, event, key):
     """The long title wraps to two lines at 0.36 of the banner inside the
     banner, which keeps its height."""
-    phone_only(page)
     open_titled(page, event, key, LONG)
 
     m = whole_title(page)
@@ -182,20 +179,24 @@ def test_a_long_title_shows_whole_in_the_banner_on_a_phone(page, event, key):
     shoot(page, f"kiosk-banner-{name(key)}")
 
 
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_scale_mph_shows_its_own_title_whole_on_a_phone(page, event):
     """ "Scale Miles Per Hour", which the master branch cut to "Scale Miles
     Per H..." (#256)."""
-    phone_only(page)
     open_kiosk(page, event, "kiosks/scale-MPH.kiosk")
     expect(page.locator("[data-banner-title]")).to_have_text("Scale Miles Per Hour")
 
     whole_title(page)
 
 
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_a_one_line_title_keeps_the_banner_height_on_a_phone(page, event):
     """A short title leaves the banner at `--k-banner`, a minimum on a
     phone, as on a TV."""
-    phone_only(page)
     open_kiosk(page, event, "kiosks/scale-MPH.kiosk")
     write_title(page, "Racing")
 
@@ -205,6 +206,9 @@ def test_a_one_line_title_keeps_the_banner_height_on_a_phone(page, event):
     assert height(m) == pytest.approx(m["kBanner"], abs=0.5), m
 
 
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 @pytest.mark.parametrize(
     "key, group",
     (
@@ -219,7 +223,6 @@ def test_a_title_of_three_lines_grows_the_banner_on_a_phone(page, event, key, gr
     end inside the page. The unbreakable name breaks inside the title's
     box. The columnar layouts share columnar.html and kiosk.css's
     `.k-column`, so the reversed one is not run again."""
-    phone_only(page)
     open_titled(page, event, key, group)
 
     m = whole_title(page)
@@ -238,6 +241,9 @@ def test_a_title_of_three_lines_grows_the_banner_on_a_phone(page, event, key, gr
     shoot(page, f"kiosk-banner-grows-{name(key)}-{len(group)}")
 
 
+@pytest.mark.sizes(
+    "desktop", reason="the phone wraps (test_a_long_title_shows_whole_...)"
+)
 @pytest.mark.parametrize(
     "window",
     (
@@ -253,8 +259,6 @@ def test_wider_windows_keep_the_one_line_title(page, event, window):
     640 px, the banner is as before #272: its height is `--k-banner`, the
     title one line at 0.48 of it, cut with an ellipsis past its box, and
     the logo `logo()` high."""
-    if page.size != "desktop":
-        pytest.skip("the phone wraps (test_a_long_title_shows_whole_...)")
     page.set_viewport_size(window)
     open_titled(page, event, "kiosks/now-racing.kiosk", LONGER)
 
@@ -284,6 +288,9 @@ LANE_FIT = """() => [...document.querySelectorAll('[data-now-racing] [data-lane]
   })"""
 
 
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
     page,
     event,
@@ -295,7 +302,6 @@ def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
     or a resize, does not run. The rows are `minmax(0, 1fr)` and shrink
     with the board, and each lane's names (test_kiosk_names.MISFITS) and
     photo still fit inside it."""
-    phone_only(page)
     open_rows(page, event)
     assert_fits(page)
     before = whole_title(page)
@@ -319,11 +325,13 @@ def test_a_title_that_grows_with_the_same_lineup_keeps_the_lanes_fitted(
     shoot(page, "kiosk-banner-grows-in-place")
 
 
+@pytest.mark.sizes(
+    "phone", reason="test_wider_windows_keep_the_one_line_title covers the desktop"
+)
 def test_the_phone_rules_hold_at_640_px(page, event):
     """640 px wide is the phone's widest (kiosk.css's `max-width: 640px`):
     the title wraps there at 0.36 of the banner. 641 px is in
     test_wider_windows_keep_the_one_line_title."""
-    phone_only(page)
     page.set_viewport_size({"width": 640, "height": 844})
     open_titled(page, event, "kiosks/now-racing.kiosk", LONG)
 

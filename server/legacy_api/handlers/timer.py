@@ -6,6 +6,7 @@ Every message and timer state change goes to the timer audit (D19).
 """
 
 from accounts.permissions import Perm
+from legacy_api.handlers.race_control import TIMER_TEST_CLASSID
 from legacy_api.registry import LegacyContext, action, query
 from racing.engine.phpcompat import php_intval, php_truthy
 from racing.services import polls, timer
@@ -15,6 +16,13 @@ from racing.services import polls, timer
     "timer-message",
     permission=Perm.TIMER_MESSAGE,
     divergences=(
+        "Q17: FINISHED with a time of only 0 and . on every lane the current"
+        " heat schedules, and none needed on its byes, replays, stops racing"
+        " and writes nothing (#65); PHP needs such a time on every lane up to"
+        " the lane count (write-heat-results.inc:7-20), so there it writes the"
+        " heat and moves on. In a timer test, which schedules no lanes, the"
+        " lanes its mask leaves in stand for them, so zero times on those"
+        " lanes stop the test where PHP and master stored them (#65, Q17).",
         "D74: IDENTIFIED sets the race's lane count only while no heat of the"
         " event is scheduled; afterward it stores the timer's count to show"
         " beside the race's (fixes #64 C26). PHP always writes the timer's"
@@ -31,6 +39,10 @@ from racing.services import polls, timer
         " dated to when the minute ran out (timer.timed_out_at). PHP writes"
         " them at the first read after the minute, a page or poll included"
         " (timer-state.inc:72-79).",
+        "Q2: in a timer test, FINISHED moves the test heat on and leaves"
+        " ClassID as it was; PHP's advance_heat writes ClassID from round -100"
+        ' and stores "" (autoadvance.inc:138, fixes #64 C4), which current-heat'
+        " then shows (#406).",
     ),
 )
 def timer_message(ctx: LegacyContext) -> None:
@@ -102,7 +114,11 @@ def timer_log(ctx: LegacyContext) -> None:
     ctx.put("file-size", read.size)
 
 
-@query("poll.timer.test", permission=Perm.CONTROL_RACE)
+@query(
+    "poll.timer.test",
+    permission=Perm.CONTROL_RACE,
+    divergences=(TIMER_TEST_CLASSID,),
+)
 def poll_timer_test(ctx: LegacyContext) -> None:
     run = polls.running(ctx.event)
     ctx.put("current-heat", polls.current_heat(run))

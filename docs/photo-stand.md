@@ -2,7 +2,7 @@
 
 A photo stand takes each racer's photo, or each car's, when someone scans a barcode, and sends the photo to the server for that racer. It runs on a Raspberry Pi with a barcode scanner and a camera. The script that drives it is `extras/scripts/photostand.sh`. It is shown at work in a video: <https://youtu.be/aR5vDUBemx4?t=213>.
 
-Photo stands built for earlier versions of DerbyNet keep working with this server. They use the same requests the server has always answered (ADR-02). Point one at the new server's address, as in [Point it at the server](#point-it-at-the-server). Ready-made container images for the Pi's photo stand and timer are planned, in #59.
+Photo stands built for earlier versions of DerbyNet keep working with this server. They use the same requests the server has always answered (ADR-02). Point one at the new server's address, as in [Point it at the server](#point-it-at-the-server). A new photo stand can run as a container instead: [Raspberry Pi timer and photo stand](pi-setup.md).
 
 You can also take photos at check-in, with a phone, and need no photo stand.
 
@@ -33,7 +33,7 @@ A few barcodes control the photo stand itself:
 
 ## Set up a new photo stand
 
-These steps install the photo stand's scripts from a copy of the DerbyNet repository on the Pi. They copy the scripts to the places the older install package put them. Nobody has tried these steps on a Pi yet, so check each one, and tell the project what you find. The Pi images of #59 will replace them.
+These steps install the photo stand's scripts from a copy of the DerbyNet repository on the Pi. They copy the scripts to the places the older install package put them. Nobody has tried these steps on a Pi yet, so check each one, and tell the project what you find. The photo stand image does the same with less to install ([Raspberry Pi timer and photo stand](pi-setup.md)).
 
 1. Copy the scripts into place:
 

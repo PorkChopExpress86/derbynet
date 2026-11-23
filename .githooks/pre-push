@@ -114,8 +114,10 @@ while read -r _ local_sha _ remote_sha; do
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
-  checked='^(server/|testing/|website/inc/generators/|plan/'
-  checked+='|\.github/workflows/image\.yml$)'
+  # The guides and the workflows that run their stages, which
+  # tests/test_guide_commands.py reads (#414).
+  checked='^(server/|testing/|website/inc/generators/|plan/|docs/[^/]+\.md$'
+  checked+='|\.github/workflows/(image|server|pi-images)\.yml$)'
   if [ -z "$base" ] || grep -qE "$checked" <<<"$names"; then
     changed=1
   fi

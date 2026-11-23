@@ -217,7 +217,29 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
     """On the paused clock, a results/rounds/ poll with no reply: no error
     once the clock has run 14 s, `net::ERR_ABORTED` from the page by 16 s
     (`PAST_GIVE_UP_MS`, past kiosk.js's `GIVE_UP_MS`), and the poll's next
-    turn goes out after it."""
+    turn goes out after it, and only that turn: the clock stops with its
+    reply in, before the turn the reply queues (#434)."""
+    import re
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parents[2] / "static" / "ui"
+    give_up = re.search(r"var GIVE_UP_MS = (\d+);", (static / "kiosk.js").read_text())
+    re_poll = re.search(
+        r"Kiosk\.poll\(poll, (\d+), 'after'\)",
+        (static / "kiosk-results.js").read_text(),
+    )
+    assert give_up, "kiosk.js no longer has `var GIVE_UP_MS = <ms>;`"
+    assert re_poll, "kiosk-results.js no longer has `Kiosk.poll(poll, <ms>, 'after')`"
+    give_up_ms, re_poll_ms = int(give_up[1]), int(re_poll[1])
+    # `run_for` fires a timer due at its last tick, so the next turn, due at
+    # the sum, goes out in the run to `PAST_GIVE_UP_MS`.
+    assert give_up_ms + re_poll_ms <= PAST_GIVE_UP_MS < give_up_ms + 2 * re_poll_ms, (
+        f"the page gives up at {give_up_ms} ms and re-polls {re_poll_ms} ms later:"
+        f" the run to {PAST_GIVE_UP_MS} ms must reach that turn and not the next"
+    )
+    assert 14_000 < give_up_ms, (
+        f"the page gives up at {give_up_ms} ms: the check at 14 s would see the abort"
+    )
     seen = []
 
     def hold_the_first(route):
@@ -237,15 +259,14 @@ def test_the_page_gives_a_poll_up_between_14_and_16_s(page, event, day, page_err
     # One read: what had failed by 14 s, before the allowance below.
     at_14_s = list(page_errors.errors)
     page_errors.allow(r"request failed: \S*/results/rounds/\S* net::ERR_ABORTED$")
+    # The second poll's reply is in before the count (#434).
     with page.expect_event(
-        "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
-    ) as failed:
-        page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
-    page.clock.run_for(1_100)
-    for _ in range(100):
-        if len(seen) > 1:
-            break
-        page.wait_for_timeout(50)
+        "requestfinished", lambda r: "/results/rounds/" in r.url, timeout=10_000
+    ):
+        with page.expect_event(
+            "requestfailed", lambda r: "/results/rounds/" in r.url, timeout=10_000
+        ) as failed:
+            page.clock.run_for(PAST_GIVE_UP_MS - 14_000)
     assert at_14_s == []
     assert failed.value.failure == "net::ERR_ABORTED"
     assert len(seen) == 2

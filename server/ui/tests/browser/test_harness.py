@@ -4,19 +4,29 @@ import os
 import re
 import subprocess
 import sys
+import threading
+import time
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
+from django.core.signals import request_started
 from playwright.sync_api import expect
 
+from ui.tests.browser import conftest
 from ui.tests.browser.conftest import (
+    BLOCKED,
     InFlight,
     _settle,
     check_harness,
     close_tab,
     font_config,
+    stop_timers,
 )
+from ui.tests.browser.helpers import pause_clock_at
 
 
 def test_an_aborted_htmx_request_is_no_page_error(page, page_errors, event):
@@ -222,6 +232,344 @@ def test_the_settle_stops_the_polls_of_a_page_on_a_fake_clock(page, event):
     assert sent == []
 
 
+# The settle's bound on a fake-clock page (#347).
+FAKE_CLOCK_SETTLE_S = 1.0
+
+
+def test_the_settle_on_a_fake_clock_takes_under_a_second(page, event):
+    """STOP_TIMERS cleared the native id range through the fake clock's
+    `clearTimeout`, which builds an Error for each id below its own, and
+    blocked the renderer for seconds, during which a resumed fake clock ran
+    on toward kiosk.js's give-up (#347). Under the fake clock it now
+    clears only the clock's own ids. The slack is FAKE_CLOCK_SETTLE_S less
+    the settle's own time (`slack`), which the PR body measures beside a
+    should-pass mutation that makes the stop late."""
+    page.clock.install()
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    started = time.monotonic()
+    assert _settle(page) == []
+    took = time.monotonic() - started
+    slack = FAKE_CLOCK_SETTLE_S - took
+    assert slack > 0, f"the settle took {took:.3f} s, over FAKE_CLOCK_SETTLE_S"
+
+
+def test_stop_timers_stops_a_poll_set_after_a_pending_animation_frame(page, event):
+    """The fake clock's `clearTimeout` throws on the id of a pending
+    `requestAnimationFrame`, so STOP_TIMERS stopped at that id and left
+    every later timer running (#347). Here the frame is requested before
+    the poll, on a paused clock, so it is still pending at the stop.
+    `stop_timers` runs alone, as `close_tab` and `stop_the_kiosk` run it:
+    the settle's request freeze would hide a timer left running."""
+    pause_clock_at(page, datetime(2026, 1, 1, 12, 0))
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    page.evaluate(
+        """() => {
+          requestAnimationFrame(() => {});
+          setInterval(() => fetch('/held-request'), 10);
+        }"""
+    )
+    stop_timers(page)
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.clock.run_for(1000)
+    page.wait_for_timeout(100)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_the_settle_stops_a_timer_that_loads_images(page, event):
+    """The settle's request freeze stops fetch and XMLHttpRequest only; a
+    timer that loads an image is stopped by clearing the timers."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    with page.expect_request("**/held-request*"):
+        page.evaluate(
+            """() => {
+              let n = 0;
+              setInterval(() => { new Image().src = '/held-request?' + n++; }, 10);
+            }"""
+        )
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+def test_the_settle_stops_a_poll_set_before_the_fake_clock(page, event):
+    """A poll set before `page.clock.install()` runs on a native timer,
+    which STOP_TIMERS leaves running under the clock. The settle's request
+    freeze stops its requests (#347 review)."""
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    start_a_fast_poll(page)
+    page.clock.install()
+    assert _settle(page) == []
+    sent = []
+    page.on("request", lambda r: sent.append(r))
+    page.wait_for_timeout(200)
+    # One read after the wait: the point is that nothing more was sent.
+    assert sent == []
+
+
+# Polls that send their next request only once the last reply is handled,
+# each to /held-request, a frame's among them, and when each has its next
+# request ready: htmx's `every` queues a trigger that comes while its
+# request is out.
+REPLY_POLLS = {
+    "setTimeout": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setTimeout(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "setInterval": (
+        """() => {
+          const poll = () => fetch('/held-request').then(() => setInterval(poll, 10));
+          poll();
+        }""",
+        "() => true",
+    ),
+    "fetch-chain": (
+        """() => {
+          const poll = () => fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "animation-frame": (
+        """() => {
+          let out = false;
+          const loop = () => {
+            if (!out) {
+              out = true;
+              fetch('/held-request').then(() => { out = false; });
+            }
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        }""",
+        "() => true",
+    ),
+    "frame-fetch-chain": (
+        """() => {
+          const frame = document.createElement('iframe');
+          document.body.append(frame);
+          const w = frame.contentWindow;
+          const poll = () => w.fetch('/held-request').then((r) => r.text()).then(poll);
+          poll();
+        }""",
+        "() => true",
+    ),
+    "htmx-every": (
+        """() => {
+          const poll = document.createElement('div');
+          poll.id = 'poll';
+          poll.setAttribute('hx-get', '/held-request');
+          poll.setAttribute('hx-trigger', 'every 20ms');
+          poll.setAttribute('hx-swap', 'none');
+          document.body.append(poll);
+          htmx.process(poll);
+        }""",
+        # htmx's private queue on the element (htmx-2.0.4.min.js,
+        # `queuedRequests`).
+        "() => document.getElementById('poll')['htmx-internal-data']"
+        ".queuedRequests?.length > 0",
+    ),
+}
+
+
+@pytest.mark.parametrize("source", REPLY_POLLS)
+def test_a_reply_handled_after_the_stop_starts_no_request(
+    page, page_errors, event, monkeypatch, source
+):
+    """A poll whose reply lands after the stop sent its next request after
+    the drain came back empty: on a new timer (#317's results-by-racer
+    kiosk, #347), from the reply's own handler, from an animation frame,
+    and from htmx's queue, with no timer at all (#347 review). The settle
+    now also stops the page's fetch and XMLHttpRequest. Here the reply is
+    released from Python after the barrier, the settle's last stop."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    start, ready = REPLY_POLLS[source]
+    page.evaluate(start)
+    wait_until(page, lambda: held, "the poll's request")
+    page.wait_for_function(ready, timeout=InFlight.TIMEOUT_MS)
+    barrier = conftest._barrier
+
+    def barrier_then_reply(tab):
+        barrier(tab)
+        held.pop().fulfill(status=204)
+
+    sent = []
+    page.on("request", lambda r: r.url.endswith("/held-request") and sent.append(r))
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "_barrier", barrier_then_reply)
+        assert _settle(page) == []
+    page.wait_for_timeout(500)
+    # One read after the wait: the point is that no request was tried
+    # again, blocked or not.
+    assert sent == []
+    assert page_errors.errors == []
+
+
+# What a reply handled after the stops can send by neither the page's fetch
+# nor its XMLHttpRequest, each to /held-request (#409's review of PR #424,
+# its probes; kiosk-awards.js sets an image in a reply's handler, kiosk.js
+# navigates on one): an image, a beacon, a fetch from a frame made then,
+# and a navigation to a document that polls.
+LEAKS = {
+    "image": "new Image().src = '/held-request?image';",
+    "beacon": "navigator.sendBeacon('/held-request');",
+    "new-frame": """const frame = document.createElement('iframe');
+      document.body.append(frame);
+      frame.contentWindow.fetch('/held-request');""",
+    "navigation": "location.href = '/login/?nav';",
+}
+
+
+@pytest.mark.parametrize("source", LEAKS)
+def test_the_settle_blocks_what_the_stops_leave(
+    page, page_errors, event, monkeypatch, source
+):
+    """The stubs of the page's own fetch and XMLHttpRequest leave an image,
+    a beacon, a frame made after them and a new document free to send; the
+    settle then has Chromium block every request of the page. A frame or
+    document made after the block gets the stubs too, so no fetch of its
+    fails into a handler (a `pageerror` here). The reply is held until the
+    block is on."""
+    page.route("**/held-request*", answer_the_poll)
+    first = []
+    page.route(lambda url: url.endswith("?first"), lambda route: first.append(route))
+    page.add_init_script(
+        """if (location.search === '?nav') addEventListener('DOMContentLoaded', () => {
+          fetch('/held-request');
+        });"""
+    )
+    page.goto("/login/")
+    with page.expect_request(lambda r: r.url.endswith("?first")):
+        page.evaluate(
+            """(leak) => {
+              fetch('/held-request?first').then(() => new Function(leak)());
+            }""",
+            LEAKS[source],
+        )
+    block = conftest.block_sending
+    reached = []
+
+    def block_then_reply(tab):
+        block(tab)
+        page.on(
+            "requestfinished",
+            lambda r: not r.url.endswith("?first") and reached.append(r),
+        )
+        first.pop().fulfill(status=204)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "block_sending", block_then_reply)
+        assert _settle(page) == []
+    page.wait_for_timeout(300)
+    # One read after the wait: the point is that nothing reached a reply.
+    assert reached == []
+    assert page_errors.errors == []
+
+
+def test_a_blocked_request_before_the_settle_is_a_page_error(page, page_errors, event):
+    """The page errors drop a request the settle's block failed, and only
+    after the settle: the same failure before it still counts."""
+    page.goto("/login/")
+    session = page.context.new_cdp_session(page)
+    session.send("Network.enable")
+    session.send("Network.setBlockedURLs", {"urls": ["*held-request"]})
+    with page.expect_event("requestfailed"):
+        page.evaluate("() => { fetch('/held-request').catch(() => {}); }")
+    session.detach()
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
+def test_a_request_the_block_fails_while_it_starts_is_no_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """Playwright hands the page's events over while a CDP send waits for
+    its reply, so a request the URL block fails can reach the page errors
+    before `block_sending` returns: a thumbnail's kiosk.css and logo, on a
+    board swapped in as the settle ran (#451). Here an image is loaded, and
+    its failure waited for, as soon as the URL block's send returns."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    new_session = page.context.new_cdp_session
+    failures = []
+
+    def session_that_fails_an_image(target):
+        session = new_session(target)
+        send = session.send
+
+        def send_then_fail_an_image(method, params=None):
+            reply = send(method, params)
+            if method == "Network.setBlockedURLs":
+                with page.expect_event("requestfailed") as failed:
+                    page.evaluate("() => { new Image().src = '/held-request?early'; }")
+                failures.append(failed.value.failure)
+            return reply
+
+        session.send = send_then_fail_an_image
+        return session
+
+    monkeypatch.setattr(page.context, "new_cdp_session", session_that_fails_an_image)
+    assert _settle(page) == []
+    assert failures == [BLOCKED[0]]
+    assert page_errors.errors == []
+
+
+def test_the_block_outlasts_the_settle(page, event):
+    """The block ends with its CDP session (#409, PR #424), so the session
+    stays open after the settle returns: an image the page asks for later
+    is still blocked."""
+    page.route("**/held-request*", answer_the_poll)
+    page.goto("/login/")
+    assert _settle(page) == []
+    page.wait_for_timeout(100)
+    with page.expect_event("requestfailed") as failed:
+        page.evaluate("() => { new Image().src = '/held-request?later'; }")
+    assert failed.value.failure == BLOCKED[0]
+
+
+def test_another_failure_after_the_settle_is_a_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """After the settle the page errors drop the block's failures only: a
+    request sent before the block that fails otherwise still counts."""
+    held = []
+    page.route("**/held-request", lambda route: held.append(route))
+    page.goto("/login/")
+    with page.expect_request("**/held-request"):
+        page.evaluate("() => { fetch('/held-request').catch(() => {}); }")
+    block = conftest.block_sending
+
+    def block_then_abort(tab):
+        block(tab)
+        held.pop().abort()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(conftest, "block_sending", block_then_abort)
+        assert _settle(page) == []
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    wait_until(page, lambda: len(page_errors.errors) > 1, "the console error")
+    assert sorted(page_errors.errors) == [
+        "console: Failed to load resource: net::ERR_FAILED",
+        f"request failed: {url} net::ERR_FAILED",
+    ]
+    page_errors.errors.clear()
+
+
 # kiosk.css's font stack, and the name of the font Chromium draws it in.
 KIOSK_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 
@@ -354,3 +702,311 @@ def test_the_collection_hook_runs_the_harness_check():
     here = Path(conftest.__file__).parent
     with pytest.raises(pytest.UsageError, match=r"^test_b\.py::t lost "):
         conftest.pytest_collection_modifyitems([collected(here / "test_b.py", "page")])
+
+
+def wait_until(page, check, what):
+    """Wait until `check()` holds, reading Playwright's events every 20 ms,
+    for at most `InFlight.TIMEOUT_MS`."""
+    for _ in range(InFlight.TIMEOUT_MS // 20):
+        if check():
+            return
+        page.wait_for_timeout(20)
+    raise AssertionError(f"{what} not within {InFlight.TIMEOUT_MS} ms")
+
+
+class Sent:
+    """A stand-in request of `resource_type`, sent by `frame`."""
+
+    def __init__(self, frame, resource_type):
+        self.frame = frame
+        self.resource_type = resource_type
+
+
+class RefusedFrame:
+    """A request whose `frame` Playwright refuses, as it does a
+    `target="_blank"` popup's navigation request."""
+
+    def __init__(self, resource_type):
+        self.resource_type = resource_type
+
+    @property
+    def frame(self):
+        from playwright.sync_api import Error
+
+        raise Error("Frame for this navigation request is not available")
+
+
+# A page with an iframe and a `target="_blank"` link to a popup.
+FRAME_AND_BLANK_LINK = """() => {
+  const frame = document.createElement('iframe');
+  frame.src = '/frame-target?first';
+  document.body.append(frame);
+  const link = document.createElement('a');
+  link.href = '/popup-target';
+  link.target = '_blank';
+  link.id = 'blank-link';
+  link.textContent = 'Open';
+  document.body.prepend(link);
+}"""
+MOVE_THE_IFRAME = (
+    "() => { document.querySelector('iframe').src = '/frame-target?second'; }"
+)
+
+
+def test_a_navigation_keeps_a_request_whose_frame_is_refused(page, event):
+    """When a frame navigates, the harness drops that frame's own requests
+    of the types in `InFlight.ORPHANED`, and keeps its document request,
+    another frame's request and a request whose frame Playwright refuses
+    (#378). Only a navigation request has its frame refused, and that is a
+    document, which `ORPHANED` never holds
+    (`test_a_blank_link_followed_while_a_frame_navigates_is_tracked`), so
+    these requests are stand-ins, put in the page's set while its iframe
+    navigates."""
+    page.route(
+        "**/frame-target?*",
+        lambda route: route.fulfill(body="<p>frame</p>", content_type="text/html"),
+    )
+    page.goto("/login/")
+    with page.expect_event(
+        "framenavigated", lambda f: f.url.endswith("/frame-target?first")
+    ):
+        page.evaluate(FRAME_AND_BLANK_LINK)
+    iframe = next(f for f in page.frames if f.url.endswith("/frame-target?first"))
+    own = Sent(iframe, "fetch")
+    document = Sent(iframe, "document")
+    others = Sent(page.main_frame, "fetch")
+    refused = RefusedFrame("fetch")
+    stand_ins = {own, document, others, refused}
+    page.in_flight.requests |= stand_ins
+    try:
+        with page.expect_event(
+            "framenavigated", lambda f: f.url.endswith("/frame-target?second")
+        ):
+            page.evaluate(MOVE_THE_IFRAME)
+        left = page.in_flight.requests & stand_ins
+    finally:
+        # The drain after the test names what is left, and a stand-in has
+        # no method or url.
+        page.in_flight.requests -= stand_ins
+    assert left == {document, others, refused}
+
+
+def test_a_blank_link_followed_while_a_frame_navigates_is_tracked(page, event):
+    """A `target="_blank"` link sends the popup's navigation request before
+    Playwright has a page for the popup, and `request.frame` raises for that
+    request. While it was out, the opener's iframe navigated, and
+    `InFlight.navigated`, which read every request's frame, raised from the
+    `framenavigated` listener; the test's next call failed with it (#344's
+    Preview test, whose thumbnails swap; #378). The harness now keeps
+    tracking that request, and drains it once the popup's page loads. It is
+    a document request, and the opener's own `request` listener never sees
+    it, since Playwright gives it no page; so a recorder there that reads
+    `request.frame`, as `test_kiosk_thumbnails.py`'s does, never meets it."""
+    held = []
+    page.context.route("**/popup-target", lambda route: held.append(route))
+    page.route(
+        "**/frame-target?*",
+        lambda route: route.fulfill(body="<p>frame</p>", content_type="text/html"),
+    )
+    on_the_opener = []
+    page.on("request", lambda r: on_the_opener.append(r.url))
+    page.goto("/login/")
+    with page.expect_event(
+        "framenavigated", lambda f: f.url.endswith("/frame-target?first")
+    ):
+        page.evaluate(FRAME_AND_BLANK_LINK)
+    page.click("#blank-link")
+    wait_until(page, lambda: held, "the popup's request")
+    assert len(held) == 1
+    request = held[0].request
+    assert request.resource_type == "document"
+    assert request.is_navigation_request()
+    # The popup has no page yet while its request is held.
+    assert page.context.pages == [page]
+    page.evaluate(MOVE_THE_IFRAME)
+    wait_until(
+        page,
+        lambda: any(f.url.endswith("/frame-target?second") for f in page.frames),
+        "the iframe's navigation",
+    )
+    assert [r.url for r in page.in_flight.requests if "popup-target" in r.url] == [
+        request.url
+    ]
+    # No tab is known to have sent it, and asking does not raise.
+    assert request not in page.in_flight.of(page)
+    with page.context.expect_page() as opened:
+        held[0].fulfill(body="<p>popup</p>", content_type="text/html")
+    popup = opened.value
+    expect(popup.locator("p")).to_have_text("popup")
+    assert page.in_flight.drain(page) == []
+    assert not [url for url in on_the_opener if "popup-target" in url]
+    close_tab(page, popup)
+
+
+def test_the_barrier_blocked_before_the_settle_is_a_page_error(
+    page, page_errors, event
+):
+    """The page errors drop the settle's blocked barrier, and only once the
+    settle sent it: the same failure before then still counts."""
+    page.goto("/login/")
+    session = page.context.new_cdp_session(page)
+    session.send("Network.enable")
+    session.send("Network.setBlockedURLs", {"urls": [f"*{conftest.SETTLE_BARRIER}"]})
+    with page.expect_event("requestfailed"):
+        page.evaluate(
+            "(url) => { fetch(url).catch(() => {}); }", conftest.SETTLE_BARRIER
+        )
+    session.detach()
+    url = f"{page.url.rsplit('/', 2)[0]}{conftest.SETTLE_BARRIER}"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
+def test_another_request_blocked_after_the_barrier_is_a_page_error(
+    page, page_errors, event, monkeypatch
+):
+    """The page errors drop the barrier's failure alone: another request
+    blocked once the barrier is sent, before the settle's own block, still
+    counts."""
+    page.goto("/login/")
+    block = conftest.block_sending
+
+    def fail_one_then_block(tab):
+        session = tab.context.new_cdp_session(tab)
+        session.send("Network.enable")
+        session.send("Network.setBlockedURLs", {"urls": ["*held-request"]})
+        # A stylesheet, which no stop stubs (#409's PR #424 stubs images).
+        with tab.expect_event("requestfailed"):
+            tab.evaluate(
+                """() => document.head.append(Object.assign(
+                  document.createElement('link'),
+                  {rel: 'stylesheet', href: '/held-request'}))"""
+            )
+        session.detach()
+        block(tab)
+
+    monkeypatch.setattr(conftest, "block_sending", fail_one_then_block)
+    assert _settle(page) == []
+    url = f"{page.url.rsplit('/', 2)[0]}/held-request"
+    assert page_errors.errors == [f"request failed: {url} {BLOCKED[0]}"]
+    page_errors.errors.clear()
+
+
+# Fetches /login/?held in the task that sends the barrier, just before it.
+FETCH_BEFORE_THE_BARRIER = """() => {
+  const send = window.fetch.bind(window);
+  window.fetch = (url, ...rest) => {
+    if (String(url).endsWith('settle-barrier')) send('/login/?held').catch(() => {});
+    return send(url, ...rest);
+  };
+}"""
+
+
+@pytest.mark.parametrize("route", ["page", "context", "none"])
+def test_the_barrier_follows_a_fetch_sent_before_it(
+    page, page_errors, event, monkeypatch, route
+):
+    """The barrier's end reaches Python after the `request` event of a fetch
+    the page sent just before it, with a route on the page, on its context,
+    or none: Playwright reports a request by the Fetch domain where a route
+    has it intercepting, and a blocked barrier there came first (#347). The
+    fetch is held, by the route or by the server, until the barrier is in."""
+    gate = threading.Event()
+    held = []
+
+    def hold(sender, environ, **kwargs):
+        if environ.get("QUERY_STRING") == "held":
+            gate.wait(InFlight.TIMEOUT_MS / 1000)
+
+    request_started.connect(hold, weak=False)
+    if route == "page":
+        page.route("**/login/?held", lambda r: held.append(r))
+    elif route == "context":
+        page.context.route("**/login/?held", lambda r: held.append(r))
+    seen = []
+    page.on("request", lambda r: r.url.endswith("?held") and seen.append(r))
+    barrier = conftest._barrier
+    at_barrier = []
+
+    def barrier_then_release(tab):
+        barrier(tab)
+        at_barrier.append(len(seen))
+        gate.set()
+        for held_route in held:
+            held_route.fulfill(status=204)
+
+    try:
+        page.goto("/login/")
+        page.evaluate(FETCH_BEFORE_THE_BARRIER)
+        monkeypatch.setattr(conftest, "_barrier", barrier_then_release)
+        assert _settle(page) == []
+    finally:
+        gate.set()
+        request_started.disconnect(hold)
+    assert at_barrier == [1]
+    assert page_errors.errors == []
+
+
+# The commit and the barrier race, and the old barrier lost only in some
+# runs, fewer under load (#347): each size runs the test this many times.
+COMMIT_RACES = 3
+
+
+@pytest.mark.parametrize("attempt", range(COMMIT_RACES))
+def test_the_settle_sees_every_request_of_a_page_that_commits_as_it_starts(
+    page, page_errors, event, monkeypatch, attempt
+):
+    """The settle ran while a navigation was out: a test that failed in
+    `log_in` with the login POST held (#347 gap 1). Its stop waits for the
+    new document's commit, and the barrier's `page.route` then turned
+    Playwright's interception on as the commit landed. The new document's
+    requests then reached the server with no `request` event, the barrier's
+    among them: a 404 and a 10 s wait for its end (#316's log). Here the
+    server holds a navigation until the settle's first stop, and the held
+    page fetches once as it loads. The barrier now never reaches the
+    server, and every request the server gets after the release has its
+    `request` event."""
+    gate = threading.Event()
+    held = []
+    after = []
+
+    def hold(sender, environ, **kwargs):
+        if environ.get("QUERY_STRING") == "held":
+            held.append(environ["PATH_INFO"])
+            gate.wait(InFlight.TIMEOUT_MS / 1000)
+        elif gate.is_set():
+            after.append(environ["PATH_INFO"])
+
+    request_started.connect(hold, weak=False)
+    page.add_init_script(
+        "if (location.search === '?held') fetch('/login/?from-the-held-page');"
+    )
+    try:
+        page.goto("/login/?all")
+        seen = []
+        page.on(
+            "request", lambda r: gate.is_set() and seen.append(urlsplit(r.url).path)
+        )
+        page.evaluate("() => { location.href = '/login/?held'; }")
+        wait_until(page, lambda: held, "the held navigation at the server")
+        stop = conftest.stop_timers
+
+        def release_then_stop(tab):
+            gate.set()
+            stop(tab)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(conftest, "stop_timers", release_then_stop)
+            assert _settle(page) == []
+        assert page.url.endswith("/login/?held")
+    finally:
+        gate.set()
+        request_started.disconnect(hold)
+    assert conftest.SETTLE_BARRIER not in after
+    assert "/login/" in after, "the held page's own fetch reached the server"
+    wait_until(
+        page,
+        lambda: not Counter(after) - Counter(seen),
+        f"a request event for each of {after} (got {seen})",
+    )
+    assert page_errors.errors == []

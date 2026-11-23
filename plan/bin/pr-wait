@@ -1,7 +1,8 @@
 #!/bin/bash
 # Waits until every check on PR <number>'s current head has finished, then prints
 # one "<bucket> <name> <link>" line per check.  Exits 0 only if all passed or
-# were skipped.  On a failure it also prints `plan/bin/ci-failures`: each
+# were skipped, and GitHub rejected no workflow file on the head
+# (plan/bin/rejected-workflows).  On a failure it also prints `plan/bin/ci-failures`: each
 # failing test, and whether it failed on master lately, and for a job that
 # names no test, the step that failed and its error line.  Waits for checks to
 # appear first, because GitHub creates the runs a few seconds after a push.
@@ -14,6 +15,11 @@
 # a PR pr-merge then merged (#206 retro).
 #
 # Usage: plan/bin/pr-wait <pr or branch> [--timeout-min N]   (default 90)
+#
+# Exits 0 when every counted check passed; 1 on a failed check, a rejected
+# workflow or a failed read of the runs; 2 when the head moved (rerun it);
+# 3 on a timeout; 4 on a bound that is no whole number, which is a typo, not
+# a red check (#417 retro).
 #
 # A branch names its PR, as `gh pr checks` takes it, so an implementer waits
 # on every workflow of its head: #58's own waiter watched image.yml alone and
@@ -32,6 +38,16 @@
 set -euo pipefail
 PR=${1:?usage: pr-wait <pr or branch> [--timeout-min N]}
 TIMEOUT_MIN=${3:-90}
+PUSH_MIN=${PR_WAIT_PUSH_MIN:-5}
+# Bash drops a command whose arithmetic fails and goes on with no failed
+# status, so a bound like `5m`, or `08`, which reads as octal, must stop
+# here (#417 retro).
+case "$TIMEOUT_MIN" in
+  *[!0-9]* | 0?*) echo "pr-wait: --timeout-min takes a whole number of minutes, not '$TIMEOUT_MIN'" >&2; exit 4 ;;
+esac
+case "$PUSH_MIN" in
+  *[!0-9]* | 0?*) echo "pr-wait: PR_WAIT_PUSH_MIN takes a whole number of minutes, not '$PUSH_MIN'" >&2; exit 4 ;;
+esac
 GH=${GH:-gh}
 REPO=${REPO:-PorkChopExpress86/derbynet}
 
@@ -63,7 +79,7 @@ read -r head branch <<<"$head_branch"
 deadline=$(( $(date +%s) + TIMEOUT_MIN * 60 ))
 # The wait for GitHub to show the push has a bound of its own: a PR reset to an
 # older commit than origin/<branch> would otherwise wait out all of TIMEOUT_MIN.
-push_min=$(( TIMEOUT_MIN < ${PR_WAIT_PUSH_MIN:-5} ? TIMEOUT_MIN : ${PR_WAIT_PUSH_MIN:-5} ))
+push_min=$(( TIMEOUT_MIN < PUSH_MIN ? TIMEOUT_MIN : PUSH_MIN ))
 push_deadline=$(( $(date +%s) + push_min * 60 ))
 if behind_the_push "$head" "$branch"; then
   echo "waiting for PR #$PR to show origin/$branch $(git rev-parse "origin/$branch");" \
@@ -84,6 +100,18 @@ while :; do
   if [ "$now_head" != "$head" ]; then
     echo "head moved to $now_head while waiting; rerun pr-wait" >&2
     exit 2
+  fi
+  # A workflow GitHub rejected has a failed run with no job and no check on
+  # the PR, so the checks below never show it (#59 retro).
+  if ! rejected=$(GH="$GH" REPO="$REPO" "$(dirname "$0")/rejected-workflows" "$head"); then
+    echo "could not read the workflow runs on $head" >&2
+    exit 1
+  fi
+  if [ -n "$rejected" ]; then
+    echo "$rejected"
+    echo "GitHub rejected each workflow file above on $head: its run failed with no job," \
+         "so no check of it shows on the PR; the run's page names the error" >&2
+    exit 1
   fi
   # bucket is pass, fail, pending, skipping, or cancel
   all=$("$GH" pr checks "$PR" --repo "$REPO" --json bucket,name,link,workflow,event \

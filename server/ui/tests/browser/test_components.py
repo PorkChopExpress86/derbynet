@@ -133,9 +133,10 @@ def test_the_sortable_list_moves_by_the_row_menu(gallery):
     ).to_be_focused()
 
 
+@pytest.mark.sizes(
+    "desktop", reason="Playwright's mouse drag stands in for touch on the desktop"
+)
 def test_the_sortable_list_moves_by_drag(gallery):
-    if gallery.size == "phone":
-        pytest.skip("Playwright's mouse drag stands in for touch on the desktop")
     rows = gallery.get_by_role("list", name="Awards in presentation order")
     gallery.wait_for_function("window.Sortable !== undefined")
 

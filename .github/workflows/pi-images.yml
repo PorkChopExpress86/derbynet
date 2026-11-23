@@ -1,0 +1,315 @@
+name: pi-images
+
+# The Raspberry Pi images (#59): the timer (extras/docker/timer.Dockerfile)
+# and the photo stand (extras/docker/photostand.Dockerfile), for linux/arm64.
+#
+# - build: each image under QEMU, once, into an OCI archive that the later
+#   jobs use, so the published bits are the checked ones.  The job pushes
+#   each archive to a registry that lives only in the job, so `docker buildx
+#   imagetools inspect` can show its platform, and dry-runs
+#   server/docker/ci/publish.sh there.
+# - checks: every check of extras/docker/ci/checks.sh (its header lists them),
+#   natively on GitHub's ubuntu-24.04-arm runner, against the server image
+#   built there from server/docker/Dockerfile.
+# - publish: on a release tag only, each archive to
+#   ghcr.io/porkchopexpress86/derbynet_timer and derbynet_photostand, next to
+#   the server image (#58, D89), with server/docker/ci/publish.sh.  Pull
+#   requests and branch pushes push nothing.
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+    paths:
+      - extras/docker/**
+      - extras/scripts/photostand.sh
+      - extras/scripts/lib/**
+      - extras/conf/**
+      - extras/sounds/**
+      - timer/build.xml
+      - timer/src/**
+      - lib/jssc.jar
+      - lib/slf4j-nop-1.7.30.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
+      - website/img/status/**
+      # The checks run against the server image, and set up with these.
+      - server/docker/**
+      - testing/reset-database.sh
+      - testing/import-roster.sh
+      - testing/common.sh
+      - server/tests/test_pi_images.py
+      - docs/pi-setup.md
+      - server/docs/guide-commands.tsv
+      - server/tools/guide_commands.py
+      - server/ui/docs/build.py
+      - server/pyproject.toml
+      - server/uv.lock
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
+      - .github/workflows/pi-images.yml
+  pull_request:
+    paths:
+      - extras/docker/**
+      - extras/scripts/photostand.sh
+      - extras/scripts/lib/**
+      - extras/conf/**
+      - extras/sounds/**
+      - timer/build.xml
+      - timer/src/**
+      - lib/jssc.jar
+      - lib/slf4j-nop-1.7.30.jar
+      - lib/Java-WebSocket-1.5.2.jar
+      - lib/json-20210307.jar
+      - website/img/status/**
+      # The checks run against the server image, and set up with these.
+      - server/docker/**
+      - testing/reset-database.sh
+      - testing/import-roster.sh
+      - testing/common.sh
+      - server/tests/test_pi_images.py
+      - docs/pi-setup.md
+      - server/docs/guide-commands.tsv
+      - server/tools/guide_commands.py
+      - server/ui/docs/build.py
+      - server/pyproject.toml
+      - server/uv.lock
+      # The apt mirror fallback the setup steps run (test_workflow_paths.py).
+      - .github/ubuntu-mirror.sh
+      - .github/workflows/pi-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi-images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build (linux/arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      registry:
+        image: registry:3@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU for the arm64 stages; the timer's jar stage runs on the runner's
+      # own platform (--platform=$BUILDPLATFORM).
+      - name: Set up QEMU
+        run: |
+          docker run --privileged --rm \
+            tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 \
+            --install arm64
+
+      - uses: docker/setup-buildx-action@v4.4.1
+        with:
+          driver-opts: network=host
+
+      - name: Build the timer image into an OCI archive
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: extras/docker/timer.Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          outputs: type=oci,dest=${{ runner.temp }}/timer.tar
+          cache-from: type=gha,scope=pi-timer
+          cache-to: type=gha,scope=pi-timer,mode=max
+
+      - name: Build the photo stand image into an OCI archive
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: extras/docker/photostand.Dockerfile
+          platforms: linux/arm64
+          provenance: false
+          outputs: type=oci,dest=${{ runner.temp }}/photostand.tar
+          cache-from: type=gha,scope=pi-photostand
+          cache-to: type=gha,scope=pi-photostand,mode=max
+
+      - name: Push each archive to the job's own registry, and inspect it
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in timer photostand; do
+            skopeo copy --all --preserve-digests --dest-tls-verify=false \
+              "oci-archive:$RUNNER_TEMP/$image.tar" "docker://localhost:5000/derbynet_$image:ci"
+            docker buildx imagetools inspect "localhost:5000/derbynet_$image:ci"
+            # A one-platform build pushes a plain manifest, with no platform
+            # list for imagetools to print (run 44246355493), so the
+            # platform is read from the image's config.
+            platform="$(skopeo inspect --tls-verify=false --config "docker://localhost:5000/derbynet_$image:ci" \
+              | jq -r '.os + "/" + .architecture')"
+            echo "derbynet_$image: $platform"
+            test "$platform" = linux/arm64
+          done
+
+      # publish.sh as the publish job runs it, against the job's registry.
+      - name: Dry-run the publish step
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in timer photostand; do
+            server/docker/ci/publish.sh "$RUNNER_TEMP/$image.tar" "localhost:5000/dry-$image" v1.2.3 --dest-tls-verify=false
+            tags="$(curl -s "http://localhost:5000/v2/dry-$image/tags/list" | jq -c '.tags | sort')"
+            echo "dry-$image: $tags"
+            test "$tags" = '["latest","v1.2.3"]'
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pi-images
+          path: |
+            ${{ runner.temp }}/timer.tar
+            ${{ runner.temp }}/photostand.tar
+          retention-days: 7
+          if-no-files-found: error
+
+  checks:
+    name: checks (arm64)
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
+    env:
+      SERVER_IMAGE: derbynet_server:ci
+      TIMER_IMAGE: derbynet_timer:ci
+      PHOTOSTAND_IMAGE: derbynet_photostand:ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: pi-images
+          path: ${{ runner.temp }}
+
+      # The runner context is not available in a job's env (GitHub's context
+      # table); run 44236545824 failed on it, so LOGS is set here.
+      - name: Load the images the build job made
+        run: |
+          echo "LOGS=$RUNNER_TEMP/logs" >> "$GITHUB_ENV"
+          command -v skopeo >/dev/null || {
+            sudo sh .github/ubuntu-mirror.sh
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends skopeo
+          }
+          skopeo copy "oci-archive:$RUNNER_TEMP/timer.tar" "docker-daemon:$TIMER_IMAGE"
+          skopeo copy "oci-archive:$RUNNER_TEMP/photostand.tar" "docker-daemon:$PHOTOSTAND_IMAGE"
+          uname -m
+          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$TIMER_IMAGE" "$PHOTOSTAND_IMAGE"
+
+      - uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Build the server image for arm64
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: server/docker/Dockerfile
+          load: true
+          tags: ${{ env.SERVER_IMAGE }}
+          cache-from: type=gha,scope=pi-server
+          cache-to: type=gha,scope=pi-server,mode=max
+
+      - name: The timer image races a round with its simulated timer
+        run: extras/docker/ci/checks.sh timer
+
+      - name: The timer image loads jssc's serial library for arm64
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh timer-serial
+
+      - name: The timer image passes TIMER_PASSWORD and TIMER_ARGS to the jar as given
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh timer-args
+
+      - name: compose.timer.yaml, run as docs/pi-setup.md runs it, races the round
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh timer-compose
+
+      - name: The photo stand takes, uploads and checks in on a scan
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh photostand
+
+      - name: The photo stand reads its settings back as passed
+        if: success() || failure()
+        run: extras/docker/ci/checks.sh photostand-conf
+
+      # compose.photostand.yaml passes in the machine's /dev/snd and USB bus,
+      # so this check runs here and not on a developer's machine, where the
+      # stand would speak through its speakers.  The step lists /dev/snd first.
+      - name: compose.photostand.yaml, run as docs/pi-setup.md runs it, uploads on a scan
+        if: success() || failure()
+        run: |
+          ls -la /dev/snd || true
+          extras/docker/ci/checks.sh photostand-compose
+
+      # docs/pi-setup.md's timer and photo stand commands, as written
+      # (#414), with server/docker/ci/guide-commands.sh: .env as the guide
+      # writes it, the server at the address it names, the images from a
+      # registry of the job's own.  The timer's port the .env names is a
+      # stand-in like /dev/null (checks.sh timer-serial passes /dev/null the
+      # same way), and TIMER_ARGS runs the jar's simulated timer.
+      - uses: astral-sh/setup-uv@v10.3.2
+        if: success() || failure()
+        with:
+          python-version: '3.14'
+
+      - name: A stand-in for the timer's serial port
+        if: success() || failure()
+        run: |
+          test ! -e /dev/ttyUSB0
+          sudo mknod -m 666 /dev/ttyUSB0 c 1 3
+          ls -l /dev/ttyUSB0
+
+      - name: docs/pi-setup.md's timer and photo stand commands, run as written
+        if: success() || failure()
+        env:
+          IMAGE: ${{ env.SERVER_IMAGE }}
+        run: >-
+          server/docker/ci/guide-commands.sh pi-timer-folder pi-timer-env
+          pi-timer pi-timer-update pi-photostand-folder pi-photostand-env
+          pi-photostand
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pi-checks
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: warn
+
+  publish:
+    name: publish to ghcr.io
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: pi-images
+          path: ${{ runner.temp }}
+
+      - name: Push the checked archives to ghcr.io
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | skopeo login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for image in timer photostand; do
+            server/docker/ci/publish.sh "$RUNNER_TEMP/$image.tar" \
+              "ghcr.io/porkchopexpress86/derbynet_$image" "$GITHUB_REF_NAME"
+          done
+
+      - name: docker buildx imagetools inspect
+        run: |
+          for image in timer photostand; do
+            docker buildx imagetools inspect "ghcr.io/porkchopexpress86/derbynet_$image:${GITHUB_REF_NAME}"
+          done

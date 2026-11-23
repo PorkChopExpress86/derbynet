@@ -111,13 +111,6 @@ def _in_heat_loosely(candidate: int | None, heat: Heat) -> bool:
     return candidate in heat
 
 
-def _no_heat(index: int | None) -> bool:
-    """PHP's `!$relos[$lane]`, which also takes heat index 0 for no heat, so
-    the first heat of the chart never takes a displaced racer (Q3 in #20,
-    reproduced in v1 by D19; #65 fixes it)."""
-    return not index
-
-
 class ScheduleAdjuster:
     """One reschedule of one round.
 
@@ -284,12 +277,12 @@ class ScheduleAdjuster:
                         continue
                     relos[lane] = bh
                     break
-                if _no_heat(relos[lane]):
+                if relos[lane] is None:
                     plausible = False
                     break
             if plausible:
                 for lane, bh in enumerate(relos):
-                    if not _no_heat(bh):
+                    if bh is not None:
                         self._chart[bh][lane] = heat[lane]
                 del self._chart[h]
                 del self._numbers[h]

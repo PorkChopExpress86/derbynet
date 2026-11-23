@@ -126,6 +126,11 @@ class Scenario:
             self.post_as(self._timer_client, "action=role.login&name=Timer&password=")
         return self._timer_client
 
+    def log_in_timer_again(self):
+        """A new Timer session at the next timer message, as a scenario's
+        `user_login_timer` after `reset_database` makes."""
+        self._timer_client = None
+
     def post_as(self, client: Client, body: str) -> bytes:
         return send(client, "POST action.php", body, self.ids).content
 
@@ -218,13 +223,14 @@ class Scenario:
 def _matches_deviation(body: bytes, status: int, entry: dict) -> bool:
     """An expected exchange holds Django's whole reply, or, as
     `tools/reschedule_deviations.py` writes them, only what the reschedule
-    service computes: the chart and `timing.internal`, or `failure`."""
-    want = json.loads(entry["body"])
-    if "outcome" in want or "status" in entry:
+    service computes: the chart and `timing.internal`, or `failure`. A whole
+    reply that is not JSON, such as a timer's XML, carries its status."""
+    if "status" in entry or "outcome" in json.loads(entry["body"]):
         # Some entries were written without the final newline.
         return body.rstrip(b"\n") == entry["body"].rstrip(b"\n") and status == int(
             entry.get("status", 200)
         )
+    want = json.loads(entry["body"])
     got = json.loads(body)
     if "failure" in want:
         return got["outcome"]["code"] == want["failure"]
@@ -471,6 +477,15 @@ def run_reschedule_quirks(client) -> Scenario:
     s.scenario("http/reschedule/last-added-heat.http")
     s.capture("rounds-before")
     s.capture("dry-run-runs-out-of-added-heats")
+
+    # Q3: a bye in the first heat takes a racer of the heat squeezed out (#65).
+    _reschedule_case(s, 5, "Racers", mask=12)
+    s.post_ok("action=racer.bulk&who=all&what=checkin")
+    s.learn_rows()
+    s.post_ok("action=schedule.generate&roundid=1")
+    s.post_ok("action=racer.pass&racer=1&value=0")
+    s.scenario("http/reschedule/first-heat-bye.http")
+    s.capture("dry-run-with-a-bye-in-the-first-heat")
     return s
 
 

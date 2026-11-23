@@ -13,7 +13,11 @@
 # the first entry of a folder listing taken as it comes (#312 retro),
 # the role page lists of testing/test-permissions.sh against the page gates
 # (#319 retro), a fake clock paused at its install time and a browser test
-# that takes no fixture (#317 retro),
+# that takes no fixture (#317 retro), a browser test that skips on its size
+# in its body (#366), a shell function that records state
+# called in a subshell (#59 retro), a guide's command with no row in
+# docs/guide-commands.tsv (#414), a number a tool script reads with no
+# check that it is one (#417 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -30,7 +34,9 @@
 # slowest parts, and runs the rest on xdist: run it before each push.  #373's
 # push ran the whole script in the hook, which found a made-up path in a
 # test string that read as a cite (test_php_cite_lines.py) after about 15
-# min, and the fix needed a second push (#373 retro).
+# min, and the fix needed a second push (#373 retro).  It refuses a tree
+# with untracked files, which the checks that read `git ls-files` skip
+# (#414 retro): git add new files first.
 
 set -e -o pipefail
 
@@ -52,6 +58,21 @@ quick=()
 if [ "${1:-}" = --quick ]; then
   shift
   quick=(-n auto --deselect tests/test_pytest_under_load.py)
+  # Several checks read the tracked files alone (`git ls-files`, as in
+  # tests/test_pipefail_pipes.py), and a push checks the commit: #414's
+  # --quick passed with a new script untracked, and the hook's run refused
+  # three of its pipes 19 min later (#414 retro).  Outside a work tree (the
+  # tests' copies of this script) there is nothing to list.
+  if top="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)"; then
+    untracked="$(git -C "$top" -c core.quotePath=false ls-files --others --exclude-standard)"
+    if [ -n "$untracked" ]; then
+      echo "source-checks.sh --quick: these files are untracked, and the" \
+           "checks that read tracked files skip them; git add each one" \
+           "(or remove it) and run again (#414 retro):" >&2
+      sed 's/^/  /' <<<"$untracked" >&2
+      exit 2
+    fi
+  fi
   echo "source-checks.sh --quick: skips plan/tests and" \
        "tests/test_pytest_under_load.py; the pre-push hook runs the whole" \
        "script, so a green --quick run is not a green push." >&2
@@ -78,8 +99,13 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_playwright_in_process.py \
   tests/test_transactional_tests.py \
   tests/test_docker_checks.py \
+  tests/test_pi_images.py \
+  tests/test_guide_commands.py \
+  tests/test_workflow_contexts.py \
   tests/test_readme_compose.py \
   tests/test_pipefail_pipes.py \
+  tests/test_subshell_state.py \
+  tests/test_arithmetic_operands.py \
   tests/test_listing_order.py \
   tests/test_plan_source_checks.py \
   tests/test_role_pages_fixture.py \
@@ -92,6 +118,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   ui/tests/test_browser_empty_fulfill.py \
   ui/tests/test_browser_missing_allowance.py \
   ui/tests/test_browser_clock_pause.py \
+  ui/tests/test_browser_size_skips.py \
   ui/tests/test_browser_source_only.py \
   ui/tests/test_php_libraries.py \
   legacy_api/tests/test_registry.py \

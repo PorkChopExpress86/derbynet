@@ -31,11 +31,6 @@ from ui.tests.browser.helpers import bound, ready
 DESIGN = 1
 
 
-def phone_only(page):
-    if page.size != "phone":
-        pytest.skip("this acceptance check is at 390x844")
-
-
 def racer(event, name, partition, car, **flags) -> Racer:
     made = insert_new_racer(
         event,
@@ -132,11 +127,11 @@ def edit_award(page, award):
 # ----- acceptance: a judge on a phone -----
 
 
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_judge_on_a_phone_assigns_and_removes_an_award(login, event):
     """At 390x844, as the race crew: tap a racer, tap an award on the
     racer's sheet, then remove the award from its card, and Undo. No drag."""
     page = login("RaceCrew")
-    phone_only(page)
     found = pack(event)
     paint = new_award(event, "Best Paint")
     open_judging(page)
@@ -200,6 +195,7 @@ def test_the_wrong_subgroup_is_refused_with_a_visible_reason(login, event):
 # ----- acceptance: D35, Parents -----
 
 
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_parents_win_a_pack_judged_award_until_the_editor_leaves_them_out(login, event):
     """At 390x844 (D35): with the pack's speed-award list leaving out
     Parents, the Parents racer can be given a pack-wide judged award whose
@@ -207,7 +203,6 @@ def test_parents_win_a_pack_judged_award_until_the_editor_leaves_them_out(login,
     awards editor saves a list without it, unchecking the last box is
     refused, and judging then lists no Parents racer for that award."""
     page = login("RaceCoordinator")
-    phone_only(page)
     found = pack(event)
     set_partition_list(event, [partition(event, "Lions"), partition(event, "Tigers")])
     paint = new_award(event, "Best Paint")
@@ -321,6 +316,7 @@ def test_the_no_kiosk_warning_shows_and_hides(login, event):
     expect(warning).to_have_count(0)
 
 
+@pytest.mark.sizes("phone", reason="this acceptance check is at 390x844")
 def test_a_long_award_name_keeps_the_phone_list_one_screen_wide(login, event):
     """A card is no wider than the list, whatever the award's name, so the
     editor never scrolls sideways on a phone. With no phone columns the list's
@@ -330,7 +326,6 @@ def test_a_long_award_name_keeps_the_phone_list_one_screen_wide(login, event):
     award = new_award(event, "Darrell & Darrell Delaughter Memorial Award")
     new_award(event, "Short")
     page = open_editor(login("RaceCoordinator"))
-    phone_only(page)
     card = page.locator(f'[data-award-list] [data-award="{award.pk}"]')
     expect(card).to_contain_text("Darrell & Darrell Delaughter Memorial Award")
     page.wait_for_function(
