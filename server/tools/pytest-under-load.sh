@@ -10,11 +10,14 @@
 # so a long run is never cut short or filtered.  It stops only the loops it
 # started.
 #
-# Usage: server/tools/pytest-under-load.sh [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
+# Usage: server/tools/pytest-under-load.sh [-h | --help] [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
 #
 #   server/tools/pytest-under-load.sh --postgres -m browser -n 4 --count 25 -k phone ui/tests/browser/test_photos.py
 #
-# --postgres runs through tools/pytest-postgres.sh, and starts the loops once
+# -h or --help among its own options, which are read first, prints the Usage
+# line and exits 0 before any refusal and before the lock; given after the
+# first pytest argument it reaches pytest.  --postgres runs through
+# tools/pytest-postgres.sh, and starts the loops once
 # its Postgres is ready: started under load, it once missed a 300 s wait
 # (#54 retro).  --loops sets the number
 # of busy loops (default 8).  Results go to var/load-runs/<time>/ under
@@ -43,14 +46,43 @@
 # folder, commit and arguments, which the holder writes into the file.  #316's
 # hand-off ran beside #317's 25-count run at a load average of 35 and failed,
 # then waited 74 min for a slot the lead handed out by message (#316 retro).
+# Runs wait in a line and take the lock in the order they came, each
+# printing its place and the runs ahead of it, again whenever that changes
+# (tools/load-lock-line.sh, #417).  Whatever fails on the way to the lock,
+# the run ends with 2 and a message and starts nothing; a file in the line
+# folder that it did not make is ignored.
 # Only this script holds the lock (its loops and pytest get no copy of it),
 # so a SIGKILL frees it at once.  A SIGKILL while it waits leaves its flock
-# waiting, which takes the lock once it frees and exits at once; a SIGTERM,
-# SIGINT or SIGHUP stops that flock too (#391).  Its pytest gets
+# waiting, which takes the lock once it frees and exits at once, and its
+# entry in the line, which the next waiter removes; a SIGTERM, SIGINT or
+# SIGHUP stops that flock and removes the entry (#391).  Its pytest gets
 # DERBYNET_LOAD_LOCK_HELD, and any other pytest run names the holder in its
 # header and summary (conftest.py).
 
 set -e -E -o pipefail
+
+# Its own options come first, and -h or --help among them prints the usage
+# and takes no lock: hold-load-lock.sh --help once queued on the lock as a
+# COMMAND, and this script would run `pytest --help` under load (#434 retro).
+# They are read before the refusals below, so --help works through a pipe.
+SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+RUNNER=(uv run pytest)
+ALL_ARGS="$*"
+LOOPS=8
+FLAKE_TICKET=
+usage() {
+  sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
+  echo "The comment at the top of $0 says more."
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
+    --loops) LOOPS="$2"; shift 2 ;;
+    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
+    *) break ;;
+  esac
+done
 
 # It refuses to start through a pipe or under `timeout`: #47 and #48 each
 # lost a 25-repeat run to `timeout 3000 ... | grep`, killed with nothing
@@ -72,20 +104,6 @@ if ! command -v flock >/dev/null; then
        "load run at a time: install util-linux, or on macOS \`brew install flock\`." >&2
   exit 2
 fi
-
-SERVER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-RUNNER=(uv run pytest)
-ALL_ARGS="$*"
-LOOPS=8
-FLAKE_TICKET=
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
-    --loops) LOOPS="$2"; shift 2 ;;
-    --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
-    *) break ;;
-  esac
-done
 
 OUT="${DERBYNET_LOAD_RUN_DIR:-$SERVER_DIR/var/load-runs/$(date +%Y%m%d-%H%M%S)-$$}"
 # A folder that already holds files is refused: #220 reused one, and a wait
@@ -131,6 +149,12 @@ fi
 # The commit is read before the lock, so a slow git never leaves a waiter
 # reading half the holder's lines (#354 review).
 HEAD_SHA="$(git -C "$SERVER_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+LINE_FILE="$SERVER_DIR/tools/load-lock-line.sh"
+. "$LINE_FILE" || {
+  echo "pytest-under-load.sh: it cannot read $LINE_FILE, which keeps the" \
+       "line the load lock is served in; it runs no command." >&2
+  exit 2
+}
 
 WAITING=
 PIDS=()
@@ -150,6 +174,7 @@ stop_all() {
   fi
   stop_loops
   if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
+  line_leave
 }
 trap stop_all EXIT
 # A signal ignores any further TERM, INT or HUP, and so does the cleanup,
@@ -160,26 +185,36 @@ trap stop_all EXIT
 # the wait killed the script and left its flock waiting (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
-if ! flock -n -x 9; then
+trap 'line_fail "$BASH_COMMAND"' ERR
+line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
+  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
+if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   # Empty from the holder's truncation until its one write lands.
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
   # In the background, so a signal's trap runs during the wait, and the
   # cleanup stops the flock, the only job then: bash runs a trap only once a
-  # foreground command ends.  The lock is on the file fd 9 opened, so it
-  # stays with this script once flock exits; a flock that ends without it
-  # fails the script here.
+  # foreground command ends.  line_wait_turn sleeps the same way.  The lock
+  # is on the file fd 9 opened, so it stays with this script once flock
+  # exits; a flock that ends without it fails the script here.  `8>&-`
+  # keeps the entry's flock with this script alone.
   WAITING=1
-  flock -x 9 &
+  line_wait_turn
+  flock -x 9 8>&- &
   wait "$!"
   WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
+elif [ "$LINE_STATE" != took ]; then
+  line_fail "the join gave no place and no lock"
 fi
+trap - ERR
 refuse_used_folder
 # One write of the whole text.
 printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS" >"$LOCK"
+# Out of the line, now that it holds the lock.
+line_leave
 
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"

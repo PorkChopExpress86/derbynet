@@ -4,7 +4,7 @@
 # hand-off's runs without load queue behind a load run and keep the next
 # one out until they end.
 #
-# Usage: server/tools/hold-load-lock.sh COMMAND [ARGUMENT ...]
+# Usage: server/tools/hold-load-lock.sh [-h | --help] | COMMAND [ARGUMENT ...]
 #
 #   server/tools/hold-load-lock.sh bash ~/.cache/derbynet-drafts/N/handoff.sh
 #
@@ -12,16 +12,18 @@
 # names a load run's holder (D114).  #350's hand-off polled for a free lock
 # and waited about 2 h: #348's queued load runs took the lock again within
 # seconds of each other, so its gate waited for a 5-minute free window
-# (#348, #350 retro).  This script waits in flock instead, beside any load
-# run that waits: a hand-off already waiting went ahead of a
-# pytest-under-load.sh started as the holder let go, 25 of 25 under load
-# (tests/test_pytest_under_load.py).  flock(2) promises no order: the
-# kernel wakes every waiter at the release and the first to run takes the
-# lock, so two runs already waiting race, and a run that starts after the
-# release loses only because waking is quicker than starting a script.
+# (#348, #350 retro).  This script waits in the same line as the load runs
+# instead, and takes the lock in the order it came, ahead of any run that
+# starts waiting after it (tools/load-lock-line.sh, #417).  Whatever fails on
+# the way to the lock, it exits 2 with a message and runs no COMMAND.  It takes
+# no option: -h or --help as its first argument prints the Usage line and
+# exits 0, and a first argument that starts with any other - is refused with
+# 2, since no COMMAND starts with - and #434's `--help` once waited in the
+# lock's line to run one (#434 retro).
 #
 # It takes the lock as pytest-under-load.sh does (DERBYNET_LOAD_LOCK, or
-# ~/.cache/derbynet/load-run.lock), writes the same holder lines, with
+# ~/.cache/derbynet/load-run.lock), prints its place in the line as that
+# script does, writes the same holder lines, with
 # `args hold-load-lock.sh: COMMAND ...`, and runs COMMAND in a process group
 # of its own with DERBYNET_LOAD_LOCK_HELD set, so the pytest runs under it
 # name no holder (conftest.py).  COMMAND gets no copy of the lock, so a
@@ -34,10 +36,23 @@
 
 set -e -E -o pipefail
 
+usage() {
+  sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
+}
 if [ $# -eq 0 ]; then
-  echo "usage: hold-load-lock.sh COMMAND [ARGUMENT ...]" >&2
+  usage >&2
   exit 2
 fi
+case "$1" in
+  -h|--help)
+    usage
+    echo "The comment at the top of $0 says more."
+    exit 0 ;;
+  -*)
+    echo "hold-load-lock.sh: it takes no option, and no COMMAND starts with -: $1" >&2
+    usage >&2
+    exit 2 ;;
+esac
 if ! command -v flock >/dev/null; then
   echo "hold-load-lock.sh: it needs flock(1): install util-linux, or on macOS" \
        "\`brew install flock\`." >&2
@@ -65,6 +80,12 @@ if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
   exit 2
 fi
 HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+LINE_FILE="$(dirname "${BASH_SOURCE[0]}")/load-lock-line.sh"
+. "$LINE_FILE" || {
+  echo "hold-load-lock.sh: it cannot read $LINE_FILE, which keeps the line" \
+       "the load lock is served in; it runs no command." >&2
+  exit 2
+}
 
 WAITING=
 CHILD=
@@ -76,6 +97,7 @@ stop_child() {
     if [ -n "$waiter" ]; then kill "$waiter" 2>/dev/null || true; fi
   fi
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
+  line_leave
 }
 trap stop_child EXIT
 # A signal ignores further signals, as in pytest-under-load.sh, which says
@@ -86,19 +108,28 @@ trap stop_child EXIT
 # lock, as there (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
-if ! flock -n -x 9; then
+trap 'line_fail "$BASH_COMMAND"' ERR
+line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s' \
+  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*")"
+if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
   # Waited on in the background, as in pytest-under-load.sh, which says why.
   WAITING=1
-  flock -x 9 &
+  line_wait_turn
+  flock -x 9 8>&- &
   wait "$!"
   WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
+elif [ "$LINE_STATE" != took ]; then
+  line_fail "the join gave no place and no lock"
 fi
+trap - ERR
 printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s\n' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*" >"$LOCK"
+# Out of the line, now that it holds the lock.
+line_leave
 
 # setsid gives COMMAND a process group of its own (its pid), which the trap
 # stops whole; `9>&-` keeps the lock with this script alone.  `<&0` keeps
