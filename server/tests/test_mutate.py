@@ -1695,19 +1695,48 @@ class Tab:
 def test_reads_the_tab():
     tab = Tab()
     if twice() != 2:
-        tab.blocker.send("Network.enable")
+        {raises}
+
+
+def unbound():
+    if False:
+        late = 1
+    return late
 """
 
 
-def test_a_kill_on_an_attribute_error_says_it_was_no_assert(project):
+@pytest.mark.parametrize(
+    "raises, error",
+    [
+        ('tab.blocker.send("Network.enable")', "AttributeError"),
+        ("blocker", "NameError"),
+        ("unbound()", "UnboundLocalError"),
+        ("tab()", "TypeError"),
+    ],
+)
+def test_a_kill_on_a_scaffolding_error_says_it_was_no_assert(project, raises, error):
     """#409's m2 read KILLED on `tab.blocker`'s AttributeError in its own
     test, which the mutant reached, not on an assert (#409 retro)."""
-    (project / "test_scaffold.py").write_text(SCAFFOLD_TEST)
+    (project / "test_scaffold.py").write_text(SCAFFOLD_TEST.format(raises=raises))
     subprocess.run([*GIT, "add", "."], cwd=project, check=True)
     subprocess.run([*GIT, "commit", "-qm", "scaffold"], cwd=project, check=True)
     run = mutate(project, "1 + 1", "1 + 2", "test_scaffold.py::test_reads_the_tab")
     last = run.stdout.splitlines()[-1]
-    assert last.endswith("'1 + 2'  (failed on AttributeError, not an assert)")
+    assert last.startswith("KILLED  mod.py"), run.stdout
+    assert last.endswith(f"failed on {error}, not an assert)"), run.stdout
+
+
+@pytest.mark.parametrize("tb", ["--tb=no", "--tb=native"])
+def test_a_kill_with_no_traceback_line_names_no_error(project, tb):
+    """`--tb=no` prints no failures section, and `--tb=native` no
+    `file.py:N: Error` line, so no error is named."""
+    (project / "test_scaffold.py").write_text(
+        SCAFFOLD_TEST.format(raises='tab.blocker.send("Network.enable")')
+    )
+    subprocess.run([*GIT, "add", "."], cwd=project, check=True)
+    subprocess.run([*GIT, "commit", "-qm", "scaffold"], cwd=project, check=True)
+    run = mutate(project, "1 + 1", "1 + 2", tb, "test_scaffold.py::test_reads_the_tab")
+    assert run.stdout.splitlines()[-1] == "KILLED  mod.py: '1 + 1' -> '1 + 2'"
 
 
 def test_a_kill_on_an_assert_names_no_error(project):
@@ -1729,15 +1758,14 @@ def test_sometimes():
 """
 
 
-def test_a_kill_under_count_gives_the_runs_it_failed_in(project):
-    """#409's mutant that deleted stop_sending survived one run, then was
-    killed in some runs of ten and of three: a kill by chance (#409 retro)."""
+@pytest.mark.parametrize("count", [["--count", "4"], ["--count=4"]])
+def test_a_kill_under_count_gives_the_runs_it_failed_in(project, count):
+    """#409's mutant that deleted stop_sending survived a run, then was
+    killed in only some of its repeats: a kill by chance (#409 retro)."""
     (project / "test_sometimes.py").write_text(SOMETIMES_TEST)
     subprocess.run([*GIT, "add", "."], cwd=project, check=True)
     subprocess.run([*GIT, "commit", "-qm", "sometimes"], cwd=project, check=True)
-    run = mutate(
-        project, "1 + 1", "1 + 2", "--count", "4", "test_sometimes.py::test_sometimes"
-    )
+    run = mutate(project, "1 + 1", "1 + 2", *count, "test_sometimes.py::test_sometimes")
     last = run.stdout.splitlines()[-1]
     assert last == "KILLED  mod.py: '1 + 1' -> '1 + 2'  (failed in 2 of 4 runs)", (
         run.stdout + run.stderr
