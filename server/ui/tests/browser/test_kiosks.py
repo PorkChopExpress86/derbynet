@@ -2335,3 +2335,181 @@ def test_a_close_with_no_sheet_open_leaves_a_held_key_alone(login, event):
     page.keyboard.up("Enter")
     expect(counter).to_have_attribute("data-clicks", "3")
     expect(sheet(page, "kiosks")).to_be_hidden()
+
+
+@pytest.mark.parametrize(
+    ("opener", "body", "control", "post", "shows"),
+    [
+        pytest.param(
+            "name",
+            "[data-name-sheet]",
+            "#kn-name",
+            "/kiosks/name/",
+            ("[data-name]", "Lobby"),
+            id="name field",
+        ),
+        pytest.param(
+            "name",
+            "[data-name-sheet]",
+            "[data-submit]",
+            "/kiosks/name/",
+            ("[data-name]", "Lobby"),
+            id="save name",
+        ),
+        pytest.param(
+            "page",
+            "[data-page-sheet]",
+            '[data-page-choice="standings"]',
+            "/kiosks/page/",
+            ("[data-page]", "Standings"),
+            id="page choice",
+        ),
+    ],
+)
+def test_a_held_enter_in_a_sheet_form_submits_once(
+    login, event, opener, body, control, post, shows
+):
+    """#400: Enter goes down in the tv card's Name sheet, in its field with
+    Lobby typed or on Save name, or on Standings in its Page sheet, and
+    submits the form. The POST is held at its route while two auto-repeat
+    keydowns land on the same control, then the keyup: htmx sends the one
+    POST. Before, each repeat sent another, and the form's
+    `hx-sync="#kiosk-board:replace"` aborted the one before it (3 sends).
+    PHP's naming dialog posts one kiosk.assign for the same press, its
+    repeats landing on BODY (the PR's php-scratch run). The held POST then
+    saves and the sheet closes. Near miss: a fresh Enter press in the
+    reopened sheet submits it again."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    target = card(page, "tv").locator(f'[data-action="{opener}"]')
+    tap(page, target)
+    form = ready(page, sheet(page, "kiosks").locator(body))
+    if opener == "name":
+        form.get_by_label("Name for this kiosk").fill("Lobby")
+    held = []
+    page.route(
+        f"**{post}",
+        lambda route: (
+            held.append(route) if route.request.method == "POST" else route.continue_()
+        ),
+    )
+    htmx_settled(page)
+    page.evaluate(SHEET_LOG)
+    form.locator(control).focus()
+    page.keyboard.down("Enter")
+    wait_for_held(page, held, f"{post} POST")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.sheetLog.some((r) => r.what === 'keyup')")
+    log = page.evaluate("window.sheetLog")
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 2 and all(r["inSheet"] for r in repeats), log
+    # one read: htmx sends a repeat's POST in the repeat keydown's task,
+    # before keyboard.down() returns.
+    assert [r["path"] for r in log if r["what"] == "send"] == [post], log
+    with htmx_post(page, post):
+        held[0].continue_()
+    expect(sheet(page, "kiosks")).to_be_hidden()
+    expect(card(page, "tv").locator(shows[0])).to_contain_text(shows[1])
+
+    page.unroute(f"**{post}")
+    tap(page, target)
+    form = ready(page, sheet(page, "kiosks").locator(body))
+    form.locator(control).focus()
+    with htmx_post(page, post):
+        page.keyboard.press("Enter")
+    expect(sheet(page, "kiosks")).to_be_hidden()
+
+
+@pytest.mark.parametrize(
+    ("where", "submits"),
+    [
+        pytest.param('[data-sheet="kiosks"]', 1, id="in a sheet"),
+        pytest.param("main", 3, id="off a sheet"),
+    ],
+)
+def test_a_held_enter_in_a_form_off_a_sheet_still_repeats(login, event, where, submits):
+    """#400's rule covers a form in a sheet only. A form with a text field
+    and a submit counter is put in the open Name sheet, or in the page's
+    main, outside any sheet, and Enter is held in its field with two
+    auto-repeat keydowns. In the sheet the form submits once; off it,
+    each repeat submits it again, 3 submits in all, as before #400."""
+    kiosk(event, "tv")
+    page = open_dashboard(login("RaceCoordinator"))
+    tap(page, card(page, "tv").locator('[data-action="name"]'))
+    ready(page, sheet(page, "kiosks").locator("[data-name-sheet]"))
+    page.evaluate(
+        """where => {
+          const f = document.createElement('form');
+          f.id = 'counted';
+          f.dataset.submits = '0';
+          f.innerHTML = '<input id="counted-field" type="text">';
+          f.addEventListener('submit', (e) => {
+            e.preventDefault();
+            f.dataset.submits = String(Number(f.dataset.submits) + 1);
+          });
+          document.querySelector(where).append(f);
+        }""",
+        where,
+    )
+    if where == "main":
+        page.evaluate("Alpine.store('ui').close()")
+        expect(sheet(page, "kiosks")).to_be_hidden()
+    field = page.locator("#counted-field")
+    field.focus()
+    expect(field).to_be_focused()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    expect(page.locator("#counted")).to_have_attribute("data-submits", str(submits))
+
+
+def test_a_held_enter_after_a_refusal_sends_nothing_more(login, event):
+    """#400's risk: the scene editor's Add kiosk name form, with
+    `hx-sync="this:drop"`, drops a repeat only while its POST is out. Main
+    is a name the scenes already use, so Enter in the field sends the POST,
+    whose reply refuses it and leaves the sheet open, the focus back in the
+    field. Two auto-repeat keydowns then land in the field and send
+    nothing. Before, the first repeat sent the refused POST again (the PR's
+    survey of the sheet forms). Near miss: a fresh Enter press sends it
+    again, and is refused again."""
+    page = login("RaceCoordinator")
+    page.goto("/kiosks/scenes/")
+    tap(page, page.locator('[data-action="add-name"]'))
+    form = ready(page, sheet(page, "scenes").locator("[data-add-name-sheet]"))
+    field = form.get_by_label("Kiosk name")
+    field.fill("Main")
+    htmx_settled(page)
+    page.evaluate(SHEET_LOG)
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/kiosks/scenes/name/" in r.url
+    ):
+        page.keyboard.down("Enter")
+    htmx_settled(page)
+    expect(sheet(page, "scenes").locator("[data-error]")).to_contain_text(
+        "There is a kiosk called Main already."
+    )
+    expect(field).to_be_focused()
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.sheetLog.some((r) => r.what === 'keyup')")
+    log = page.evaluate("window.sheetLog")
+    repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
+    assert len(repeats) == 2 and all(r["inSheet"] for r in repeats), log
+    # one read: htmx sends a repeat's POST in the repeat keydown's task.
+    assert [r["path"] for r in log if r["what"] == "send"] == [
+        "/kiosks/scenes/name/"
+    ], log
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/kiosks/scenes/name/" in r.url
+    ):
+        page.keyboard.press("Enter")
+    htmx_settled(page)
+    expect(sheet(page, "scenes").locator("[data-error]")).to_be_visible()
+    log = page.evaluate("window.sheetLog")
+    assert [r["path"] for r in log if r["what"] == "send"] == [
+        "/kiosks/scenes/name/"
+    ] * 2, log
