@@ -421,7 +421,7 @@ def _result(run, output: str, expect: str) -> tuple[str, str]:
 # The errors a test's own code raises when a mutant breaks its scaffolding,
 # not the behaviour it asserts.
 SCAFFOLD_ERRORS = {"AttributeError", "NameError", "UnboundLocalError", "TypeError"}
-# The last line of a failure's traceback: `tests/test_x.py:12: AttributeError`.
+# The last line of a failure's traceback: `test_x.py:12: AttributeError`.
 RAISED = re.compile(r"^\S+\.py:\d+: (\w+)$", re.M)
 
 
