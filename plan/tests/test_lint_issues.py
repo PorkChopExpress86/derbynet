@@ -471,5 +471,89 @@ class LoadDatabase(Lint):
         self.assertNotIn('names no database', done.stdout)
 
 
+# PR 438's line on #430 (merged 2026-11-21), and a fake gh that lists it as
+# merged into master.
+PR_438 = ("Part of #430. The ticket's third box (below) and its load box stay open.")
+FAKE_GH_PRS = """import json, sys
+issues = {issues!r}
+prs = {prs!r}
+if sys.argv[1:3] == ['issue', 'list'] and '--label' in sys.argv:
+    print(json.dumps(issues))
+elif sys.argv[2] == 'list' and 'closingIssuesReferences' in ' '.join(sys.argv):
+    print(json.dumps(prs))
+elif sys.argv[1] == 'pr':
+    print(json.dumps([{{'number': p['number']}} for p in prs]))
+else:
+    print(json.dumps([{{'number': i['number']}} for i in issues]))
+"""
+
+
+class PartOfAReadyTicket(unittest.TestCase):
+    """#430 was dispatched with its work done: merged PR 438 said "Part of
+    #430", and #430 kept ready-for-agent with no "Still open" section
+    (#470 retro)."""
+
+    def lint(self, body, pr_body=PR_438, labels=('kind:ticket', 'ready-for-agent')):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        issues = [*ISSUES, {'number': 430, 'state': 'OPEN', 'body': body,
+                            'labels': [{'name': l} for l in labels]}]
+        prs = [{'number': 438, 'state': 'MERGED', 'baseRefName': 'master',
+                'headRefOid': '0' * 40, 'closingIssuesReferences': [], 'body': pr_body}]
+        gh = tmp / 'gh'
+        gh.write_text(f'#!{sys.executable}\n' + FAKE_GH_PRS.format(issues=issues, prs=prs))
+        gh.chmod(0o755)
+        return subprocess.run([sys.executable, '-I', str(LINT)], capture_output=True,
+                              text=True, env={**os.environ, 'GH': str(gh)})
+
+    def test_430_as_it_was_dispatched_is_a_finding(self):
+        done = self.lint(TICKET + '\n\n- [ ] A box.')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#430: ready-for-agent, but merged PR #438 is part of it; add a '
+                      '"## Still open" section that names what is left, or close it',
+                      done.stdout)
+
+    def test_a_still_open_section_passes(self):
+        done = self.lint(TICKET + '\n\n## Still open\n\n- [ ] The load box.')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_ticket_not_ready_passes(self):
+        done = self.lint(TICKET, labels=('kind:ticket', 'blocked'))
+        self.assertNotIn('is part of it', done.stdout)
+
+    def test_part_of_in_code_names_no_issue(self):
+        for body in ('Quotes `Part of #430`.', 'Quotes:\n\n```\nPart of #430\n```\n'):
+            with self.subTest(body=body):
+                done = self.lint(TICKET, pr_body=body)
+                self.assertNotIn('is part of it', done.stdout)
+
+
+# #400's body as the lead wrote it, citing #383's probe logs, which no
+# folder held (#400 retro).
+BODY_400 = ("#383's php-scratch probe saw one `kiosk.assign` per press "
+            "(`~/.cache/derbynet-drafts/383/probe/php-enter-*.log`).")
+
+
+class DraftsPaths(Lint):
+    """A --file draft's drafts-folder path must exist on the lead's machine."""
+
+    def setUp(self):
+        super().setUp()
+        self.env['HOME'] = str(self.tmp)
+
+    def test_400s_missing_logs_are_a_finding(self):
+        done = self.lint(TICKET + '\n\n' + BODY_400)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('#0: drafts path `~/.cache/derbynet-drafts/383/probe/php-enter-*.log` '
+                      'is on no disk here', done.stdout)
+
+    def test_a_path_that_exists_passes(self):
+        logs = self.tmp / '.cache' / 'derbynet-drafts' / '383' / 'probe'
+        logs.mkdir(parents=True)
+        (logs / 'php-enter-1.log').write_text('')
+        done = self.lint(TICKET + '\n\n' + BODY_400)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
