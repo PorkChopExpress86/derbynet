@@ -98,7 +98,7 @@ locals=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
   pushed=1
-  pushes+=("$local_sha $remote_ref")  # a ref name holds no space
+  pushes+=("$local_sha $remote_ref $remote_sha")  # a ref name holds no space
   locals+=("$local_sha $local_ref")
   if [ "$remote_sha" = "$ZERO" ]; then
     base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
@@ -137,7 +137,8 @@ done
 # reads the PR body only (#439, #415 retro). It reads `git log`, about a second.
 # DERBYNET_PUSH_CLOSES="64 65" names the issues the push closes on purpose,
 # and a ref pushed as issue-<n>-<slug> may close its ticket, n, as the PR
-# body may. Neither origin/master nor local master is read, unless the push
+# body may, and each commit it sends, merges left out, names #n (--ticket,
+# #499 retro; --ticket-base, #504 review). Neither origin/master nor local master is read, unless the push
 # is to master itself: a stale origin/master behind local master read
 # master's own `fixes #64` and `Closes #316` again (#439 review). With no
 # origin/master, every commit no remote-tracking branch has is read.
@@ -151,8 +152,7 @@ for issue in ${DERBYNET_PUSH_CLOSES:-}; do
   closes_args+=(--closes "$issue")
 done
 for push in ${pushes[@]+"${pushes[@]}"}; do
-  sha="${push%% *}"
-  ref="${push#* }"
+  read -r sha ref old <<<"$push"
   args=()
   if git rev-parse -q --verify origin/master >/dev/null; then
     args=(--base origin/master)
@@ -162,7 +162,19 @@ for push in ${pushes[@]+"${pushes[@]}"}; do
     fi
   fi
   if [[ $ref =~ ^refs/heads/issue-([1-9][0-9]*)- ]]; then
-    args+=(--closes "${BASH_REMATCH[1]}")
+    args+=(--closes "${BASH_REMATCH[1]}" --ticket "${BASH_REMATCH[1]}")
+    # Only the commits this push sends: one the remote ref already has can
+    # be mended only by a force push (#504 review). Master's commits that a
+    # merge or a rebase brings in are not the branch's own: the tool leaves
+    # out what any remote-tracking branch has, origin/master among them, and
+    # local master is a base when the closing check reads it as one, for a
+    # stale origin/master (#504 review round 2).
+    if git cat-file -e "$old^{commit}" 2>/dev/null; then
+      args+=(--ticket-base "$old")
+    fi
+    if [[ " ${args[*]} " == *" --base refs/heads/master "* ]]; then
+      args+=(--ticket-base refs/heads/master)
+    fi
   fi
   echo "pre-push: plan/bin/commit-closes $sha ($ref)" >&2
   python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${args[@]+"${args[@]}"} \

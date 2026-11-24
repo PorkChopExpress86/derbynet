@@ -93,6 +93,35 @@ class Matcher(unittest.TestCase):
         self.assertEqual(TOOL.refusals([('a' * 40, ''), ('b' * 40, '\n')], set()), [])
 
 
+class Ticket(unittest.TestCase):
+    """--ticket N refuses a commit whose message names no #N (#499 retro)."""
+
+    def unnamed(self, message: str, ticket: str = '499') -> list[str]:
+        return [sha for sha, _subject in TOOL.unnamed([('abc', message)], ticket)]
+
+    def test_the_ticket_anywhere_in_subject_or_body_passes(self):
+        for message in ('Undo turns racing off (#499)',
+                        'heat-intermission: RacingHeatAllowed passes at the #499 fix',
+                        'Subject\n\nThe body says #499.',
+                        '#499: the start'):
+            with self.subTest(message=message):
+                self.assertEqual(self.unnamed(message), [])
+
+    def test_a_near_miss_names_no_ticket(self):
+        for message in ('Subject (#4990)', 'Subject (#49)', 'Subject 499', 'Subject a#499',
+                        'Subject', ''):
+            with self.subTest(message=message):
+                self.assertEqual(self.unnamed(message), ['abc'])
+
+    def test_the_real_unnamed_commit_is_refused(self):
+        """06b4ddaa on issue-37-transcript-differ named no #37."""
+        found = [('06b4ddaa', "Compare the final's heat lanes in id order, since Postgres "
+                              'may return updated rows in another order\n\nCo-Authored-By: x')]
+        self.assertEqual(TOOL.unnamed(found, '37'), [
+            ('06b4ddaa', "Compare the final's heat lanes in id order, since Postgres may "
+                         'return updated rows in another order')])
+
+
 class Repo:
     """A scratch repository: `master`, a remote-tracking origin/master at its
     first commit, and a branch of commits with the given messages."""
@@ -187,6 +216,59 @@ class CommandLine(unittest.TestCase):
         self.repo.git('merge', '-q', '--no-edit', 'master')
         done = self.repo.tool()
         self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+
+    def test_ticket_refuses_a_commit_that_names_no_ticket_and_names_the_fix(self):
+        self.repo.commit('Names it (#499)')
+        silent = self.repo.commit('Says nothing')
+        done = self.repo.tool('--ticket', '499')
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertEqual(done.stdout, f"names no #499, {silent[:8]} 'Says nothing': a commit "
+                                      "on the ticket's branch names its ticket\n")
+        self.assertIn('refused: name the ticket in each commit\'s subject, as `... (#499)`',
+                      done.stderr)
+        self.assertIn('git commit --amend', done.stderr)
+        self.assertEqual(self.repo.tool().returncode, 0, 'no --ticket, no such rule')
+
+    def test_ticket_leaves_out_a_merge_of_origin_master(self):
+        self.repo.git('checkout', '-q', '-b', 'b')
+        self.repo.commit('Branch commit (#499)')
+        self.repo.git('checkout', '-q', 'master')
+        new = self.repo.commit('Master later')
+        self.repo.git('update-ref', 'refs/remotes/origin/master', new)
+        self.repo.git('checkout', '-q', 'b')
+        self.repo.git('merge', '-q', '--no-edit', 'master')
+        done = self.repo.tool('--ticket', '499')
+        self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+
+    def test_ticket_reads_only_what_no_ticket_base_has(self):
+        """The hook names the remote ref's old sha, so a commit already
+        pushed is not read again (#504 review); with none given, what any
+        remote ref has is left out, as for a new branch."""
+        old = self.repo.commit('old unnamed')
+        self.repo.commit('new (#7)')
+        self.assertEqual(self.repo.tool('--ticket', '7').returncode, 1)
+        done = self.repo.tool('--ticket', '7', '--ticket-base', old)
+        self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+        self.repo.git('update-ref', 'refs/remotes/origin/issue-7-x', old)
+        done = self.repo.tool('--ticket', '7')
+        self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+
+    def test_ticket_base_leaves_the_closing_check_on_its_base(self):
+        old = self.repo.commit('old: Fixes #2 (#7)')
+        self.repo.commit('new (#7)')
+        done = self.repo.tool('--ticket', '7', '--ticket-base', old)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('Fixes #2', done.stdout)
+
+    def test_ticket_base_needs_ticket(self):
+        done = self.repo.tool('--ticket-base', 'HEAD')
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn('--ticket-base goes with --ticket', done.stderr)
+
+    def test_ticket_takes_an_issue_number(self):
+        done = self.repo.tool('--ticket', '499x')
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn('takes an issue number', done.stderr)
 
     def test_a_base_option_replaces_origin_master(self):
         bad = self.repo.commit('Fixes #2')
@@ -344,7 +426,8 @@ class Sweep(unittest.TestCase):
                 self.assertIn('takes a whole number of PRs', done.stderr)
 
     def test_sweep_takes_no_other_option(self):
-        for other in (('--closes', '5'), ('--base', 'master'), ('--head', 'HEAD')):
+        for other in (('--closes', '5'), ('--base', 'master'), ('--head', 'HEAD'),
+                      ('--ticket', '5'), ('--ticket-base', 'HEAD')):
             with self.subTest(other=other):
                 done = subprocess.run([sys.executable, '-I', str(COMMIT_CLOSES), '--sweep', '1',
                                        *other], capture_output=True, text=True,

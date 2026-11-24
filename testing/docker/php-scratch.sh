@@ -26,6 +26,7 @@
 # DERBYNET_TEST_PREFIX (default "derbynet-test").  Build them once from a
 # regular clone with
 #   testing/docker/run-suite.sh harness assets server
+# which the script prints, with the clone's path, when an image is missing.
 # This script reads them only; it removes its own container and volume, both
 # named after DERBYNET_TEST_PREFIX.  DERBYNET_PHP_IMAGES lets a run with a
 # prefix of its own use images built under another: #356 and #360 each
@@ -53,10 +54,15 @@ while [ $# -gt 0 ]; do
 done
 [ $# -gt 0 ] || { sed -n '2,/^[^#]/{/^#/p}' "$0" >&2; exit 2; }
 
+# run-suite.sh builds from a regular clone, not a worktree, so the command
+# it prints names the main worktree, the first `git worktree list` prints,
+# with the prefix this run reads the images under (#499 retro).
 for image in "$HARNESS_IMAGE" "$SERVER_IMAGE"; do
   docker image inspect "$image" >/dev/null 2>&1 || {
-    echo "No image $image.  From a regular clone, run:" >&2
-    echo "  DERBYNET_TEST_PREFIX=$IMAGES testing/docker/run-suite.sh harness assets server" >&2
+    CLONE="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+    echo "No image $image.  Build the images from the regular clone with:" >&2
+    printf '  cd %q && DERBYNET_TEST_PREFIX=%q testing/docker/run-suite.sh harness assets server\n' \
+           "${CLONE:-$ROOT}" "$IMAGES" >&2
     exit 1
   }
 done
