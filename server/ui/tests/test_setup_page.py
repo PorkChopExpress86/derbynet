@@ -159,12 +159,14 @@ def test_health_checks_compare_nginx_cap_in_the_image(
 ):
     """In the image the check reads nginx's `client_max_body_size` from the
     nginx.conf the entrypoint rendered, and compares it with the photo
-    stand's 30000000 bytes (#48 Scope). Django's own limits stay at their
-    defaults, so only nginx's cap decides."""
+    stand's 30000000 bytes (#48 Scope, D134). Django's own limits stay at
+    their defaults, so only nginx's cap decides, and a commented-out
+    directive is not read."""
     _in_image(
         settings,
         tmp_path,
-        f"http {{\n    sendfile on;\n    client_max_body_size {size};\n}}\n",
+        "http {\n    # client_max_body_size 1M;\n"
+        f"    client_max_body_size {size};\n}}\n",
     )
     body = html(coordinator.get("/setup/"))
     assert _check(body, "upload") == status

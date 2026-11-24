@@ -319,7 +319,7 @@ upload_check() {
     login "$1" "$jar" RaceCoordinator
     page="$(curl -m 120 -sf -c "$jar" -b "$jar" "$1/about/")" || fail "the about page did not answer"
     say "the about page's upload check"
-    grep -A3 'data-check="upload"' <<<"$page"
+    grep -o -e 'data-check="upload" data-check-status="[a-z]*"' -e 'Upload size limit\.</span>[^<]*' <<<"$page"
     grep -q "data-check=\"upload\" data-check-status=\"$2\"" <<<"$page" \
         || fail "the upload check is not $2"
     grep -q "nginx in the image (MAX_UPLOAD_SIZE) takes requests up to $3 " <<<"$page" \
