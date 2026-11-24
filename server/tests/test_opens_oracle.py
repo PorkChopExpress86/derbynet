@@ -154,7 +154,7 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
     """The report, run in a stand-in with the repository's affected-tests,
     names each pair mapped or UNMAPPED, a listing as a listing, and counts
     the unmapped file pairs; a top-level read reaches a browser test that
-    imports its module."""
+    imports its module, and no plain test that does."""
     out, root = tmp_path / "out", tmp_path / "repo"
     repo = Path(__file__).resolve().parents[2]
     files = {
@@ -166,6 +166,7 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
         "server/helpers/rows.py": "",
         "server/ui/tests/browser/test_cites.py": BROWSER + 'CSV = "roster.csv"\n',
         "server/ui/tests/browser/test_quiet.py": BROWSER + "import helpers.rows\n",
+        "server/ui/tests/test_plain.py": "import helpers.rows\n",
     }
     for rel, text in files.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
