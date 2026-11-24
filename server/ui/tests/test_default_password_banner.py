@@ -80,7 +80,8 @@ def test_a_change_on_the_roles_page_takes_its_role_off(login):
     client.post("/settings/roles/Photo/password/", {"password": "zoom"})
 
     page = client.get("/").content.decode()
-    assert "RaceCrew, RaceCoordinator still use their default passwords." in page
+    # The span starts the list, so the three-role sentence does not match.
+    assert "<span>RaceCrew, RaceCoordinator still use their default passwords." in page
 
 
 def test_a_password_changed_back_to_the_seeded_one_is_named_again(login):
