@@ -13,9 +13,11 @@
 #   secret     secret_key: mode 0600, kept across containers, new per volume,
 #              and not written when DJANGO_SECRET_KEY is set
 #   user       ps -o user,comm: gunicorn runs as derbynet, not root
-#   upload     with MAX_UPLOAD_SIZE=16M a 15 MiB photo.upload succeeds and a
-#              17 MiB one answers 413; at the default (100M) the photo
-#              stand's 30 MB photo succeeds
+#   upload     with MAX_UPLOAD_SIZE=16M a 15 MiB photo.upload succeeds, a
+#              17 MiB one answers 413, and the about page's upload check is
+#              trouble and names nginx's 16M; at the default (100M) the photo
+#              stand's 30 MB photo succeeds and the check is ok and names
+#              100M (#48, D134)
 #   bind-mount with no DERBYNET_UID, derbynet takes a bind mount's non-root
 #              owner (D106); with the host user's DERBYNET_UID and
 #              DERBYNET_GID, a photo the server writes is the host user's
@@ -292,6 +294,7 @@ check_upload() {
         -F repo=head -F photo=@"$work/17m.jpg" "$url/action.php")"
     echo "HTTP $code"
     [ "$code" = 413 ] || fail "the 17 MiB upload answered $code, not 413"
+    upload_check "$url" trouble 16M
     stop up1
 
     say "at the default MAX_UPLOAD_SIZE, the photo stand's 30000000-byte photo"
@@ -305,6 +308,22 @@ check_upload() {
     echo "$reply" | tail -12
     echo "$reply" | grep -q 'HTTP 200' || fail "the 30 MB upload did not answer 200"
     echo "$reply" | grep -q '"code": "success"' || fail "the 30 MB upload did not succeed"
+    upload_check "$url" ok 100M
+}
+
+# upload_check <url> <status> <size>: the about page, as RaceCoordinator,
+# shows the upload health check with <status>, naming nginx's <size>.
+upload_check() {
+    local jar="$RUNNER_TEMP_DIR/upload/about-cookies" page
+    rm -f "$jar"
+    login "$1" "$jar" RaceCoordinator
+    page="$(curl -m 120 -sf -c "$jar" -b "$jar" "$1/about/")" || fail "the about page did not answer"
+    say "the about page's upload check"
+    grep -A3 'data-check="upload"' <<<"$page"
+    grep -q "data-check=\"upload\" data-check-status=\"$2\"" <<<"$page" \
+        || fail "the upload check is not $2"
+    grep -q "nginx in the image (MAX_UPLOAD_SIZE) takes requests up to $3 " <<<"$page" \
+        || fail "the upload check does not name nginx's $3"
 }
 
 # The ids derbynet keeps when nothing gives it others (D106): the image's own,

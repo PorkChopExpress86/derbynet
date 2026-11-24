@@ -164,7 +164,9 @@ def _nginx_cap() -> tuple[str, int] | None:
 
 
 def upload_limit() -> Check:
-    """The upload caps against the 30 MB the photo stand sends (#48 Scope):
+    """The upload caps against the 30 MB the photo stand sends (#48 Scope,
+    D134; PHP warns under 8000 KB of `upload_max_filesize` alone,
+    `details-for-setup-page.inc:152-156`):
     Django's photo cap, and in the image (#58) nginx's
     `client_max_body_size`, which `MAX_UPLOAD_SIZE` sets. Outside the image
     the server cannot see the proxy in front of it, so the page says to
