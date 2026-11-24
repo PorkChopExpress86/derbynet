@@ -6,7 +6,7 @@ slideshow Configure sheet showing what was saved (C20), the parity boxes of
 
 import json
 import re
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from datetime import timedelta
 
 import pytest
@@ -714,6 +714,14 @@ PREVIEW_LINK = '#kiosk-board [data-kiosk="tv"] a[data-action="preview"]'
 IDENTIFY_BUTTON = '#kiosk-board [data-kiosk="tv"] button[data-action="identify"]'
 
 
+# True once htmx has no request out but the board's own poll and has
+# settled every swap: `htmx_settled()`'s wait, less the board's request.
+SETTLED_PAST_THE_HOLD = (
+    "!document.querySelector("
+    "'.htmx-request:not(#kiosk-board), .htmx-swapping, .htmx-settling')"
+)
+
+
 class HeldPolls:
     """Holds each board poll at its route until the test answers it, so the
     reply comes while the pointer is down, and no other poll swaps the board
@@ -723,6 +731,7 @@ class HeldPolls:
     def __init__(self, page):
         self.page = page
         self.held = []
+        self.let_go = []
         self.ended = False
         page.route("**/kiosks/board/**", self.route)
 
@@ -744,6 +753,7 @@ class HeldPolls:
         """Let poll `index` through and wait until the page has handled its
         reply: a new board (200), or no change (204); either, for `None`."""
         self.held[index].continue_()
+        self.let_go.append(self.held[index])
         self.page.wait_for_function(
             "n => window.boardLog.filter((r) => r.what === 'poll').length >= n",
             arg=index + 1,
@@ -751,10 +761,44 @@ class HeldPolls:
         polls = [r for r in board_log(self.page) if r["what"] == "poll"]
         assert status is None or polls[index]["status"] == status, polls
 
+    def settled(self):
+        """`htmx_settled()` for a page whose polls the hold holds: it waits
+        for every request but the board's own, and for every swap and
+        settle. The board polls every `state.POLL_SECONDS` once a reply or
+        an abort ends the poll before, and the hold keeps that poll out,
+        with the board's `.htmx-request`, until the test answers it, so
+        `htmx_settled()` timed out whenever a poll had gone out (#446). The
+        board sends one poll at a time (`hx-sync="this:drop"`), and a board
+        control's change aborts the poll out. `answer(i)` waits until the
+        board log holds `i + 1` polls, which is poll `i`'s reply only while
+        no board control's request has ended as a logged poll before it, as
+        Identify's does (`end()`); every `answer()` here follows none. So
+        any board request left out during the hold is the one the hold
+        keeps.
+        `test_a_settle_waits_on_no_held_poll` fails every run with
+        `htmx_settled()` in its place."""
+        self.page.wait_for_function(SETTLED_PAST_THE_HOLD)
+
+    @contextmanager
+    def post(self, path: str):
+        """`htmx_post()`, with `settled()` for its settle."""
+        with self.page.expect_response(
+            lambda r: r.request.method == "POST" and path in r.url
+        ) as reply:
+            yield
+        assert reply.value.ok, reply.value.status
+        self.settled()
+
     def end(self):
+        """Let through each poll held that `answer()` has not. The board log
+        is no count of them: it records the end of Identify's POST, whose
+        reply brings the board, as a poll, so a slice past the log's polls
+        left the poll held after it out, and the harness found it in flight
+        (`test_a_settle_waits_on_no_held_poll`, #446)."""
         self.ended = True
-        for route in self.held[self.answered() :]:
-            route.continue_()
+        for route in self.held:
+            if route not in self.let_go:
+                route.continue_()
 
     def answered(self) -> int:
         return len([r for r in board_log(self.page) if r["what"] == "poll"])
@@ -857,7 +901,7 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     polls = a_press_spans_a_swap(page, event, target)
     page.evaluate(FOLLOWED)
     if control == "scene":
-        with htmx_post(page, "/kiosks/scene/"):
+        with polls.post("/kiosks/scene/"):
             page.mouse.up()
     elif control == "page":
         with page.expect_response(lambda r: "/kiosks/page/" in r.url and r.ok):
@@ -921,7 +965,7 @@ def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     cdp = touch(page)
     touch_start(cdp, page, scene_button(page, racing))
     polls.answer(0)
-    with htmx_post(page, "/kiosks/scene/"):
+    with polls.post("/kiosks/scene/"):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
     log = board_log(page)
     down = after(log, "down")
@@ -982,7 +1026,7 @@ def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, canc
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     if cancel == "moved off":
         page.mouse.up()
-    htmx_settled(page)
+    polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
     # one read: a click would have sent its POST before mouse.up() returned.
@@ -1005,7 +1049,7 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     polls = a_press_spans_a_swap(page, event, welcome)
     Kiosk.objects.filter(address="tv").update(name="Hall")
     page.locator(IDENTIFY_BUTTON).focus()
-    with htmx_post(page, "/kiosks/identify/"):
+    with polls.post("/kiosks/identify/"):
         page.keyboard.press("Enter")
     log = board_log(page)
     down = after(log, "down")
@@ -1014,7 +1058,7 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     wait_for_a_swap_after(page, down)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     page.mouse.up()
-    htmx_settled(page)
+    polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
     expect(welcome).to_have_attribute("aria-pressed", "false")
@@ -1115,7 +1159,7 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     assert len(late["ran"]) == 1, late
     assert late["ran"][0] > log[second]["at"], (late, log)
     assert swaps_since(log, second) == [], log
-    with htmx_post(page, "/kiosks/scene/"):
+    with polls.post("/kiosks/scene/"):
         page.mouse.up()
     expect(welcome).to_have_attribute("aria-pressed", "true")
     log = board_log(page)
@@ -1184,6 +1228,38 @@ def test_a_change_from_a_sheet_swaps_its_board_at_once(login, event):
     polls.end()
 
 
+def test_a_settle_waits_on_no_held_poll(login, event):
+    """`HeldPolls.settled()` and `HeldPolls.post()` wait for every request
+    but the board poll the hold keeps out (#446). A poll is held first, and
+    `settled()` returns with it out. Identify's POST, held at its route,
+    aborts that poll, and the page is not settled while the POST is out.
+    The POST is then let go, the next poll is held once its reply has come,
+    and `post()` settles with that poll out. With `htmx_settled()` in
+    either's place the test times out on every run. Each poll wait is
+    bounded at 10 s, as `HeldPolls.wait_for` is, and a poll comes no later
+    than `state.POLL_SECONDS` after the reply or abort before it: its slack
+    is that bound less `state.POLL_SECONDS`."""
+    kiosk(event, "tv", name="Main")
+    page = open_dashboard(login("RaceCoordinator"))
+    posts = held_at_route(page, "**/kiosks/identify/**")
+    polls = hold_the_polls(page)
+    held_poll = page.locator("#kiosk-board.htmx-request")
+    polls.wait_for(1)
+    expect(held_poll).to_have_count(1)
+    polls.settled()
+    focus_on(page, page.locator(IDENTIFY_BUTTON))
+    page.keyboard.press("Enter")
+    wait_for_held(page, posts, "Identify POST")
+    expect(held_poll).to_have_count(0)
+    # one read: the POST is held at its route, so nothing ends it here.
+    assert not page.evaluate(SETTLED_PAST_THE_HOLD)
+    with polls.post("/kiosks/identify/"):
+        posts[0].continue_()
+        polls.wait_for(2)
+    expect(held_poll).to_have_count(1)
+    polls.end()
+
+
 def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
     """A poll that answers 204 while the pointer is down holds nothing, and
     the press's end swaps nothing (D102). No kiosk checks in, so nothing on
@@ -1199,7 +1275,7 @@ def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
     polls.answer(0, status=204)
     move_off(page)
     page.mouse.up()
-    htmx_settled(page)
+    polls.settled()
     log = board_log(page)
     # one read: the move off applies a held board at once, before it returns.
     assert swaps_since(log, after(log, "down")) == [], log
@@ -1314,7 +1390,7 @@ def test_a_second_tap_that_aborts_a_taps_request_still_posts(
     polls = a_press_spans_a_swap(page, event, racing)
     page.mouse.up()
     wait_for_held(page, first, "Racing POST")
-    with htmx_post(page, "/kiosks/scene/"):
+    with polls.post("/kiosks/scene/"):
         if second == "keyboard":
             welcome.focus()
             page.keyboard.press("Enter")
@@ -1368,7 +1444,7 @@ def test_a_second_finger_keeps_the_hold(login, event):
     assert swaps_since(log, down) == [], log
     cdp.send("Input.dispatchTouchEvent", {"type": "touchCancel", "touchPoints": []})
     wait_for_a_swap_after(page, down)
-    htmx_settled(page)
+    polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Lobby"], log
     assert [r for r in log[down:] if r.get("verb") == "post"] == [], log
@@ -1459,7 +1535,7 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     polls.answer(0)
     page.keyboard.down(" ")  # two auto-repeats during the hold (D131)
     page.keyboard.down(" ")
-    with htmx_post(page, POST_PATHS[control]):
+    with polls.post(POST_PATHS[control]):
         page.keyboard.up(" ")
     tapped(page, control)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
@@ -1513,7 +1589,7 @@ def test_a_space_press_whose_focus_moves_off_applies_the_held_board(
     expect(moved_to).to_be_focused()
     page.keyboard.up(" ")
     page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
-    htmx_settled(page)
+    polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, keydown)] == ["Lobby"], log
     # one read: a click would have sent its POST before keyboard.up()
@@ -1576,7 +1652,7 @@ def test_a_pointer_and_space_on_one_button_hold_until_both_end(
     page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
     log = board_log(page)
     assert swaps_since(log, start) == [], log
-    with htmx_post(page, "/kiosks/scene/"):
+    with polls.post("/kiosks/scene/"):
         tap()
     expect(racing).to_have_attribute("aria-pressed", "true")
     log = board_log(page)
