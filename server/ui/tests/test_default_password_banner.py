@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
 from django.test import Client
 
@@ -98,9 +99,10 @@ def test_a_password_changed_back_to_the_seeded_one_is_named_again(login):
 
 def test_a_flush_and_re_seed_names_every_seeded_role_again(login):
     """As the browser conftest re-seeds after each test's flush."""
+    before = login("RaceCrew")
     for name in ("Photo", "RaceCrew", "RaceCoordinator"):
         change_password(name, f"new-{name}")
-    assert roles_with_default_password() == []
+    assert BANNER not in before.get("/").content.decode()
     Role.objects.all().delete()
 
     seed = import_module("accounts.migrations.0002_seed_default_roles").seed
@@ -134,9 +136,10 @@ def test_an_import_with_new_passwords_takes_the_banner_away(event):
 
 def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
     """`config-roles-default.json` holds the passwords a new install seeds."""
+    before = login("RaceCrew")
     for name in ("Photo", "RaceCrew", "RaceCoordinator"):
         change_password(name, f"new-{name}")
-    assert roles_with_default_password() == []
+    assert BANNER not in before.get("/").content.decode()
 
     import_roles("config-roles-default.inc")
 
@@ -144,3 +147,21 @@ def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
     assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
         page
     )
+
+
+def test_a_role_no_install_seeds_is_never_named(login):
+    """A role whose hash is written without `set_password` keeps whatever
+    flag it had, so the banner names only the roles seeded with a password,
+    as before #441: not a new role, and not Timer, seeded with none."""
+    Role.objects.create(
+        name="Judge", password_hash=make_password("x"), permissions=258, position=9
+    )
+    Role.objects.filter(name="Timer").update(
+        password_hash=make_password("tick"), keeps_seeded_password=True
+    )
+
+    page = login("RaceCrew").get("/").content.decode()
+
+    assert "<span>Photo, RaceCrew, RaceCoordinator still use their default" in page
+    assert "Judge" not in page
+    assert "Timer" not in page

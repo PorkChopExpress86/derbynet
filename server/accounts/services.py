@@ -4,13 +4,19 @@ from accounts.defaults import DEFAULT_ROLES
 from accounts.models import Role
 from accounts.permissions import Perm
 
+# The roles a new install seeds with a password: the only ones the banner
+# names, as before #441, whatever a row's flag says.
+_SEEDED_WITH_PASSWORD = [name for name, pw, _, _ in DEFAULT_ROLES if pw]
+
 
 def roles_with_default_password() -> list[str]:
     """The roles, in login-page order, whose password is still the one a new
     install seeds (`accounts.defaults`). A role with no password, such as
     Timer, was seeded without one and is never listed. The answer is stored
     (`Role.keeps_seeded_password`), so no page hashes for it (#441)."""
-    roles = Role.objects.filter(keeps_seeded_password=True).exclude(password_hash="")
+    roles = Role.objects.filter(
+        name__in=_SEEDED_WITH_PASSWORD, keeps_seeded_password=True
+    ).exclude(password_hash="")
     return list(roles.values_list("name", flat=True))
 
 
