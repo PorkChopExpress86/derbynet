@@ -322,8 +322,9 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
 
 
 # The now-racing frame logs, on its own clock, each replay message, each
-# change of its banner title and each place that lands. Its `query=poll`
-# requests are read from the frame's resource timings on the same clock.
+# change of its banner title's text and each place that lands. Its
+# `query=poll` requests are read from the frame's resource timings on the
+# same clock.
 RECORD_NOW_RACING = """window.__log = [];
 performance.setResourceTimingBufferSize(10000);
 window.addEventListener('message', (e) =>
@@ -331,9 +332,12 @@ window.addEventListener('message', (e) =>
 document.addEventListener('DOMContentLoaded', () => {
   const title = document.querySelector('[data-banner-title]');
   if (!title) return;
-  new MutationObserver(() => window.__log.push(
-    {at: performance.now(), title: title.textContent})
-  ).observe(title, {childList: true, characterData: true, subtree: true});
+  let shown = title.textContent;
+  new MutationObserver(() => {
+    if (title.textContent === shown) return;
+    shown = title.textContent;
+    window.__log.push({at: performance.now(), title: shown});
+  }).observe(title, {childList: true, characterData: true, subtree: true});
   new MutationObserver((changes) => changes.forEach((c) => {
     if (c.target.matches('[data-place]') && c.target.classList.contains('k-shown'))
       window.__log.push({at: performance.now(), landed: c.target.textContent});
@@ -346,6 +350,13 @@ READ_NOW_RACING = """() => ({
   polls: performance.getEntriesByType('resource')
     .filter((r) => r.name.includes('query=poll&')).map((r) => r.startTime),
 })"""
+
+SKIPBACK_MS = 4000
+POST_ROLL_MS = 500
+RING_FILL_MS = 5000
+# kiosk-now-racing.js `results()` starts the landing's linger after the
+# last place's wait.
+PLACE_WAIT_MS = 400
 
 
 @pytest.mark.sizes("desktop", reason="the replay station is a laptop")
@@ -360,12 +371,31 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     starts inside that linger, and the linger ends while the replay plays,
     both asserted, so a board that did not hold would take heat 2 during
     the replay, and one that did not linger again would take it at once
-    after."""
+    after.
+
+    The bounds, each with its slack:
+    - The ring fills for `RING_FILL_MS` before the heat, and the clip takes
+      the last `SKIPBACK_MS` before the right-click: slack
+      `RING_FILL_MS - SKIPBACK_MS`, plus the time heat 1 takes to land.
+    - The replay starts `POST_ROLL_MS` after the right-click, plus the
+      click's latency, and must start before `landed + linger_ms`: slack
+      `linger_ms - POST_ROLL_MS - latency`.
+    - The replay ends `POST_ROLL_MS + SKIPBACK_MS + POST_ROLL_MS` after the
+      right-click (the post-roll, then the clip at rate 100), and the
+      landing's linger ends at `landed + PLACE_WAIT_MS + linger_ms`, which
+      must come first: slack `2 * POST_ROLL_MS + SKIPBACK_MS - PLACE_WAIT_MS
+      - linger_ms`, plus the click's latency.
+    - Heat 2 is awaited `linger_ms + 5000` ms from the replay page's
+      `watching`: it comes `linger_ms` after `replay-ended`, then at the
+      next poll, sent 500 ms after the reply before it (kiosk.js `queue()`),
+      and that poll's reply.
+    - `heat_2 - ended >= linger_ms` has no slack: the test's own listener
+      logs `replay-ended` before kiosk.js's listener starts the linger."""
     linger_ms = 3000
     fast_replays(
         event,
-        replay_skipback_ms=4000,
-        replay_post_roll_ms=500,
+        replay_skipback_ms=SKIPBACK_MS,
+        replay_post_roll_ms=POST_ROLL_MS,
         replay_max_clip_ms=5000,
         now_racing_linger_ms=linger_ms,
     )
@@ -379,8 +409,7 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     board = page.frame_locator("#interior")
     title = board.locator("[data-banner-title]")
     expect(title).to_have_text("Heat 1 of 4")
-    # More than the replay's clip in the ring before the right-click.
-    page.wait_for_timeout(5000)
+    page.wait_for_timeout(RING_FILL_MS)
 
     run_heat(event)
     expect(board.locator(".k-shown[data-place]")).to_have_count(4, timeout=10_000)
@@ -402,9 +431,12 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     # The rows page lands the places in place order.
     assert [e["landed"] for e in log if "landed" in e] == ["1", "2", "3", "4"]
     landed = max(e["at"] for e in log if "landed" in e)
+    assert [e["title"] for e in log if "title" in e] == ["Heat 1 of 4", "Heat 2 of 4"]
     [heat_2] = [e["at"] for e in log if e.get("title") == "Heat 2 of 4"]
     # The replay starts inside the landing's linger, which ends during it.
-    assert landed < started < landed + linger_ms < ended, (landed, started, ended)
+    lingered = landed + PLACE_WAIT_MS + linger_ms
+    assert landed < started < landed + linger_ms, (landed, started)
+    assert lingered < ended, (landed, ended)
     assert [t for t in seen["polls"] if started < t < ended] == []
     assert any(t > ended for t in seen["polls"] if t < heat_2)
     assert heat_2 - ended >= linger_ms, (ended, heat_2)
