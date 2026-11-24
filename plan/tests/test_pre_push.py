@@ -15,6 +15,7 @@ from pathlib import Path
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
 HOOK = Path(__file__).resolve().parents[2] / '.githooks' / 'pre-push'
+PLAN_BIN = Path(__file__).resolve().parents[2] / 'plan' / 'bin'
 SOURCE_CHECKS = Path(__file__).resolve().parents[2] / 'server' / 'tools' / 'source-checks.sh'
 # The server checks' stand-ins: each notes its arguments and passes.
 UV = '#!/bin/sh\necho "uv $*" >>"$STUB_LOG"\n'
@@ -43,21 +44,35 @@ class Plan(unittest.TestCase):
 
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
-         local: str = 'head', git_dir: bool = False) -> subprocess.CompletedProcess:
+         local: str = 'head', git_dir: bool = False, message: str = 'change',
+         environ: dict | None = None, base_message: str = 'base',
+         origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
+         checked_out: str = 'head', ahead: str | None = None,
+         ref: str = 'refs/heads/b') -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
     sends: the base commit; 'orphan', a new branch with no common history
     (no base); or 'missing', a commit this clone lacks. `base_files` are
     committed in the base, `delete` is removed by the change, and `local`
-    'deleted' pushes a deletion of the branch."""
+    'deleted' pushes a deletion of the branch. `message` is the change commit's
+    message, `environ` adds variables to the hook's environment, `base_message` is
+    the base commit's, `origin` makes the base commit origin/master, and
+    `other_clone` runs the hook and tools of a second checkout, as
+    core.hooksPath does, while the pushed tree holds none of the tools,
+    `pushed_before` makes the pushed commit the head of a remote-tracking
+    branch other than origin/master, and `checked_out` 'base' leaves the base
+    commit checked out while the head is pushed. The change is committed on
+    branch b, cut from master; `ahead` is the message of a commit on local
+    master atop the base, as a pull leaves it when origin/master is stale,
+    which b is cut from. `ref` is the ref pushed to."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
     env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
                GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
                GIT_CONFIG_NOSYSTEM='1')
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as main:
         repo = Path(tmp)
 
         def git(*argv):
@@ -65,8 +80,13 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
                                   capture_output=True, text=True).stdout.strip()
 
         git('init', '-q', '-b', 'master')
-        (repo / '.githooks').mkdir()
-        shutil.copy(HOOK, repo / '.githooks' / 'pre-push')
+        clone = Path(main) if other_clone else repo
+        (clone / '.githooks').mkdir(exist_ok=True)
+        shutil.copy(HOOK, clone / '.githooks' / 'pre-push')
+        (clone / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
+        for tool in ('commit-closes', 'pr-evidence'):
+            shutil.copy(PLAN_BIN / tool, clone / 'plan' / 'bin' / tool)
+        (repo / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
         (repo / 'server' / 'tools').mkdir(parents=True)
         shutil.copy(SOURCE_CHECKS, repo / 'server' / 'tools' / 'source-checks.sh')
         (repo / 'server' / 'docs' / 'adr').mkdir(parents=True)
@@ -75,7 +95,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         stubs.mkdir()
         (stubs / 'uv').write_text(UV)
         (stubs / 'uv').chmod(0o755)
-        env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')))
+        env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')),
+                   **(environ or {}))
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
         # The stand-ins' log and the plan test's bytecode, which the hook
@@ -86,10 +107,15 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             (repo / name).parent.mkdir(parents=True, exist_ok=True)
             (repo / name).write_text(body)
         git('add', '.')
-        git('commit', '-q', '-m', 'base')
+        git('commit', '-q', '-m', base_message)
         base = git('rev-parse', 'HEAD')
-        if remote == 'orphan':
-            git('checkout', '-q', '--orphan', 'b')
+        if origin:
+            git('update-ref', 'refs/remotes/origin/master', base)
+        if ahead is not None:
+            (repo / 'ahead.txt').write_text('ahead\n')
+            git('add', '.')
+            git('commit', '-q', '-m', ahead)
+        git('checkout', '-q', *(('--orphan',) if remote == 'orphan' else ('-b',)), 'b')
         for name in (changed,) if isinstance(changed, str) else changed:
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -97,17 +123,22 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         for name in delete:
             git('rm', '-q', name)
         git('add', '.')
-        git('commit', '-q', '-m', 'change')
+        git('commit', '-q', '-m', message)
         head = git('rev-parse', 'HEAD')
-        hook = ['bash', '.githooks/pre-push', 'origin', 'url']
+        if pushed_before:
+            git('update-ref', 'refs/remotes/origin/b', head)
+        if checked_out == 'base':
+            git('checkout', '-q', '--detach', base)
+        hook_file = clone / '.githooks' / 'pre-push'
+        hook = ['bash', str(hook_file), 'origin', 'url']
         if shell:
             # Not the script's last command, so bash forks the hook as its child.
-            hook = ['bash', '-c', f'{shell}\nbash .githooks/pre-push origin url; exit $?']
+            hook = ['bash', '-c', f'{shell}\nbash {hook_file} origin url; exit $?']
         # Git runs a hook with GIT_DIR set to the pushing checkout's.
         hook_env = {**env, 'GIT_DIR': str(repo / '.git')} if git_dir else env
         result = subprocess.run(
             hook, cwd=repo, env=hook_env,
-            input=f'refs/heads/b {head if local == "head" else "0" * 40} refs/heads/b '
+            input=f'refs/heads/b {head if local == "head" else "0" * 40} {ref} '
                   f'{REMOTES.get(remote, base)}\n',
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
@@ -392,6 +423,124 @@ class TreeChanged(unittest.TestCase):
                 result = push('notes/x.md', PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn(self.CHANGED, result.stderr)
+
+
+class CommitClosingKeyword(unittest.TestCase):
+    """A closing keyword in a commit message closes its issue when the
+    commit reaches master. #415's first commit, 73a1c975, quoted
+    `Closes #399.` and the agent caught it by hand; the hook now refuses it
+    before git sends the commit, and before any slow check (#439). Each
+    pushes notes/x.md, whose let-through push runs plan/tests alone, and
+    test_commit_closes.py holds the matcher's cases."""
+
+    def refused(self, result, *words):
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('closes another issue', result.stdout)
+        for word in words:
+            self.assertIn(word, result.stdout)
+        self.assertIn('refused:', result.stderr)
+        self.assertEqual(result.ran, '', 'a refusal comes before every other check')
+
+    def test_a_closing_keyword_in_a_message_is_refused_before_every_check(self):
+        message = 'A subject\n\nA body line\nthat says Closes #399.'
+        self.refused(push('notes/x.md', PASSING, message=message), 'line 4: Closes #399')
+
+    def test_a_quoted_keyword_passes(self):
+        result = push('notes/x.md', PASSING, message='Quotes `Closes #399.` and see #399')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
+
+    def test_the_issues_the_push_closes_on_purpose_split_on_blanks(self):
+        message = 'Closes #399, fixes #64, resolves #5.'
+        result = push('notes/x.md', PASSING, message=message,
+                      environ={'DERBYNET_PUSH_CLOSES': '#64\t399'})
+        self.refused(result, 'line 1: resolves #5')
+        self.assertEqual(result.stdout.count('closes another issue'), 1, result.stdout)
+
+    def test_a_bad_name_in_the_variable_stops_the_push(self):
+        result = push('notes/x.md', PASSING, message='plain',
+                      environ={'DERBYNET_PUSH_CLOSES': '399x'})
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn('takes an issue number', result.stderr)
+        self.assertEqual(result.ran, '')
+
+    def test_a_commit_on_origin_master_is_not_read(self):
+        """Master's own history has upstream's `Fixes #N` commits, which
+        closed upstream's issues long ago."""
+        result = push('notes/x.md', PASSING, base_message='Fixes #1', origin=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_commit_on_local_master_is_not_read_when_origin_master_is_stale(self):
+        """A pull that leaves origin/master behind local master: master's own
+        `Closes #316.` (4f7e0dff on the fork) came with the branch, and the
+        push of the branch passes (#439 review)."""
+        result = push('notes/x.md', PASSING, origin=True, ahead='Upstream\n\nCloses #316.')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_keyword_on_the_branch_atop_a_stale_origin_master_is_refused(self):
+        result = push('notes/x.md', PASSING, origin=True, ahead='Clean', message='Fixes #2')
+        self.refused(result, 'Fixes #2')
+
+    def test_a_push_to_master_reads_local_master(self):
+        """Local master is the commit pushed, so it is no base."""
+        result = push('notes/x.md', PASSING, origin=True, ahead='Upstream\n\nCloses #316.',
+                      ref='refs/heads/master')
+        self.refused(result, 'Closes #316')
+
+    def test_the_ticket_a_branch_names_may_be_closed(self):
+        """pr-evidence --check lets the ticket's own keyword through in a PR
+        body; the hook takes the ticket from `issue-<n>-` in the pushed ref."""
+        result = push('notes/x.md', PASSING, origin=True, message='Closes #439.',
+                      ref='refs/heads/issue-439-commit-closing-keyword')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_ref_that_names_no_ticket_closes_none(self):
+        for ref, words in (('refs/heads/issue-439', 'Closes #439'),
+                           ('refs/heads/issue-0439-x', 'Closes #439'),
+                           ('refs/heads/b', 'Closes #439'),
+                           ('refs/heads/x/refs/heads/issue-439-y', 'Closes #439'),
+                           ('refs/heads/issue-4390-x', 'Closes #439'),
+                           ('refs/heads/issue-439-x', 'Closes owner/repo#439'),
+                           ('refs/heads/issue-439-x', 'Closes #43')):
+            with self.subTest(ref=ref, words=words):
+                result = push('notes/x.md', PASSING, origin=True, message=words, ref=ref)
+                self.refused(result, words)
+
+    def test_a_commit_no_remote_has_is_read_when_there_is_no_origin_master(self):
+        self.refused(push('notes/x.md', PASSING, base_message='Fixes #1'), 'Fixes #1')
+
+    def test_a_commit_already_pushed_on_another_branch_is_read_again(self):
+        """It reaches master with the PR's squash, so a branch pushed twice is
+        read twice."""
+        result = push('notes/x.md', PASSING, message='Fixes #1', origin=True,
+                      pushed_before=True)
+        self.refused(result, 'Fixes #1')
+
+    def test_the_pushed_commit_is_read_not_the_checked_out_one(self):
+        result = push('notes/x.md', PASSING, message='Fixes #1', origin=True,
+                      checked_out='base')
+        self.refused(result, 'Fixes #1')
+
+    def test_a_push_that_changes_server_is_refused_before_the_slow_checks_too(self):
+        result = push('server/tools/parity_gate.py', PASSING, message='Fixes #1')
+        self.refused(result, 'Fixes #1')
+
+    def test_a_branch_deletion_reads_no_commit(self):
+        result = push('notes/x.md', PASSING, message='Fixes #1', local='deleted')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_missing_tool_stops_the_push(self):
+        result = push('notes/x.md', PASSING, shell='rm plan/bin/commit-closes')
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.ran, '')
+
+    def test_the_tool_is_the_one_beside_the_hook_not_the_pushed_trees(self):
+        """core.hooksPath names the main clone's .githooks, so a branch cut
+        before the tool existed is pushed through a hook whose tree lacks it."""
+        result = push('notes/x.md', PASSING, other_clone=True, message='Fixes #1')
+        self.refused(result, 'Fixes #1')
+        result = push('notes/x.md', PASSING, other_clone=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class GitDirUnset(unittest.TestCase):
