@@ -148,6 +148,13 @@ class CommandLine(unittest.TestCase):
                     f'#500 and #501 share: {MODEL}, server/racing/services/playlist.py\n'
                     'share none: #494\n'))
 
+    def test_it_reads_only_the_tickets_named(self):
+        """With every ticket shared, no ticket is left alone."""
+        result = self.run_tool('499', '500')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, f'#499 and #500 share: {MODEL}, '
+                         'server/racing/services/heats.py\nshare none: none\n')
+
     def test_a_gh_failure_exits_2(self):
         result = self.run_tool(fail=True)
         self.assertEqual(result.returncode, 2)
