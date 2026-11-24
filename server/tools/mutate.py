@@ -30,6 +30,13 @@ that turns a parsed pid into the wrong one, as retro-391's `$PPID` named
 `systemd --user` and ended the desktop session, fails its test instead of
 signalling it. A run in which the guard refused a signal reads `KILLED`
 (`BROKE` with `--expect pass`) with the refusal in its parentheses (#448).
+Each pytest run gets a token of its own in its environment
+(`DERBYNET_MUTATE_RUN`), and every process still carrying it when the run
+ends is killed with SIGKILL and named on the result line (`left N
+processes running, now killed: PID COMM, ...`): #463's hang mutants left 5
+load scripts running, which only `pgrep` showed (#463 retro). A process a
+test started with an environment of its own carries no token.
+
 The guard covers the Python tests' own calls, not a `kill` a script under
 test runs. Before a mutant of code whose tests signal a pid, run those tests
 once with `--kill-guard-print`, which sends nothing and lists each refusal:
@@ -73,10 +80,15 @@ file and names the mutants not run. The cases the listing reads past are
 still mutated by hand, one per call.
 
 Each run stops at its first failure (`-x`; a `--maxfail` given after it
-wins), since one failure kills the mutant (#344 retro). It prints
-pytest's output, then one line: `KILLED` (a test failed; with
-`failed in helper NAME` when a helper in a test file raised, not the test
-itself, so read whether the assert the mutant aims at failed),
+wins), since one failure kills the mutant (#344 retro). It prints one
+line, then pytest's output, then the same line again: `KILLED` (a test
+failed; with `failed in helper NAME` when a helper in a test file raised,
+not the test itself, so read whether the assert the mutant aims at
+failed, and with each test that passed with the mutant in and the count
+`-x` left unrun, since only the one that failed killed it; under
+pytest-repeat's `--count`, which runs on past a failure, the runs it
+failed in, `failed in F of N runs`, and when the first failure raised an
+AttributeError, NameError or TypeError, `failed on NAME, not an assert`),
 `SURVIVED` (every test passed), or with `--expect pass`, for a should-pass
 mutant, `PASSED` or `BROKE`. It exits 0 when the result is the one
 expected, 1 when it is not, and 2 when it refuses, when pytest errors (an
@@ -106,6 +118,8 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
+import uuid
 from pathlib import Path
 
 REFUSED = 2
@@ -255,6 +269,11 @@ def _pytest(pytest_args: list[str], timeout: float):
     without `-x` and were stopped part-way, their mutants NOT RUN (#344
     retro). A `--maxfail` in the arguments comes after `-x` and wins. `-x`
     stops at a fixture's error too (stopped_on_error())."""
+    # A run of pytest-repeat's --count goes on past a failure, so its rate
+    # shows: #409's mutant that deleted stop_sending survived one run, then
+    # was killed in 5 of 10 and 1 of 3 (#409 retro).
+    if any(arg == "--count" or arg.startswith("--count=") for arg in pytest_args):
+        return _pytest_once(pytest_args, timeout)
     run, output = _pytest_once(["-x", *pytest_args], timeout)
     if stopped_on_error(counts(output)):
         return _pytest_once(pytest_args, timeout)
@@ -275,14 +294,26 @@ def _pytest_once(pytest_args: list[str], timeout: float):
     # copy from before the first mutant is what each run loads, so a mutant of
     # the guard is judged by the tests and not by itself (#448).
     assert _guard_folder, "main() copies the guard before a mutant is written"
+    token = uuid.uuid4().hex
     env = {
         **os.environ,
         "PYTHONPATH": os.pathsep.join([_guard_folder, *_pythonpath()]),
+        RUN_MARK: token,
     }
     try:
+        return _with_strays(_run_pytest(pytest_args, env, timeout), token)
+    finally:
+        # A timeout or a stop leaves pytest's children too.
+        _kill_strays(token)
+
+
+def _run_pytest(pytest_args: list[str], env: dict, timeout: float):
+    try:
         run = subprocess.run(
+            # `-rfEp`: the summary names each test that passed, for spared();
+            # an `-r` in the arguments comes after it and wins.
             [sys.executable, "-m", "pytest", "-p", "no:xdist", "-p", "kill_guard"]
-            + pytest_args,
+            + ["-rfEp", *pytest_args],
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -293,6 +324,75 @@ def _pytest_once(pytest_args: list[str], timeout: float):
         # Bytes whatever `text` says (the subprocess docs, TimeoutExpired).
         return None, (late.stdout or b"").decode()
     return run, run.stdout
+
+
+# Set in each pytest run's environment to a token of the run's own, which
+# every process it starts inherits, `setsid` or not.
+RUN_MARK = "DERBYNET_MUTATE_RUN"
+# The line _with_strays() adds to a run's output, which _result() reads.
+STRAYS = re.compile(r"^mutate\.py: (left \d+ process.*)$", re.M)
+
+
+def _carries(pid: int, token: str) -> bool:
+    """Whether the process's environment holds the run's token; one this
+    user can't read, or a zombie's, is no run's."""
+    try:
+        environ = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+    except OSError:
+        return False
+    return f"{RUN_MARK}={token}".encode() in environ
+
+
+def _carriers(token: str) -> list[tuple[int, str]]:
+    """Each live process that carries the run's token, with its `comm`."""
+    found = []
+    for proc in Path("/proc").iterdir():
+        if proc.name.isdigit() and _carries(int(proc.name), token):
+            with contextlib.suppress(OSError):
+                found.append((int(proc.name), (proc / "comm").read_text().strip()))
+    return found
+
+
+def _kill_strays(token: str) -> list[tuple[int, str]]:
+    """SIGKILLs each process that still carries the run's token, until none
+    does, and returns those it found first. Each signal goes through a pidfd
+    opened before the token is read again, so a pid reused meanwhile is
+    never signalled."""
+    if sys.platform != "linux":
+        return []
+    first = found = _carriers(token)
+    for _ in range(50):
+        if not found:
+            break
+        for pid, _comm in found:
+            try:
+                fd = os.pidfd_open(pid)
+            except OSError:
+                continue
+            try:
+                if _carries(pid, token):
+                    signal.pidfd_send_signal(fd, signal.SIGKILL)
+            except OSError:
+                pass
+            finally:
+                os.close(fd)
+        time.sleep(0.1)
+        found = _carriers(token)
+    return first
+
+
+def _with_strays(result, token: str):
+    """The run, with a line added to its output naming the processes it left
+    running, which are then killed. #463's hang mutants (`sleep 100000`)
+    left 5 load scripts running, seen only with `pgrep`, beside other
+    agents' load runs (#463 retro)."""
+    run, output = result
+    strays = _kill_strays(token)
+    if not strays:
+        return run, output
+    named = ", ".join(f"{pid} {comm}" for pid, comm in strays)
+    line = f"mutate.py: left {len(strays)} processes running, now killed: {named}\n"
+    return run, output + line
 
 
 def _result(run, output: str, expect: str) -> tuple[str, str]:
@@ -309,7 +409,61 @@ def _result(run, output: str, expect: str) -> tuple[str, str]:
     outcome = OUTCOMES[expect].get(run.returncode)
     if outcome is None:
         return "ERROR", f"pytest exit status {run.returncode}"
-    return outcome, failed_in_helper(output)
+    why = [failed_in_helper(output)]
+    if outcome == OUTCOMES[expect][1]:
+        why.append(raised_outside_an_assert(output))
+        why.append(spared(output))
+    if strays := STRAYS.search(output):
+        why.append(strays.group(1))
+    return outcome, "; ".join(w for w in why if w)
+
+
+# The errors a test's own code raises when a mutant breaks its scaffolding,
+# not the behaviour it asserts.
+SCAFFOLD_ERRORS = {"AttributeError", "NameError", "UnboundLocalError", "TypeError"}
+# The last line of a failure's traceback: `test_x.py:12: AttributeError`.
+RAISED = re.compile(r"^\S+\.py:\d+: (\w+)$", re.M)
+
+
+def raised_outside_an_assert(output: str) -> str:
+    """`failed on NAME, not an assert` when pytest's first failure raised one
+    of SCAFFOLD_ERRORS. #409's m2 read KILLED on `tab.blocker`'s
+    AttributeError in its test, not on an assert (#409 retro)."""
+    failures = FAILURES.search(output)
+    if failures is None:
+        return ""
+    raised = RAISED.search(output, failures.end())
+    if raised is None or raised.group(1) not in SCAFFOLD_ERRORS:
+        return ""
+    return f"failed on {raised.group(1)}, not an assert"
+
+
+# pytest's header line for a run in one process: "collected 3 items".
+COLLECTED = re.compile(r"^collected (\d+) items?", re.M)
+
+
+def spared(output: str) -> str:
+    """The tests a failed run passed with the mutant in, from the `PASSED`
+    lines of its short summary (`-rp`), and how many `-x` left unrun. #463's
+    `true` mutant read KILLED against three node ids, two of which passed
+    with it (`..F`), and both its implementer and reviewer nearly read each
+    of the three as a kill (#463 retro)."""
+    passed = [line.removeprefix("PASSED ") for line in summary_lines(output, "PASSED ")]
+    found = counts(output)
+    ran = sum(found.get(k, 0) for k in ("passed", "failed", "skipped", "error"))
+    ran += found.get("xfailed", 0) + found.get("xpassed", 0)
+    collected = COLLECTED.search(output)
+    unrun = int(collected.group(1)) - ran if collected else 0
+    parts = []
+    failed = found.get("failed", 0)
+    # pytest-repeat names each of --count's runs `[I-N]` or `[case-I-N]`.
+    if passed and failed and all(re.search(r"[[-]\d+-\d+\]$", p) for p in passed):
+        parts.append(f"failed in {failed} of {failed + len(passed)} runs")
+    elif passed:
+        parts.append(f"{len(passed)} passed with the mutant in: {', '.join(passed)}")
+    if unrun > 0:
+        parts.append(f"{unrun} not run after the first failure (-x)")
+    return "; ".join(parts)
 
 
 # A traceback entry's place in pytest's output: `test_x.py:12: AssertionError`
@@ -371,15 +525,16 @@ def killed_by(output: str) -> list[str]:
     test that killed a mutant and its error. #347's KILLED rows named no
     test, so a kill by a bound or a flake read as one by an assert, and a
     row was rerun by hand to see which (#347 retro)."""
+    return summary_lines(output, "FAILED ", "ERROR ")
+
+
+def summary_lines(output: str, *starts: str) -> list[str]:
+    """The lines of pytest's short test summary that start with `starts`."""
     lines = output.splitlines()
-    starts = [i for i, line in enumerate(lines) if "short test summary info" in line]
-    if not starts:
+    found = [i for i, line in enumerate(lines) if "short test summary info" in line]
+    if not found:
         return []
-    return [
-        line
-        for line in lines[starts[-1] + 1 :]
-        if line.startswith(("FAILED ", "ERROR "))
-    ]
+    return [line for line in lines[found[-1] + 1 :] if line.startswith(starts)]
 
 
 def _listing():
@@ -669,12 +824,16 @@ def _main(argv: list[str] | None) -> int:
     if run is None:
         print(f"ERROR  {mutant}  (timed out after {args.timeout:g} s)")
         return REFUSED
-    print(run.stdout, end="")
-    outcome, why = _result(run, run.stdout, args.expect)
+    outcome, why = _result(run, output, args.expect)
+    verdict = f"{outcome}  {mutant}" + (f"  ({why})" if why else "")
+    # Before pytest's output as well as after it: #437's and #463's rounds
+    # piped the tool through `grep ... | head -6`, which kept pytest's `E`
+    # lines and cut the verdict (#463 retro).
+    print(verdict)
+    print(output, end="")
+    print(verdict)
     if outcome in ("REFUSED", "ERROR"):
-        print(f"{outcome}  {mutant}  ({why})")
         return REFUSED
-    print(f"{outcome}  {mutant}" + (f"  ({why})" if why else ""))
     return 0 if outcome == EXPECTED[args.expect] else 1
 
 

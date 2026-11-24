@@ -42,7 +42,11 @@ that line of the new file. For each added line it lists:
   it never fires. #344's review found an untested pointercancel listener,
   which no listed mutant removed (#344 retro). A registration that spans
   lines, takes its event from a variable, or sits in JavaScript inside a
-  Python string (a browser test's helper) is left to hand mutants.
+  Python string (a browser test's helper) is left to hand mutants;
+- in a `.js` file on disk, each call statement on one line right
+  below a one-line `if (...) return` guard, moved above it (`moved`), so
+  the call runs where the guard returns: #383's `carryHeldKeys()` below
+  `if (!opener) return;` was moved by hand in review, and survived.
 
 A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary, comprehension and `case` guard
@@ -82,6 +86,10 @@ CALL = re.compile(r"(?<![\w.$-])((?:[A-Za-z_$][\w$]*\.)*)(min|max|clamp)\(")
 JS_IF = re.compile(r"\b(?:if|else if)\s*\(")
 FILTER = re.compile(r"\.filter\(\s*(\(?[\w, ]*\)?)\s*=>\s*")
 LISTENER = re.compile(r"(?:\baddEventListener|\.on)\(\s*(['\"`])([^'\"`]+)\1")
+# A JavaScript guard that ends its function early, on one line, and a call
+# made as a statement of its own, on one line.
+JS_GUARD = re.compile(r"^\s*if\s*\(.*\)\s*return\b[^;]*;?\s*$")
+JS_CALL = re.compile(r"^\s*(?!(?:if|return|while|for|switch)\b)[\w$.]+\(.*\);?\s*$")
 PY_IF = re.compile(r"^\s*(?:if|elif)\s+(.+):\s*(?:#.*)?$")
 OPEN, CLOSE = "([{", ")]}"
 
@@ -100,7 +108,8 @@ class Mutant:
 
     def __str__(self) -> str:
         old = " ".join(self.old.split())
-        return f"{self.path}:{self.line}  {self.kind}  {old}  ->  {self.new}"
+        new = self.new.replace("\n", " ")
+        return f"{self.path}:{self.line}  {self.kind}  {old}  ->  {new}"
 
 
 def closing(text: str, start: int) -> int | None:
@@ -535,8 +544,30 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
                 found.append((line, 0, Mutant(path, line, kind, old, new, span)))
         for line, kind, old, new, span in conditions:
             found.append((line, 1, Mutant(path, line, kind, old, new, span)))
+        # JavaScript inside a Python string is left to hand mutants.
+        if lines is not None and path.endswith(".js"):
+            for line, old, new, span in moved_calls(lines, starts, rows):
+                found.append((line, 0, Mutant(path, line, "moved", old, new, span)))
         found.sort(key=lambda f: (f[0], f[1]))
         out += [m for _, _, m in found if m.old != m.new]
+    return out
+
+
+def moved_calls(lines: list[str], starts: list[int], rows) -> list[tuple]:
+    """For each added JavaScript call statement right below a one-line
+    `if (...) return` guard, the two lines swapped, so the call runs before
+    the guard: (line, old, new, span). #383's `carryHeldKeys()` sat below
+    `if (!opener) return;`, its move above the guard survived review's
+    hand mutant, and no listed mutant moved it (#383 retro)."""
+    out = []
+    for line, _ in rows:
+        if line < 2 or line > len(lines):
+            continue
+        guard, call = lines[line - 2], lines[line - 1]
+        if JS_GUARD.match(guard) and JS_CALL.match(call):
+            start = starts[line - 1]
+            span = (start, start + len(guard) + 1 + len(call))
+            out.append((line, f"{guard}\n{call}", f"{call}\n{guard}", span))
     return out
 
 
