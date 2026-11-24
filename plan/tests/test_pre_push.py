@@ -7,8 +7,10 @@ Run: python3 -I -m unittest discover -s plan/tests
 """
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -477,6 +479,151 @@ class TreeCopy(unittest.TestCase):
                 self.assertIn(f'pre-push: the checks run in {cache}/derbynet-pre-push-',
                               result.stderr)
                 self.assertEqual(os.listdir(cache), [])
+
+
+HANGING = """import os
+import signal
+import time
+import unittest
+from pathlib import Path
+
+
+class Plan(unittest.TestCase):
+    def test_it_hangs_when_asked(self):
+        if 'HANG_PID' not in os.environ:
+            return
+        if os.environ.get('HANG_IGNORE_TERM'):
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        Path(os.environ['HANG_PID']).write_text(str(os.getpid()))
+        time.sleep(120)
+"""
+
+
+class CopySignals(unittest.TestCase):
+    """The checks of a one-commit push run in a copy, as a process group the
+    trap stops before it removes the copy. A second signal during that
+    cleanup, and a SIGKILL followed by the next push, each leave no copy and
+    no check running (AGENT-BRIEF, PR #492 review)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.repo, self.cache = self.tmp / 'repo', self.tmp / 'cache'
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
+                   GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
+                   GIT_CONFIG_NOSYSTEM='1', XDG_CACHE_HOME=str(self.cache),
+                   STUB_LOG=str(self.tmp / 'ran'), PRE_PUSH_KILL_WAIT='2')
+        self.env = env
+        repo = self.repo
+        (repo / '.githooks').mkdir(parents=True)
+        shutil.copy(HOOK, repo / '.githooks' / 'pre-push')
+        (repo / 'plan' / 'bin').mkdir(parents=True)
+        for tool in ('commit-closes', 'pr-evidence'):
+            shutil.copy(PLAN_BIN / tool, repo / 'plan' / 'bin' / tool)
+        (repo / 'plan' / 'tests').mkdir()
+        (repo / 'plan' / 'tests' / 'test_plan.py').write_text(HANGING)
+        (repo / 'server' / 'docs' / 'adr').mkdir(parents=True)
+        (repo / 'server' / 'docs' / 'adr' / 'check-paths.sh').write_text(CHECK_PATHS)
+        (repo / '.gitignore').write_text('__pycache__/\n')
+        self.git('init', '-q', '-b', 'master')
+        self.git('add', '.')
+        self.git('commit', '-q', '-m', 'base')
+        self.base = self.git('rev-parse', 'HEAD')
+        (repo / 'notes').mkdir()
+        (repo / 'notes' / 'x.md').write_text('changed\n')
+        self.git('add', '.')
+        self.git('commit', '-q', '-m', 'change')
+        self.head = self.git('rev-parse', 'HEAD')
+
+    def git(self, *argv):
+        return subprocess.run(['git', *argv], cwd=self.repo, env=self.env, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    def start(self, **environ):
+        hook = subprocess.Popen(
+            ['bash', str(self.repo / '.githooks' / 'pre-push'), 'origin', 'url'],
+            cwd=self.repo, env={**self.env, **environ}, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            start_new_session=True)
+        hook.stdin.write(f'refs/heads/master {self.head} refs/heads/b {self.base}\n')
+        hook.stdin.close()
+        return hook
+
+    def hanging(self, **environ):
+        """The hook, once its plan test hangs in the copy, and that test's pid."""
+        pid_file = self.tmp / 'hang.pid'
+        hook = self.start(HANG_PID=str(pid_file), **environ)
+        for _ in range(600):
+            if pid_file.exists() and pid_file.read_text():
+                break
+            time.sleep(0.1)
+        else:
+            hook.kill()
+            self.fail(hook.communicate()[1])
+        pid = int(pid_file.read_text())
+        self.addCleanup(self.kill, pid)
+        return hook, pid
+
+    @staticmethod
+    def kill(pid):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    @staticmethod
+    def running(pid):
+        """Whether `pid` runs, waiting up to 5 s for it to end."""
+        for _ in range(50):
+            try:
+                state = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[0]
+            except FileNotFoundError:
+                return False
+            if state == 'Z':
+                return False
+            time.sleep(0.1)
+        return True
+
+    def assert_no_copy(self):
+        self.assertEqual(list(self.cache.glob('derbynet-pre-push-*')), [])
+        self.assertEqual(self.git('worktree', 'list', '--porcelain').count('worktree '), 1)
+
+    def test_a_term_stops_the_checks_and_removes_the_copy(self):
+        hook, pid = self.hanging()
+        hook.send_signal(signal.SIGTERM)
+        _, err = hook.communicate(timeout=60)
+        self.assertEqual(hook.returncode, 143, err)
+        self.assertFalse(self.running(pid), 'the check outlived the hook')
+        self.assert_no_copy()
+
+    def test_a_second_signal_during_the_cleanup_still_removes_the_copy(self):
+        hook, pid = self.hanging(HANG_IGNORE_TERM='1')
+        hook.send_signal(signal.SIGTERM)
+        time.sleep(0.5)
+        hook.send_signal(signal.SIGTERM)
+        _, err = hook.communicate(timeout=60)
+        self.assertEqual(hook.returncode, 143, err)
+        self.assertFalse(self.running(pid), 'the check outlived the hook')
+        self.assert_no_copy()
+
+    def test_the_next_push_removes_a_killed_hooks_copy_and_its_checks(self):
+        hook, pid = self.hanging()
+        hook.kill()
+        # The check it left holds the hook's pipes open.
+        hook.wait(timeout=60)
+        hook.stdout.close()
+        hook.stderr.close()
+        copy = self.cache / f'derbynet-pre-push-{hook.pid}'
+        self.assertTrue(copy.is_dir())
+        self.assertTrue(self.running(pid))
+        again = self.start()
+        _, err = again.communicate(timeout=120)
+        self.assertEqual(again.returncode, 0, err)
+        self.assertIn(f'pre-push: removed {copy}, left by pre-push {hook.pid}, which is gone',
+                      err)
+        self.assertFalse(self.running(pid), 'the killed hook\'s check still runs')
+        self.assert_no_copy()
 
 
 class CommitClosingKeyword(unittest.TestCase):

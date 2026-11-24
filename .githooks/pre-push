@@ -25,8 +25,8 @@
 #   git config core.hooksPath .githooks
 #
 # It checks a detached copy of the pushed commit, so the working tree may
-# change while it runs (#470 retro), or, for a push of two commits, the
-# working tree, and fails when that changes while it runs (#373 retro).
+# change while it runs (#470 retro), or, when the pushed refs name two
+# commits, the working tree, and fails when that changes (#373 retro).
 # `git push --no-verify` skips it.
 
 set -e -o pipefail
@@ -168,30 +168,64 @@ for push in ${pushes[@]+"${pushes[@]}"}; do
   python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${args[@]+"${args[@]}"} \
     ${closes_args[@]+"${closes_args[@]}"} --head "$sha"
 done
-# The checks run in a detached copy of the pushed commit, so the working
-# tree is free while they run, about 15 min: #400's implementer edited it
-# during the hook, which then refused the push, about 25 min late, and
-# #470's sat idle through six pushes (#470 retro). The copy is a worktree
-# under ${XDG_CACHE_HOME:-~/.cache}, removed at exit; `uv run --locked`
-# builds its server/.venv from uv's cache, as pr-merge's does. A SIGKILL
-# leaves it behind: `git worktree remove --force <it>`. A commit made on a
+# The checks run in a detached copy of the pushed commit when every pushed
+# ref names the same commit, so the working tree is free while they run,
+# about 15 min: #400's implementer edited it during the hook, which then
+# refused the push, about 25 min late, and #470's sat idle through six
+# pushes (#470 retro). The copy is a worktree under ${XDG_CACHE_HOME:-~/.cache}
+# named for the hook's pid; `uv run --locked` builds its server/.venv from
+# uv's cache, as pr-merge's does. The checks run as a background job in a
+# process group of their own, so the trap stops them before it removes the
+# copy, and ignores a second signal while it does (AGENT-BRIEF, #333
+# review). A SIGKILL runs no trap: the next push removes each copy whose
+# hook is gone, with the processes still running in it. A commit made on a
 # pushed ref during the checks fails the push: the #470 retro's first push
 # checked a9d8d04e, and GitHub received 50650764, committed during the
-# checks, which none had read. When the push sends
-# more than one commit, the checks read the working tree as before, and
-# fail when it changes while they run: #373's implementer edited
-# network_changed.py during the hook, and the run left rerun pytests
-# behind. The head, the status, the tracked changes and the contents of the
-# untracked files are compared at exit (#390 review).
+# checks, which none had read. When the pushed refs name two commits, the
+# checks read the working tree as before, and fail when it changes while
+# they run: #373's implementer edited network_changed.py during the hook,
+# and the run left rerun pytests behind. The head, the status, the tracked
+# changes and the contents of the untracked files are compared at exit
+# (#390 review).
 mapfile -t shas < <(for push in ${pushes[@]+"${pushes[@]}"}; do echo "${push%% *}"; done |
                     sort -u)
+COPY=
+checks_pid=
+# Seconds the trap waits for a check that ignores TERM before it kills it.
+KILL_WAIT=${PRE_PUSH_KILL_WAIT:-10}
 if [ ${#shas[@]} -eq 1 ]; then
   MAIN="$ROOT"
-  COPY="${XDG_CACHE_HOME:-$HOME/.cache}/derbynet-pre-push-$$"
+  CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+  for left in "$CACHE"/derbynet-pre-push-*/; do
+    left=${left%/}
+    [ -d "$left" ] || continue
+    owner=${left##*-}
+    [ ! -e "/proc/$owner" ] || continue
+    for proc in /proc/[0-9]*; do
+      case $(readlink "$proc/cwd" 2>/dev/null) in
+        "$left"|"$left"/*) kill -KILL "${proc#/proc/}" 2>/dev/null || true ;;
+      esac
+    done
+    git worktree remove --force --force "$left" 2>/dev/null || true
+    rm -rf "$left"
+    git worktree prune 2>/dev/null || true
+    echo "pre-push: removed $left, left by pre-push $owner, which is gone" >&2
+  done
+  COPY="$CACHE/derbynet-pre-push-$$"
   remove_copy() {
     local status=$? pair now
+    trap '' INT HUP TERM
+    if [ -n "$checks_pid" ]; then
+      kill -TERM -- "-$checks_pid" 2>/dev/null || true
+      for _ in $(seq $((KILL_WAIT * 5))); do
+        kill -0 -- "-$checks_pid" 2>/dev/null || break
+        sleep 0.2
+      done
+      kill -KILL -- "-$checks_pid" 2>/dev/null || true
+      wait "$checks_pid" 2>/dev/null || true
+    fi
     cd "$MAIN"
-    git worktree remove --force "$COPY" 2>/dev/null || rm -rf "$COPY"
+    git worktree remove --force --force "$COPY" 2>/dev/null || rm -rf "$COPY"
     git worktree prune
     for pair in "${locals[@]}"; do
       now=$(git rev-parse -q --verify "${pair#* }" || true)
@@ -205,7 +239,10 @@ if [ ${#shas[@]} -eq 1 ]; then
     exit "$status"
   }
   trap remove_copy EXIT
-  mkdir -p "$(dirname "$COPY")"
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  mkdir -p "$CACHE"
   echo "pre-push: the checks run in $COPY, at ${shas[0]:0:8}" >&2
   git worktree add -q --detach "$COPY" "${shas[0]}"
   ROOT="$COPY"
@@ -231,6 +268,7 @@ else
   }
   trap check_tree EXIT
 fi
+run_checks() {
 # The guides' check, as plan-checks.yml runs it, printing only its failures
 # and its count, whatever the push changes: a guide can cite any path.
 if [ -n "$pushed" ]; then
@@ -265,3 +303,15 @@ run python manage.py makemigrations --check --dry-run
 run python tools/golden_inputs.py --check
 echo "pre-push: tools/source-checks.sh, plan/tests among them" >&2
 tools/source-checks.sh
+}
+if [ -n "$COPY" ]; then
+  # Job control puts the background job in a process group of its own.
+  set -m
+  run_checks &
+  checks_pid=$!
+  set +m
+  wait "$checks_pid" && status=0 || status=$?
+  checks_pid=
+  exit "$status"
+fi
+run_checks

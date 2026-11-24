@@ -6,7 +6,8 @@
 # A mutate.py run rewrites its file in place for each mutant, and restores
 # the working tree, not the index: the #463 retro staged `if True else []`
 # this way, and #470's implementer edited a file mid-run and left a mutant
-# in it (#470 retro). A SIGKILL leaves the lock behind; the refusal names it.
+# in it (#470 retro). A SIGKILL leaves the lock behind, and its file may
+# still hold the mutant, so a lock whose pid is gone still refuses.
 #
 # #400's 53dffcf2 joined two docstring lines into one of 93 columns, and the
 # pre-push hook's ruff found it a full push wait later (#400 retro). Ruff
@@ -20,8 +21,9 @@ ROOT="$(git rev-parse --show-toplevel)"
 locks=("$(git rev-parse --absolute-git-dir)"/mutate-*.lock)
 if [ -e "${locks[0]}" ]; then
   echo "pre-commit: tools/mutate.py holds these locks, so a file may hold a" \
-       "mutant; commit once every run has ended. If a run is gone, read" \
-       "git diff -- <its file>, then remove its lock:" >&2
+       "mutant; commit once every run has ended. A lock names its run's pid," \
+       "not its file: if the pid is gone, git diff shows the mutant it left;" \
+       "restore that file, then remove the lock:" >&2
   for lock in "${locks[@]}"; do
     pid=$(cat "$lock" 2>/dev/null || true)
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
