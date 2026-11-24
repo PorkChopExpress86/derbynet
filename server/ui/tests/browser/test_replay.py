@@ -10,6 +10,8 @@ Chromium's two fake cameras.
   WebRTC with no ICE server, and with only ICE URLs Chromium refuses
   stored, which the server drops (#259), and C32's websocket flush.
 - The screenshots of the setup screen and the camera page at both sizes.
+- Now racing inside the replay page holds its board through a replay and
+  lingers after it (#52).
 """
 
 import re
@@ -26,7 +28,7 @@ from ui.tests.browser.conftest import (
     shoot,
 )
 from ui.tests.browser.tab_closing import after_the_stop, at_the_server
-from ui.tests.race import race_setup, scheduled
+from ui.tests.race import race_setup, run_heat, scheduled
 
 # Each frame records the messages posted to it, so a test can read what the
 # replay page told the kiosk frame.
@@ -317,6 +319,93 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     [video] = list(videos.iterdir())
     assert video.name == "Wolves_Round1_Heat01.mkv"
     assert video.stat().st_size > 0
+
+
+# The now-racing frame logs, on its own clock, each replay message, each
+# change of its banner title and each place that lands. Its `query=poll`
+# requests are read from the frame's resource timings on the same clock.
+RECORD_NOW_RACING = """window.__log = [];
+performance.setResourceTimingBufferSize(10000);
+window.addEventListener('message', (e) =>
+  window.__log.push({at: performance.now(), message: e.data}));
+document.addEventListener('DOMContentLoaded', () => {
+  const title = document.querySelector('[data-banner-title]');
+  if (!title) return;
+  new MutationObserver(() => window.__log.push(
+    {at: performance.now(), title: title.textContent})
+  ).observe(title, {childList: true, characterData: true, subtree: true});
+  new MutationObserver((changes) => changes.forEach((c) => {
+    if (c.target.matches('[data-place]') && c.target.classList.contains('k-shown'))
+      window.__log.push({at: performance.now(), landed: c.target.textContent});
+  })).observe(document.body,
+    {attributes: true, attributeFilter: ['class'], subtree: true});
+});"""
+
+READ_NOW_RACING = """() => ({
+  log: window.__log,
+  polls: performance.getEntriesByType('resource')
+    .filter((r) => r.name.includes('query=poll&')).map((r) => r.startTime),
+})"""
+
+
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
+def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
+    """#52: now-racing inside the replay page stops polling on
+    `replay-started`, keeps heat 1 on the board, and polls again on
+    `replay-ended`; the next lineup waits `now-racing-linger-ms` after
+    `replay-ended` (now-racing.js:3-16: `Poller.suspended`, then
+    `start_display_linger`).
+
+    Heat 1's places land and start their own linger. The right-click replay
+    starts inside that linger, and the linger ends while the replay plays,
+    both asserted, so a board that did not hold would take heat 2 during
+    the replay, and one that did not linger again would take it at once
+    after."""
+    linger_ms = 3000
+    fast_replays(
+        event,
+        replay_skipback_ms=4000,
+        replay_post_roll_ms=500,
+        replay_max_clip_ms=5000,
+        now_racing_linger_ms=linger_ms,
+    )
+    lions = scheduled(race_setup(event, groups=(("Lions", 4),))["Lions"], race=False)
+    page = login("RaceCoordinator")
+    post(page, action="heat.select", roundid=str(lions.pk), heat="1", now_racing="1")
+    page.context.add_init_script(RECORD_NOW_RACING)
+    open_replay(page)
+    page.locator("#inner_url").fill("/kiosk.php?page=kiosks/now-racing.kiosk")
+    proceed(page)
+    board = page.frame_locator("#interior")
+    title = board.locator("[data-banner-title]")
+    expect(title).to_have_text("Heat 1 of 4")
+    # More than the replay's 4.5 s clip in the ring.
+    page.wait_for_timeout(5000)
+
+    run_heat(event)
+    expect(board.locator(".k-shown[data-place]")).to_have_count(4, timeout=10_000)
+    page.locator("#click-shield").click(button="right")
+    expect(replay_state(page)).to_have_attribute(
+        "data-replay-state", "playing", timeout=5000
+    )
+    expect(replay_state(page)).to_have_attribute(
+        "data-replay-state", "watching", timeout=15_000
+    )
+    expect(title).to_have_text("Heat 2 of 4", timeout=linger_ms + 5000)
+
+    frame = kiosk_frame(page)
+    # one read: the whole run, logged by the frame as it happened.
+    seen = frame.evaluate(READ_NOW_RACING)
+    log = seen["log"]
+    [started] = [e["at"] for e in log if e.get("message") == "replay-started"]
+    [ended] = [e["at"] for e in log if e.get("message") == "replay-ended"]
+    landed = max(e["at"] for e in log if "landed" in e)
+    [heat_2] = [e["at"] for e in log if e.get("title") == "Heat 2 of 4"]
+    # The replay starts inside the landing's linger, which ends during it.
+    assert landed < started < landed + linger_ms < ended, (landed, started, ended)
+    assert [t for t in seen["polls"] if started < t < ended] == []
+    assert any(t > ended for t in seen["polls"] if t < heat_2)
+    assert heat_2 - ended >= linger_ms, (ended, heat_2)
 
 
 @pytest.mark.sizes("desktop", reason="the replay station is a laptop")
