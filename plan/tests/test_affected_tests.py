@@ -208,6 +208,55 @@ class Docs(unittest.TestCase):
         self.assertNotIn('[fallback]', out)
         self.assertIn('(no pytest target', out)
 
+    DECISIONS = {
+        'plan/owner-decisions.md': '',
+        'server/tools/source-checks.sh': 'pytest \\\n  legacy_api/tests/test_registry.py \\\n',
+        'server/legacy_api/tests/test_registry.py': 'DECISIONS = "owner-decisions.md"\n',
+        'server/tests/test_listed_elsewhere.py': 'from legacy_api.tests.test_registry import x\n',
+        'server/tests/test_other.py': 'README = "README.md"\n',
+    }
+
+    def docs_targets(self, files, path):
+        """What cover_docs maps `path` to in a git repository of `files`."""
+        with git_repo(files) as root:
+            plan = TOOL.Plan(root=root, from_git=False, base='origin/master')
+            tree = TOOL.Tree(root)
+            TOOL.cover_docs(plan, tree, path)
+            return ([t for _rule, _note, targets in plan.covers[path] for t in targets],
+                    TOOL.source_check_targets(plan, tree))
+
+    def test_a_doc_a_test_names_maps_to_it_and_its_importers(self):
+        """test_registry.py and test_deviations.py read owner-decisions.md,
+        and the pre-push hook runs those source-checks.sh lists for a push of
+        it alone (session retro 2026-11-24)."""
+        targets, checks = self.docs_targets(self.DECISIONS, 'plan/owner-decisions.md')
+        self.assertEqual(targets, ['legacy_api/tests/test_registry.py',
+                                   'tests/test_listed_elsewhere.py'])
+        self.assertEqual(checks, ['legacy_api/tests/test_registry.py'])
+
+    def test_a_doc_whose_name_another_file_has_maps_to_none(self):
+        files = {**self.DECISIONS, 'plan/README.md': '', 'server/README.md': ''}
+        self.assertEqual(self.docs_targets(files, 'plan/README.md'), ([], []))
+
+    def test_source_checks_prints_them_one_a_line(self):
+        with git_repo(self.DECISIONS) as root:
+            result = subprocess.run(
+                [sys.executable, '-I', str(AFFECTED), '--stdin', '--source-checks',
+                 '--root', str(root)],
+                input='plan/owner-decisions.md\n', capture_output=True, text=True)
+        self.assertEqual((result.returncode, result.stdout),
+                         (0, 'legacy_api/tests/test_registry.py\n'), result.stderr)
+
+    def test_the_real_decisions_map_to_the_checks_d128_names_that_read_them(self):
+        """D128 names test_registry.py and test_deviations.py as reading
+        owner-decisions.md; test_docker_checks.py reads every tracked .md."""
+        plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+        tree = TOOL.Tree(REPO)
+        TOOL.map_file(plan, tree, 'plan/owner-decisions.md')
+        self.assertLessEqual({'legacy_api/tests/test_registry.py', 'tests/test_deviations.py',
+                              'tests/test_docker_checks.py'},
+                             set(TOOL.source_check_targets(plan, tree)))
+
 
 class Guide(unittest.TestCase):
     """A guide in docs/ renders through the docs build; #61's fix round

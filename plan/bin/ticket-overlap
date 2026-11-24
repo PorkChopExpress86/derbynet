@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Names each pair of tickets whose `## Scope` and `## References` cite a
+path in common, so the lead runs side by side only tickets that share none
+(plan/implement-all-tickets.md, Several tickets at once).
+
+In the session retro of 2026-11-24, #499 (server/racing/services, the
+heat-intermission model) ran beside #494 (the kiosk's JavaScript), and #500
+and #501 waited, since they cite racing/services and the model with #499.
+Once a ticket's PR is open, `plan/bin/pr-overlap` names the files the PRs
+change; this reads only what the tickets cite before any code exists.
+
+A cite is a backticked path with a `/` in it whose first folder is one of
+the repository's, a `:line` after it dropped: `linux/arm64` is none. A
+cite of a folder shares every path under it. `website/` is left out, since
+PHP is frozen (CLAUDE.md), and so is plan/owner-decisions.md, since no
+ticket's agent edits an owner decision (plan/AGENT-BRIEF.md): both are read,
+never changed.
+
+Usage: plan/bin/ticket-overlap [N ...]
+
+With no N, it reads every open `ready-for-agent` issue. It prints one line
+per pair that shares a cite, with the cites, then the tickets that share
+none with any other. Exits 0, or 2 when gh fails.
+"""
+import itertools
+import json
+import os
+import re
+import subprocess
+import sys
+
+GH = os.environ.get('GH', 'gh')
+REPO = os.environ.get('REPO', 'PorkChopExpress86/derbynet')
+CITE = re.compile(r'`([\w.][\w.\-/]*/[\w.\-]*)(?::[\d,\-]+)?`')
+SECTIONS = ('Scope', 'References')
+READ_ONLY = ('website/', 'plan/owner-decisions.md')
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def cites(body: str) -> set[str]:
+    """The paths the body's Scope and References sections cite."""
+    found, keep = set(), False
+    for line in body.splitlines():
+        if line.startswith('## '):
+            keep = line[3:].strip() in SECTIONS
+        elif keep:
+            found.update(m.rstrip('/') for m in CITE.findall(line))
+    return {c for c in found if not c.startswith(READ_ONLY)
+            and os.path.isdir(os.path.join(ROOT, c.split('/')[0]))}
+
+
+def shared(a: set[str], b: set[str]) -> list[str]:
+    """Each cite of `a` that is a cite of `b`, or a folder of one, or under one."""
+    return sorted({x for x in a for y in b
+                   if x == y or y.startswith(x + '/') or x.startswith(y + '/')})
+
+
+def overlaps(bodies: dict[int, str]) -> tuple[list[tuple[int, int, list[str]]], list[int]]:
+    """The pairs of tickets that share a cite, and the tickets in no pair."""
+    cited = {n: cites(body) for n, body in bodies.items()}
+    pairs = [(a, b, common) for a, b in itertools.combinations(sorted(cited), 2)
+             if (common := shared(cited[a], cited[b]))]
+    paired = {n for a, b, _ in pairs for n in (a, b)}
+    return pairs, sorted(set(cited) - paired)
+
+
+def gh(*argv: str):
+    done = subprocess.run([GH, *argv, '--repo', REPO], capture_output=True, text=True)
+    if done.returncode:
+        print(f'ticket-overlap: gh {" ".join(argv)}: {done.stderr.strip()}', file=sys.stderr)
+        sys.exit(2)
+    return json.loads(done.stdout)
+
+
+def main(argv: list[str]) -> int:
+    if any(not a.isdigit() for a in argv):
+        print(__doc__, file=sys.stderr)
+        return 2
+    if argv:
+        bodies = {int(n): gh('issue', 'view', n, '--json', 'body')['body'] for n in argv}
+    else:
+        listed = gh('issue', 'list', '--label', 'ready-for-agent', '--state', 'open',
+                    '--limit', '200', '--json', 'number,body')
+        bodies = {i['number']: i['body'] for i in listed}
+    pairs, alone = overlaps(bodies)
+    for a, b, common in pairs:
+        print(f'#{a} and #{b} share: {", ".join(common)}')
+    print('share none: ' + (', '.join(f'#{n}' for n in alone) or 'none'))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

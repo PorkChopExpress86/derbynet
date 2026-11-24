@@ -93,6 +93,8 @@ EOF
 # ref it pushes.  A new branch has no remote sha; compare it with master.
 changed=
 pushed=
+# Each pushed ref changes plan/owner-decisions.md and nothing else.
+decisions=1
 pushes=()
 locals=()
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -122,6 +124,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if [ -n "$base" ]; then
     names="$(git diff --name-only "$base" "$local_sha" || true)"
   fi
+  [ "$names" = plan/owner-decisions.md ] || decisions=
   # The guides and the workflows that run their stages, which
   # tests/test_guide_commands.py reads (#414).
   checked='^(server/|testing/|website/inc/generators/|plan/|docs/[^/]+\.md$'
@@ -201,6 +204,18 @@ done
 # (#390 review).
 mapfile -t shas < <(for push in ${pushes[@]+"${pushes[@]}"}; do echo "${push%% *}"; done |
                     sort -u)
+# The screenshots branch (D75) holds PNGs and no code, so the checks find
+# none of their scripts in it and fail its push (session retro 2026-11-24).
+# A push whose every commit lacks plan/tests runs no check past the commit
+# messages'.
+code=
+for sha in ${shas[@]+"${shas[@]}"}; do
+  if git cat-file -e "$sha:plan/tests" 2>/dev/null; then code=1; fi
+done
+if [ ${#shas[@]} -gt 0 ] && [ -z "$code" ]; then
+  echo "pre-push: no pushed commit holds plan/tests, so no check reads it" >&2
+  exit 0
+fi
 COPY=
 checks_pid=
 # Seconds the trap waits for a check that ignores TERM before it kills it.
@@ -300,6 +315,26 @@ if [ -z "$changed" ]; then
     printf '%s\n' "$out" >&2
     exit 1
   fi
+  exit 0
+fi
+
+# A push of plan/owner-decisions.md alone runs plan/tests and the source
+# checks that read it, which affected-tests finds as it maps a file to its
+# tests, not the whole of source-checks.sh, about 10 min, so the hook says
+# no `pre-push: tools/source-checks.sh` and the hand-off runs that (D129,
+# session retro 2026-11-24). A tool that fails or finds none runs it all.
+if [ -n "$decisions" ] && readers="$(python3 -I "$ROOT/plan/bin/affected-tests" \
+    --stdin --source-checks --root "$ROOT" <<<plan/owner-decisions.md)" \
+    && [ -n "$readers" ]; then
+  echo "pre-push: plan/tests" >&2
+  if ! out="$(python3 -I -m unittest discover -s "$ROOT/plan/tests" 2>&1 </dev/null)"; then
+    printf '%s\n' "$out" >&2
+    exit 1
+  fi
+  echo "pre-push: the source checks that read plan/owner-decisions.md:" $readers >&2
+  cd "$ROOT/server"
+  mapfile -t readers <<<"$readers"
+  env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${readers[@]}"
   exit 0
 fi
 

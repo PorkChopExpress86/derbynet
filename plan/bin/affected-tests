@@ -4,6 +4,7 @@ commands to run before a push (owner, 2026-11-11).
 
 Usage: plan/bin/affected-tests [BASE]          # BASE defaults to origin/master
        plan/bin/affected-tests --stdin < FILES  # one repo-relative path a line
+       plan/bin/affected-tests --source-checks [--stdin] ...  # see below
 
 It reads `git diff --name-only BASE...HEAD`, plus the uncommitted and
 untracked files, and prints for each file the rule that maps it and its
@@ -109,6 +110,9 @@ looks for database code in each whole file rather than in its diff, and
 has no BASE to find an import-only move or a changed test against, so
 every changed browser test file keeps its count, of the whole file.
 `--root DIR` reads the tree at DIR instead of the repository's top level.
+`--source-checks` prints only the test files of tools/source-checks.sh that
+the changed files map to, one a line: the pre-push hook runs those alone for
+a push that changes only plan/owner-decisions.md (session retro 2026-11-24).
 """
 
 import ast
@@ -646,6 +650,18 @@ def match_docs(path):
 
 
 def cover_docs(plan, tree, path):
+    # test_registry.py and test_deviations.py read owner-decisions.md, and
+    # the pre-push hook runs the source checks among them for a push of it
+    # alone (--source-checks, session retro 2026-11-24). By its bare name
+    # only where no other tracked file has it, as testing_citers reads one:
+    # README.md names a file in several folders.
+    name = Path(path).name
+    citers = []
+    if tree.tracked_names()[name] <= 1:
+        citers = runners(tree, tree.mentions([name], files=tree.python_in_tests()))
+    if citers:
+        plan.add(path, 'docs', 'a doc the tests that name it read', citers)
+        return
     plan.add(path, 'docs', 'docs only: no pytest target of its own. tools/source-checks.sh '
              "reads its PHP claims and cites (test_php_claims.py, "
              "test_php_cite_lines.py), and the pre-push hook its ADR paths")
@@ -2542,6 +2558,13 @@ def master_moved(plan, targets):
     return found
 
 
+def source_check_targets(plan, tree):
+    """The test files of tools/source-checks.sh that the changed files map to."""
+    found = {t for entries in plan.covers.values() for _rule, _note, targets in entries
+             for t in targets}
+    return sorted({t for t in found if tree.exists(t)} & tree.source_checks())
+
+
 def report(plan, tree):
     out = []
     say = out.append
@@ -2575,7 +2598,7 @@ def report(plan, tree):
         for why in dict.fromkeys(plan.everything):
             say(f'  {why}')
     targets = [t for t in set(all_targets) if tree.exists(t)]
-    checked = sorted(set(targets) & tree.source_checks())
+    checked = source_check_targets(plan, tree)
     if checked:
         say('tools/source-checks.sh runs these, so the commands leave them out: '
             + ', '.join(checked))
@@ -2701,6 +2724,9 @@ def main(argv):
     from_stdin = '--stdin' in args
     if from_stdin:
         args.remove('--stdin')
+    only_checks = '--source-checks' in args
+    if only_checks:
+        args.remove('--source-checks')
     if '--root' in args:
         i = args.index('--root')
         root = Path(args[i + 1]).resolve()
@@ -2722,7 +2748,10 @@ def main(argv):
     try:
         for path in files:
             map_file(plan, tree, path)
-        sys.stdout.write(report(plan, tree))
+        if only_checks:
+            sys.stdout.write(''.join(f'{t}\n' for t in source_check_targets(plan, tree)))
+        else:
+            sys.stdout.write(report(plan, tree))
     except subprocess.CalledProcessError as failed:
         # A git command no rule expects to fail, such as `ls-files` on a
         # broken index, stops the tool with git's own message (#431).
