@@ -86,6 +86,8 @@ jobs:
           tests/test_pipefail_pipes.py
           tests/test_subshell_state.py
           tests/test_arithmetic_operands.py
+          tests/test_lead_rulings.py
+          tests/test_docstring_position.py
 
       - name: Decide whether to lint the issues
         id: scope
