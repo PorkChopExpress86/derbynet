@@ -379,7 +379,7 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     board = page.frame_locator("#interior")
     title = board.locator("[data-banner-title]")
     expect(title).to_have_text("Heat 1 of 4")
-    # More than the replay's 4.5 s clip in the ring.
+    # More than the replay's clip in the ring before the right-click.
     page.wait_for_timeout(5000)
 
     run_heat(event)
