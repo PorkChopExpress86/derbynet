@@ -28,7 +28,7 @@ Briefing an agent on a ticket: `plan/AGENT-BRIEF.md`. No subagent uses the fable
 
 Working every ready ticket in a loop: `plan/implement-all-tickets.md`.
 
-mattpocock skills marked `disable-model-invocation` (implement, retro, ask-matt, triage): read their `SKILL.md` under `~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/*/skills/` and follow it.
+mattpocock skills marked `disable-model-invocation` (implement, retro, ask-matt, triage): read their `SKILL.md` under `~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/` and follow it.
 
 ## Reviews
 
