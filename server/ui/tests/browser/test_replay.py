@@ -397,15 +397,17 @@ def replay_inside_the_linger(login, event, kiosk) -> dict:
       click's latency, and must start before `landed + REPLAY_LINGER_MS`:
       slack `REPLAY_LINGER_MS - POST_ROLL_MS - latency`.
     - The replay ends `POST_ROLL_MS + SKIPBACK_MS + POST_ROLL_MS` after the
-      right-click (the post-roll, then the clip at rate 100), and the
+      right-click (the post-roll, then the clip at `fast_replays`' rate), and the
       landing's linger ends at `landed + PLACE_WAIT_MS + REPLAY_LINGER_MS`,
       which must come first: slack `2 * POST_ROLL_MS + SKIPBACK_MS -
       PLACE_WAIT_MS - REPLAY_LINGER_MS`, plus the click's latency.
     - Heat 2 is awaited `2 * REPLAY_LINGER_MS + 5000` ms from the replay
-      page's `watching`: on the rows page it comes `REPLAY_LINGER_MS` after
-      the places land again (4 places, `PLACE_WAIT_MS` apart), which the
-      first poll after `replay-ended` starts, 500 ms after the reply before
-      it (kiosk.js `queue()`), then at the next poll and its reply."""
+      page's `watching`: on the rows page it comes `PLACE_WAIT_MS +
+      REPLAY_LINGER_MS` after the last place lands again, the places
+      `PLACE_WAIT_MS` apart, which the first poll after `replay-ended`
+      starts (kiosk.js `queue()`), then at the next poll and its reply:
+      slack `5000 + REPLAY_LINGER_MS - 4 * PLACE_WAIT_MS`, less the polls
+      and replies in between."""
     fast_replays(
         event,
         replay_skipback_ms=SKIPBACK_MS,
@@ -465,8 +467,8 @@ def snapshot(log, message) -> list:
 
 def assert_no_animation_paused_or_restarted(seen):
     """D137: no animation pauses during a replay, and after it no finished
-    entry animation starts again before heat 2's lineup. The snapshot
-    after `replay-started` holds heat 1's entry animations, so the checks
+    entry animation starts again before the next lineup. The snapshot
+    after `replay-started` holds the board's entry animations, so the checks
     below are not run on an empty page."""
     during = snapshot(seen["log"], "replay-started")
     assert ENTRY_ANIMATIONS & {a["name"] for a in during}, during
