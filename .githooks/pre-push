@@ -94,10 +94,12 @@ EOF
 changed=
 pushed=
 pushes=()
-while read -r _ local_sha remote_ref remote_sha; do
+locals=()
+while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$ZERO" ] && continue  # a deleted ref
   pushed=1
   pushes+=("$local_sha $remote_ref")  # a ref name holds no space
+  locals+=("$local_sha $local_ref")
   if [ "$remote_sha" = "$ZERO" ]; then
     base="$(git merge-base "$local_sha" origin/master 2>/dev/null \
               || git merge-base "$local_sha" master 2>/dev/null || true)"
@@ -172,7 +174,10 @@ done
 # #470's sat idle through six pushes (#470 retro). The copy is a worktree
 # under ${XDG_CACHE_HOME:-~/.cache}, removed at exit; `uv run --locked`
 # builds its server/.venv from uv's cache, as pr-merge's does. A SIGKILL
-# leaves it behind: `git worktree remove --force <it>`. When the push sends
+# leaves it behind: `git worktree remove --force <it>`. A commit made on a
+# pushed ref during the checks fails the push: git's https helper sent the
+# ref as it was at the end, 50650764, which no check had read, where the
+# hook checked a9d8d04e (#470 retro's own push). When the push sends
 # more than one commit, the checks read the working tree as before, and
 # fail when it changes while they run: #373's implementer edited
 # network_changed.py during the hook, and the run left rerun pytests
@@ -184,10 +189,19 @@ if [ ${#shas[@]} -eq 1 ]; then
   MAIN="$ROOT"
   COPY="${XDG_CACHE_HOME:-$HOME/.cache}/derbynet-pre-push-$$"
   remove_copy() {
-    local status=$?
+    local status=$? pair now
     cd "$MAIN"
     git worktree remove --force "$COPY" 2>/dev/null || rm -rf "$COPY"
     git worktree prune
+    for pair in "${locals[@]}"; do
+      now=$(git rev-parse -q --verify "${pair#* }" || true)
+      if [ -n "$now" ] && [ "$now" != "${pair%% *}" ]; then
+        echo "pre-push: ${pair#* } moved from ${pair:0:8} to ${now:0:8} while the" \
+             "checks ran, and git may send the new commit, which they never read;" \
+             "push again" >&2
+        [ "$status" -ne 0 ] || status=1
+      fi
+    done
     exit "$status"
   }
   trap remove_copy EXIT

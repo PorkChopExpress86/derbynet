@@ -459,6 +459,15 @@ class TreeCopy(unittest.TestCase):
                       shell='echo dirty > notes/x.md')
         self.assertEqual(result.returncode, 1, result.stderr)
 
+    def test_a_commit_on_the_pushed_ref_during_the_checks_fails_the_push(self):
+        """The #470 retro's push checked a9d8d04e, and GitHub got 50650764,
+        committed during the checks."""
+        result = push('notes/x.md', self.edit(
+            self.MAIN + "subprocess.run(['git', '-C', str(MAIN), 'commit', '-q', "
+            "'--allow-empty', '-m', 'during'], check=True)"))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('pre-push: refs/heads/b moved from ', result.stderr)
+
     def test_the_copy_is_removed_after_a_pass_or_a_failure(self):
         for passes in (True, False):
             with self.subTest(passes=passes), tempfile.TemporaryDirectory() as cache:
