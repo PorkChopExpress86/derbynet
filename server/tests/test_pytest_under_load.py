@@ -256,7 +256,10 @@ def wait_until(condition, what, seconds=60):
 # push, at a load average of about 24, load_run_of's single bound over every
 # step of the run, its two pytest starts among them, ran out at 120 s. One
 # step may take all of it, so a wait over several steps gives each step
-# STEP_S from the step before, twice that (#463).
+# STEP_S from the step before, twice that (#463). On the 16-CPU machine at
+# 38d89184, a held rerun's Popen to its stub's start took 2.7-3.1 s with no
+# load, 18.4-21.3 s pinned to 8 CPUs at a load of 56-62, and 8.9-18.0 s in a
+# MemoryHigh=600M scope beside four direct-I/O writers (#463's probe).
 SLOWEST_RUN_S = 120
 STEP_S = 2 * SLOWEST_RUN_S
 
