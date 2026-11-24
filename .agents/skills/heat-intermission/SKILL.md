@@ -9,7 +9,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 
 ## Coverage & sync commit
 
-- **Last verified commit:** `3b4d1a32c20f16634b08f57e1f26dbde5893313f`
+- **Last verified commit:** `7c3cd879a90246a83044ae86ece6206935892679`
 - **Covered files and functions:**
   - `server/racing/engine/heat_state.py`: `State`, `Chart.allowed`, `Chart.round_complete`, `TABLE`, `decide`, `_RACING_ON_EXTRAS`
   - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `rebuild_waiting_final`, `results_locked`, `locked_failure`
@@ -19,18 +19,18 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 Before trusting a pass, check whether covered code changed since the sync commit:
 
 ```sh
-git diff --stat 3b4d1a32c20f16634b08f57e1f26dbde5893313f -- \
+git diff --stat 7c3cd879a90246a83044ae86ece6206935892679 -- \
   server/racing/engine/heat_state.py \
   server/racing/services/heats.py \
   server/racing/services/results.py \
   server/racing/services/playlist.py
 ```
 
-Move the sync commit forward **only** after confirming that `.agents/skills/heat-intermission/HeatIntermission.tla` still describes the code at the new commit.
+Move the sync commit forward **only** after confirming that `.agents/skills/heat-intermission/HeatIntermission.tla` still describes the code at the new commit, and only to a commit on master: `plan/tests/test_skill_sync_commits.py` fails a sha that is not on `origin/master`. A PR's branch commits never reach master, since `pr-merge` squashes, so a ticket PR leaves the sync commit as it is and a follow-up PR names the squash commit after the merge (#499 retro).
 
 ## Properties checked
 
-| Invariant | Promise | Harm if broken | Baseline at `3b4d1a32` |
+| Invariant | Promise | Harm if broken | Baseline at the last verified commit |
 | --- | --- | --- | --- |
 | `RacingHeatAllowed` | While racing mode is on, the current heat exists and has no results yet (`Chart.allowed`). | Timer stages or scores a heat that already has results, overwriting or corrupting scores. | **PASS** (40,863 distinct states checked; failed before #499, when `restore_results` left `racing=True` on a scored heat) |
 | `WaitingFinalMatchesStandings` | While an intermission is open and the final has not raced, the waiting final's roster matches Round 1's current standings (D27). | The wrong kids race in the final after a Round 1 result change. | **FAIL** (real bug: `select_heat` + `rerun` + `timer_result` re-opens intermission with stale roster; also `ManualWriteR2` + `DiscardHeat` + `Rerun`) |
@@ -76,7 +76,7 @@ When TLC reports a counterexample:
 1. Update the affected action(s) in `.agents/skills/heat-intermission/HeatIntermission.tla` so each action still matches the exact guards, state writes, and `rebuild_waiting_final` / `locked_failure` calls in the covered Python files.
 2. Run `./.agents/skills/heat-intermission/check.sh` and inspect with `/statechart`.
 3. Confirm every newly passing invariant is still able to fail by temporarily reverting the guard/fix in the model and verifying TLC catches it.
-4. Update the baseline table and **Last verified commit** in this `SKILL.md` only after the model matches the new commit.
+4. Update the baseline table once the model matches the code. Leave **Last verified commit** and the `.tla` header's sync commit as they are until the PR merges, then name its squash commit in both, and in the `git diff --stat` above, in a follow-up PR.
 
 ## Scope & what is NOT covered
 
