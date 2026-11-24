@@ -46,16 +46,17 @@
 # folder, commit and arguments, which the holder writes into the file.  #316's
 # hand-off ran beside #317's 25-count run at a load average of 35 and failed,
 # then waited 74 min for a slot the lead handed out by message (#316 retro).
-# Runs wait in a line and take the lock in the order they came, each
-# printing its place and the runs ahead of it, again whenever that changes
-# (tools/load-lock-line.sh, #417).  Whatever fails on the way to the lock,
+# Runs wait in a line, each printing its place and the runs ahead of it,
+# again whenever that changes, and take the lock in the order they came,
+# behind every hand-off waiting in tools/hold-load-lock.sh; while a run from
+# a branch cut before #419 waits in the line, every run keeps the order
+# runs came in (tools/load-lock-line.sh, #417, #419).  Whatever fails on the way to the lock,
 # the run ends with 2 and a message and starts nothing; a file in the line
 # folder that it did not make is ignored.
 # Only this script holds the lock (its loops and pytest get no copy of it),
-# so a SIGKILL frees it at once.  A SIGKILL while it waits leaves its flock
-# waiting, which takes the lock once it frees and exits at once, and its
-# entry in the line, which the next waiter removes; a SIGTERM, SIGINT or
-# SIGHUP stops that flock and removes the entry (#391).  Its pytest gets
+# so a SIGKILL frees it at once.  A SIGKILL while it waits leaves its entry
+# in the line, which the next waiter removes; a SIGTERM, SIGINT or SIGHUP
+# removes the entry (#391, #419).  Its pytest gets
 # DERBYNET_LOAD_LOCK_HELD, and any other pytest run names the holder in its
 # header and summary (conftest.py).
 
@@ -179,7 +180,6 @@ LINE_FILE="$SERVER_DIR/tools/load-lock-line.sh"
   exit 2
 }
 
-WAITING=
 PIDS=()
 RUN_PID=
 stop_loops() {
@@ -188,13 +188,6 @@ stop_loops() {
 }
 stop_all() {
   trap '' TERM INT HUP
-  # `jobs -p` names the waiting flock from its fork until `wait` reaps it,
-  # and nothing after: a kept pid missed a signal before it was kept, and
-  # named a flock already gone after (#391 review).
-  if [ -n "$WAITING" ]; then
-    waiter=$(jobs -p)
-    if [ -n "$waiter" ]; then kill "$waiter" 2>/dev/null || true; fi
-  fi
   stop_loops
   if [ -n "$RUN_PID" ]; then kill "$RUN_PID" 2>/dev/null || true; fi
   line_leave
@@ -209,24 +202,18 @@ trap stop_all EXIT
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 trap 'line_fail "$BASH_COMMAND"' ERR
-line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
+line_join load-run "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
 if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   # Empty from the holder's truncation until its one write lands.
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
-  # In the background, so a signal's trap runs during the wait, and the
-  # cleanup stops the flock, the only job then: bash runs a trap only once a
-  # foreground command ends.  line_wait_turn sleeps the same way.  The lock
-  # is on the file fd 9 opened, so it stays with this script once flock
-  # exits; a flock that ends without it fails the script here.  `8>&-`
-  # keeps the entry's flock with this script alone.
-  WAITING=1
+  # It sleeps between its tries in the background, so a signal's trap runs
+  # during the wait: bash runs a trap only once a foreground command ends.
+  # The lock is on the file fd 9 opened, so it stays with this script once
+  # the try's flock exits.
   line_wait_turn
-  flock -x 9 8>&- &
-  wait "$!"
-  WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
 elif [ "$LINE_STATE" != took ]; then
   line_fail "the join gave no place and no lock"

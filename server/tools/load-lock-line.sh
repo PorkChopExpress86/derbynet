@@ -1,27 +1,42 @@
 # Sourced by tools/pytest-under-load.sh and tools/hold-load-lock.sh: the
-# line their runs wait in, so the load lock goes to its waiters in the
-# order they came (#417).  flock(2) promises no order: the kernel wakes
-# every waiter at the release and the first to run takes the lock.  On
-# 2026-11-18 a queued step lost the lock to a run that started waiting
-# after it, and one rerun waited 7206 s.
+# line their runs wait in, so the load lock goes to its waiters in turn
+# (#417).  flock(2) promises no order: the kernel wakes every waiter at the
+# release and the first to run takes the lock.  On 2026-11-18 a queued step
+# lost the lock to a run that started waiting after it, and one rerun waited
+# 7206 s.
 #
 # The line is the folder LOCK.line, LOCK taken as a real path so that
 # `dir/./load.lock` waits in the same line.  A waiter's entry is the file
-# TICKET.PID in it, TICKET one more than the last live entry's, holding the
-# lines it will write as the holder.  The waiter holds an flock on its
-# entry (fd 8) until it leaves the line, and gives no child a copy, so a
-# free flock on an entry means its owner has died: a pid used again cannot
-# keep a dead entry in the line.  Entries are added, and dead ones removed,
-# only under the flock of LOCK.line/mutex (fd 7), held for that alone, so
-# no one removes an entry between its creation and its flock.  A waiter
-# removes its own entry with no lock: the pid in its name keeps any other
-# run from making that name while it lives.
+# TICKET.PID in it, TICKET one more than the highest live entry's, holding
+# `kind KIND` (hand-off or load-run) and then the lines it will write as the
+# holder.  The waiter holds an flock on its entry (fd 8) until it leaves the
+# line, and gives no child a copy, so a free flock on an entry means its
+# owner has died: a pid used again cannot keep a dead entry in the line.
+# Entries are added, and dead ones removed, only under the flock of
+# LOCK.line/mutex (fd 7), held for that alone, so no one removes an entry
+# between its creation and its flock.  A waiter removes its own entry with
+# no lock: the pid in its name keeps any other run from making that name
+# while it lives.
 #
-# Only the first live entry waits on the load lock (fd 9, in the script).
-# The others read the line every second and print their place when it
-# changes.  The flock on the load lock stays the mutual exclusion: a run
-# from a branch cut before the line takes it with no entry, so it may go
-# ahead of the line, but never runs beside a holder.
+# The line serves every hand-off before any load run, and each kind in the
+# order it came, so a hand-off of a few minutes waits for the holder and the
+# hand-offs ahead of it only (#419: #406's 3-minute hand-off waited 7585 s
+# behind a 25-count run that had queued before it).  An entry with no
+# `kind` line comes from a copy of the scripts from before #419, which
+# serves the line in ticket order alone; while one is in the line, every
+# waiter does the same, since two orders in one line can wait on each other
+# for ever.
+#
+# The run first in that order tries the load lock (fd 9, in the script)
+# once a second, each try under the mutex right after it reads the line, so
+# a hand-off that joined first is never passed: a waiter blocked in
+# `flock -x` took the lock at the release whatever had joined since.  A
+# try costs up to 1 s of free lock after a release.  The others read the
+# line every second too, and each run prints its place when it changes.
+# The mutex is never held across the sleep.  The flock on the load lock
+# stays the mutual exclusion: a run from a branch cut before the line takes
+# it with no entry, so it may go ahead of the line, but never runs beside a
+# holder.
 #
 # A run that does not hold the lock never runs its command, whatever fails
 # on the way (#417 round 4).  An entry's name is TICKET.PID with a ticket of
@@ -38,6 +53,7 @@ LINE=
 LINE_STATE=
 ENTRY_NAME='^[0-9]{10}\.[0-9]+$'
 LINE_ENTRIES=()
+LINE_LAST=0
 LINE_SHOWN=
 
 # Ends the run with 2 and a message: its command has not run, and a run that
@@ -48,30 +64,51 @@ line_fail() {
   exit 2
 }
 
-# Under the mutex: removes each entry whose owner has died, and lists the
-# others, in the order they came, in LINE_ENTRIES.
+# Under the mutex: removes each entry whose owner has died, lists the others
+# in the order the line serves them in LINE_ENTRIES, and sets LINE_LAST to
+# the highest ticket among them, 0 for none.
 line_scan() {
-  local entry
+  local entry first last marked=1 all=() handoffs=() loads=()
   LINE_ENTRIES=()
+  LINE_LAST=0
   for entry in "$LINE"/*; do
     # The mutex, an editor's backup and the like are no entries, and an
     # entry's owner made a file.
     [[ ${entry##*/} =~ $ENTRY_NAME ]] || continue
     [ -f "$entry" ] || continue
     # `6<` opens the entry without creating it, as `flock FILE` would.  An
-    # entry its owner removed since the glob fails to open, which is no
-    # error here.
+    # entry its owner removed since the glob fails to open or to read,
+    # which is no error here.
     if flock -n -x 6 2>/dev/null 6<"$entry"; then
       rm -f -- "$entry"
-    elif [ -e "$entry" ]; then
-      LINE_ENTRIES+=("$entry")
+      continue
     fi
+    if ! IFS= read -r first 2>/dev/null <"$entry"; then
+      continue
+    fi
+    all+=("$entry")
+    case $first in
+      "kind hand-off") handoffs+=("$entry") ;;
+      "kind load-run") loads+=("$entry") ;;
+      *) marked= ;;
+    esac
   done
+  # The glob sorts the ten-digit tickets, so the last entry's is the highest.
+  if [ ${#all[@]} != 0 ]; then
+    last=${all[-1]##*/}
+    LINE_LAST=$((10#${last%%.*}))
+  fi
+  if [ -n "$marked" ]; then
+    LINE_ENTRIES=("${handoffs[@]}" "${loads[@]}")
+  else
+    LINE_ENTRIES=("${all[@]}")
+  fi
 }
 
 # Takes the load lock on fd 9 at once when no one waits in the line and no
 # one holds it, leaving ENTRY empty and LINE_STATE `took`; otherwise adds an
-# entry holding TEXT, sets ENTRY, and ends with LINE_STATE `queued`.
+# entry of KIND (hand-off or load-run) holding TEXT, sets ENTRY, and ends
+# with LINE_STATE `queued`.  Called as `line_join KIND TEXT`.
 line_join() {
   LINE_STATE=
   # The script has opened LOCK on fd 9, so it exists and realpath needs no
@@ -84,29 +121,27 @@ line_join() {
   fi
   flock -x 7
   line_scan
-  local count=${#LINE_ENTRIES[@]} last=0
-  if [ "$count" = 0 ] && flock -n -x 9; then
+  # `7>&- 8>&-`: the try's flock gets no copy of the mutex or an entry.
+  if [ ${#LINE_ENTRIES[@]} = 0 ] && flock -n -x 9 7>&- 8>&-; then
     exec 7>&-
     LINE_STATE=took
     return
   fi
-  if [ "$count" != 0 ]; then
-    last=${LINE_ENTRIES[count - 1]##*/}
-    last=$((10#${last%%.*}))
-  fi
   # Named before it exists, so the cleanup removes it from its creation on.
-  ENTRY="$LINE/$(printf '%010d' $((last + 1))).$$"
+  ENTRY="$LINE/$(printf '%010d' $((LINE_LAST + 1))).$$"
   exec 8>"$ENTRY"
   flock -x 8
-  printf '%s\n' "$1" >&8
+  printf 'kind %s\n%s\n' "$1" "$2" >&8
   exec 7>&-
   LINE_STATE=queued
 }
 
 # Prints this run's place and the runs ahead of it whenever they change,
-# and returns once none is ahead: its turn to wait on the load lock.
+# and returns once it holds the load lock: it tries the lock only when none
+# is ahead, under the mutex it read the line under.  A try that finds the
+# lock held fails with 1; any other failure ends the run.
 line_wait_turn() {
-  local entry text ahead shown
+  local entry text ahead shown try_status
   while :; do
     exec 7>>"$LINE/mutex"
     flock -x 7
@@ -115,8 +150,14 @@ line_wait_turn() {
     for entry in "${LINE_ENTRIES[@]}"; do
       [ "$entry" = "$ENTRY" ] && break
       text=$(cat -- "$entry" 2>/dev/null) || continue
+      text=${text#kind *$'\n'}
       ahead+=("  ${text//$'\n'/; }")
     done
+    try_status=1
+    if [ ${#ahead[@]} = 0 ]; then
+      try_status=0
+      flock -n -x 9 7>&- 8>&- || try_status=$?
+    fi
     exec 7>&-
     if [ ${#ahead[@]} = 0 ]; then
       shown="Place 1 in line: it takes the load lock next."
@@ -128,8 +169,11 @@ line_wait_turn() {
       printf '%s\n' "$shown"
       LINE_SHOWN=$shown
     fi
-    if [ ${#ahead[@]} = 0 ]; then
+    if [ "$try_status" = 0 ]; then
       return
+    fi
+    if [ "$try_status" != 1 ]; then
+      line_fail "flock on the load lock exited $try_status"
     fi
     sleep 1 8>&- 9>&- &
     wait "$!"
