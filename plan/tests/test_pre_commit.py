@@ -60,6 +60,14 @@ class PreCommit(unittest.TestCase):
         done = self.commit('server/views.py', '"""Docs."""\n')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
+    @unittest.skipUnless(RUFF.exists(), 'no server/.venv: run uv sync in server/')
+    def test_a_file_ruff_s_config_excludes_commits(self):
+        """pyproject.toml excludes generator_tables.py, as the pre-push
+        hook's `ruff check` of the whole tree leaves it out."""
+        rel = 'server/racing/engine/scheduling/generator_tables.py'
+        done = self.commit(rel, f'X = 1  # {LINE_400}\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_with_no_ruff_it_commits_and_says_so(self):
         self.env['DERBYNET_RUFF'] = str(self.root / 'no-ruff')
         done = self.commit('server/views.py', f'"""{LINE_400}"""\n')

@@ -175,9 +175,9 @@ done
 # under ${XDG_CACHE_HOME:-~/.cache}, removed at exit; `uv run --locked`
 # builds its server/.venv from uv's cache, as pr-merge's does. A SIGKILL
 # leaves it behind: `git worktree remove --force <it>`. A commit made on a
-# pushed ref during the checks fails the push: git's https helper sent the
-# ref as it was at the end, 50650764, which no check had read, where the
-# hook checked a9d8d04e (#470 retro's own push). When the push sends
+# pushed ref during the checks fails the push: the #470 retro's first push
+# checked a9d8d04e, and GitHub received 50650764, committed during the
+# checks, which none had read. When the push sends
 # more than one commit, the checks read the working tree as before, and
 # fail when it changes while they run: #373's implementer edited
 # network_changed.py during the hook, and the run left rerun pytests

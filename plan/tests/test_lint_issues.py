@@ -573,6 +573,10 @@ class DraftsPaths(Lint):
         gh.chmod(0o755)
         return str(gh)
 
+    def test_a_placeholder_path_passes(self):
+        done = self.lint(TICKET + '\n\nLogs go in `~/.cache/derbynet-drafts/<N>/probe.log`.')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_a_path_that_exists_passes(self):
         logs = self.tmp / '.cache' / 'derbynet-drafts' / '383' / 'probe'
         logs.mkdir(parents=True)

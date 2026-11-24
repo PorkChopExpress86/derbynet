@@ -181,7 +181,8 @@ def check_draft_path(n, p):
 def check_path(n, tok):
     p = re.sub(r':\d+(-\d+)?$', '', tok.strip())
     if p.startswith(DRAFTS):
-        check_draft_path(n, p)
+        if not any(c in p for c in '<>{}$'):  # a placeholder: <N>, ${N}
+            check_draft_path(n, p)
         return
     if any(c in p for c in '<>*{}?=&%$'):
         return

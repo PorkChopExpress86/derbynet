@@ -230,6 +230,7 @@ class Plan:
     changed_helpers: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
     merge_base: str = None
+    fetch_note: str = None  # master_moved()'s, when its fetch timed out
     # KIND_READERS modules the tree lacks, which skipped a row for a file
     # outside testing/ (#471).
     no_kind_modules: list = field(default_factory=list)
@@ -2490,6 +2491,10 @@ def load_repeats(rel, base, head, module_text, postgres=False):
     return out
 
 
+# Seconds master_moved() waits on its fetch; the variable is for plan/tests.
+FETCH_TIMEOUT = float(os.environ.get('AFFECTED_FETCH_TIMEOUT', '60'))
+
+
 def area(path):
     """The area of `path` pr-merge's area rule counts (plan/bin/pr-merge,
     areas()), or None."""
@@ -2516,9 +2521,13 @@ def master_moved(plan, targets):
     if not plan.from_git:
         return []
     if plan.base == 'origin/master':
-        with no_git_vars():
-            subprocess.run(['git', 'fetch', '-q', 'origin', 'master'], cwd=plan.root,
-                           capture_output=True, timeout=60)
+        try:
+            with no_git_vars():
+                subprocess.run(['git', 'fetch', '-q', 'origin', 'master'], cwd=plan.root,
+                               capture_output=True, timeout=FETCH_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            plan.fetch_note = (f'git fetch took over {FETCH_TIMEOUT} s, so this reads '
+                               'origin/master as last fetched')
     changed = changed_files(plan)
     base = git(plan.root, 'merge-base', plan.base, 'HEAD').strip()
     log = git(plan.root, 'log', '--format=%x00%h %s', '--name-only', f'{base}..{plan.base}')
@@ -2672,10 +2681,15 @@ def report(plan, tree):
         'runs the whole script, about 15 min, #373 retro):')
     say('  tools/source-checks.sh --quick')
     moved = master_moved(plan, all_targets)
+    if plan.fetch_note:
+        say('')
+        say(plan.fetch_note)
     if moved:
         say('')
-        say(f'{plan.base} moved past the merge base, in what this branch reads: merge it '
-            'before the hand-off run, since pr-merge refuses a shared area after CI (D113):')
+        say(f'{plan.base} moved past the merge base in what this branch reads. Merge it '
+            'before the hand-off run where a commit touches a file or test (D113); where '
+            'it touches only a shared area, pr-merge refuses after CI, so merge it or run '
+            'the combined checks for --base-checked:')
         for line, why in moved:
             say(f'  {line} ({", ".join(why)})')
     return '\n'.join(out) + '\n'

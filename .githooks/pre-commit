@@ -42,5 +42,5 @@ if [ ! -x "$RUFF" ]; then
   exit 0
 fi
 cd "$ROOT/server"
-"$RUFF" check --quiet -- "${staged[@]}"
-"$RUFF" format --check --quiet -- "${staged[@]}"
+"$RUFF" check --quiet --force-exclude -- "${staged[@]}"
+"$RUFF" format --check --quiet --force-exclude -- "${staged[@]}"
