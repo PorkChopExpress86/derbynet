@@ -1557,6 +1557,46 @@ class MasterMoved(unittest.TestCase):
         self.assertRegex(moved, r'master touches plan \(plan/\)')
         self.assertNotIn('touches css', moved)
 
+    def test_each_area_of_pr_merge_s_rule(self):
+        for path, want in (('plan/README.md', 'plan/'), ('.githooks/pre-push', '.githooks/'),
+                           ('.github/workflows/x.yml', '.github/'),
+                           ('server/tools/mutate.py', 'server/tools/'),
+                           ('server/ui/conftest.py', 'conftest.py'),
+                           ('server/pyproject.toml', 'server/pyproject.toml'),
+                           ('server/uv.lock', 'server/uv.lock'),
+                           ('plan', None), ('server/ui/views.py', None)):
+            with self.subTest(path=path):
+                self.assertEqual(TOOL.area(path), want)
+
+    def test_a_stale_origin_master_is_fetched_first(self):
+        env = git_env()
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, root = Path(tmp, 'origin'), Path(tmp, 'clone')
+
+            def git(cwd, *argv):
+                subprocess.run(['git', *argv], cwd=cwd, env=env, check=True,
+                               capture_output=True)
+
+            origin.mkdir()
+            git(origin, 'init', '-q', '-b', 'master')
+            for rel, text in TREE.items():
+                (origin / rel).parent.mkdir(parents=True, exist_ok=True)
+                (origin / rel).write_text(text)
+            git(origin, 'add', '.')
+            git(origin, 'commit', '-q', '-m', 'base')
+            git(tmp, 'clone', '-q', str(origin), str(root))
+            (origin / 'plan').mkdir()
+            (origin / 'plan' / 'a.md').write_text('a\n')
+            git(origin, 'add', '.')
+            git(origin, 'commit', '-q', '-m', 'master touches plan after the clone')
+            (root / 'plan').mkdir()
+            (root / 'plan' / 'b.md').write_text('b\n')
+            git(root, 'add', '.')
+            git(root, 'commit', '-q', '-m', 'branch')
+            out = subprocess.run([sys.executable, '-I', str(AFFECTED)], cwd=root, env=env,
+                                 capture_output=True, text=True, check=True).stdout
+        self.assertIn('master touches plan after the clone (plan/)', out)
+
     def test_a_base_with_no_new_commit_names_none(self):
         out = moved()
         self.assertNotIn('moved past the merge base', out)

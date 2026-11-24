@@ -493,13 +493,18 @@ class PartOfAReadyTicket(unittest.TestCase):
     #430", and #430 kept ready-for-agent with no "Still open" section
     (#470 retro)."""
 
-    def lint(self, body, pr_body=PR_438, labels=('kind:ticket', 'ready-for-agent')):
+    def lint(self, body, pr_body=PR_438, labels=('kind:ticket', 'ready-for-agent'),
+             others=()):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
         issues = [*ISSUES, {'number': 430, 'state': 'OPEN', 'body': body,
                             'labels': [{'name': l} for l in labels]}]
+        issues += others
+        # A merged PR with no body, as GitHub gives `null`.
         prs = [{'number': 438, 'state': 'MERGED', 'baseRefName': 'master',
-                'headRefOid': '0' * 40, 'closingIssuesReferences': [], 'body': pr_body}]
+                'headRefOid': '0' * 40, 'closingIssuesReferences': [], 'body': pr_body},
+               {'number': 439, 'state': 'MERGED', 'baseRefName': 'master',
+                'headRefOid': '0' * 40, 'closingIssuesReferences': [], 'body': None}]
         gh = tmp / 'gh'
         gh.write_text(f'#!{sys.executable}\n' + FAKE_GH_PRS.format(issues=issues, prs=prs))
         gh.chmod(0o755)
@@ -520,6 +525,12 @@ class PartOfAReadyTicket(unittest.TestCase):
     def test_a_ticket_not_ready_passes(self):
         done = self.lint(TICKET, labels=('kind:ticket', 'blocked'))
         self.assertNotIn('is part of it', done.stdout)
+
+    def test_a_ready_ticket_no_pr_is_part_of_passes(self):
+        other = {'number': 431, 'state': 'OPEN', 'body': TICKET,
+                 'labels': [{'name': 'kind:ticket'}, {'name': 'ready-for-agent'}]}
+        done = self.lint(TICKET + '\n\n## Still open\n\n- [ ] Box.', others=[other])
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_part_of_in_code_names_no_issue(self):
         for body in ('Quotes `Part of #430`.', 'Quotes:\n\n```\nPart of #430\n```\n'):
@@ -546,6 +557,21 @@ class DraftsPaths(Lint):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn('#0: drafts path `~/.cache/derbynet-drafts/383/probe/php-enter-*.log` '
                       'is on no disk here', done.stdout)
+
+    def test_a_live_body_s_missing_path_passes(self):
+        """CI has no drafts folder, so only a --file draft is checked."""
+        self.env['GH'] = self.live_gh(TICKET + '\n\n' + BODY_400)
+        done = subprocess.run([sys.executable, '-I', str(LINT)], capture_output=True,
+                              text=True, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def live_gh(self, body):
+        issues = [*ISSUES, {'number': 400, 'state': 'OPEN', 'body': body,
+                            'labels': [{'name': 'kind:ticket'}]}]
+        gh = self.tmp / 'gh-live'
+        gh.write_text(f'#!{sys.executable}\n' + FAKE_GH.format(issues=issues))
+        gh.chmod(0o755)
+        return str(gh)
 
     def test_a_path_that_exists_passes(self):
         logs = self.tmp / '.cache' / 'derbynet-drafts' / '383' / 'probe'

@@ -52,6 +52,11 @@ def test_no_tool_credits_a_ruling_to_the_lead():
     )
 
 
+def test_the_tools_are_read():
+    assert ROOT / "plan" / "bin" / "affected-tests" in tool_files()
+    assert ROOT / ".githooks" / "pre-push" in tool_files()
+
+
 def test_470s_docstring_is_named():
     docstring = (
         "    map the shell scripts test_round_scenarios.py names, which no kiosk\n"

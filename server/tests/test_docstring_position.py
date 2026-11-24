@@ -60,3 +60,7 @@ def test_470s_late_docstring_is_named():
 
 def test_a_docstring_first_is_not_named():
     assert late_docstrings('def f():\n    """Doc."""\n    "text"\n') == []
+
+
+def test_a_bare_constant_that_is_no_string_is_not_named():
+    assert late_docstrings("def f():\n    x = 1\n    ...\n") == []

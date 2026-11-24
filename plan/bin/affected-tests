@@ -2526,7 +2526,7 @@ def master_moved(plan, targets):
     areas = {area(f) for f in changed} - {None}
     found = []
     for entry in log.split('\0')[1:]:
-        line, *files = [ln for ln in entry.splitlines() if ln]
+        line, *files = entry.splitlines()
         why = sorted(set(files) & mine) + sorted({area(f) for f in files} & areas)
         if why:
             found.append((line, why))
