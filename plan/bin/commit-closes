@@ -2,7 +2,8 @@
 """Refuses a closing keyword in the message of a commit a push would send,
 before GitHub reads it (#439).
 
-Usage: plan/bin/commit-closes [--closes N]... [--ticket N] [--base REV]... [--head REV]
+Usage: plan/bin/commit-closes [--closes N]... [--ticket N [--ticket-base REV]...]
+                              [--base REV]... [--head REV]
        plan/bin/commit-closes --sweep N
 
 `plan/bin/pr-merge` squashes. GitHub closes an issue that a closing keyword in
@@ -24,16 +25,19 @@ by `--closes N`. A reference into another repo is refused whatever its number.
 Exits 1 on a refusal, naming each commit and line, and 2 when git can't read a
 revision or `--sweep`'s gh fails. `--closes` takes N or #N, as it does for pr-evidence.
 
-`--ticket N` also refuses each of those commits, merges left out, whose
-subject and body name no #N (#4990 and #49 are no #499), such as 06b4ddaa on
+`--ticket N` also refuses each commit reachable from --head and from no
+--ticket-base (with none given, from no remote-tracking branch), merges left
+out, whose subject and body name no #N (#4990 and #49 are no #499), such as 06b4ddaa on
 issue-37-transcript-differ. #503's 08ae49fd names #499 mid-subject with no
-`(#499)` after it, and passes (#499 retro).
+`(#499)` after it, and passes (#499 retro). Its range is the commits the push
+sends, not --base's: a commit the remote already has can be mended only by a
+force push (#504 review).
 
 .githooks/pre-push runs it on each ref pushed, before any other check and
 before git sends the commits, with origin/master and local master as bases:
 `DERBYNET_PUSH_CLOSES="64 65"` names the issues the push closes on purpose,
 and a ref pushed as issue-<n>-<slug> may close its ticket and is read with
-`--ticket n`. The hook, not `pr-merge`, is where it runs
+`--ticket n`, and `--ticket-base` the remote ref's old sha when it has one. The hook, not `pr-merge`, is where it runs
 because `pr-merge` runs after the commits are on GitHub, where only a force
 push can mend one. `git push --no-verify`, a clone whose `core.hooksPath` is
 unset and an edit made on github.com skip the hook.
@@ -192,14 +196,17 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--closes", metavar="N", type=MATCHER.issue_number, action="append",
                         default=[])
     parser.add_argument("--ticket", metavar="N", type=MATCHER.issue_number)
+    parser.add_argument("--ticket-base", metavar="REV", action="append", default=[])
     parser.add_argument("--base", metavar="REV", action="append", default=[])
     parser.add_argument("--head", metavar="REV", action="append", default=[])
     parser.add_argument("--sweep", metavar="N", type=positive)
     args = parser.parse_args(argv)
     if args.sweep is not None:
-        if args.closes or args.base or args.head or args.ticket:
+        if args.closes or args.base or args.head or args.ticket or args.ticket_base:
             parser.error("--sweep takes no other option")
         return sweep(args.sweep)
+    if args.ticket_base and not args.ticket:
+        parser.error("--ticket-base goes with --ticket")
     found = commits(args.head or ["HEAD"], args.base)
     bad = refusals(found, set(args.closes))
     for sha, subject, hit, _number, _in_fork in bad:
@@ -209,7 +216,8 @@ def main(argv: list[str]) -> int:
         print(f"refused: {FIX}", file=sys.stderr)
     silent = []
     if args.ticket:
-        silent = unnamed(commits(args.head or ["HEAD"], args.base, merges=False), args.ticket)
+        silent = unnamed(commits(args.head or ["HEAD"], args.ticket_base, merges=False),
+                         args.ticket)
     for sha, subject in silent:
         print(f"names no #{args.ticket}, {sha[:8]} {subject!r}: a commit on the ticket's branch "
               "names its ticket")

@@ -240,6 +240,31 @@ class CommandLine(unittest.TestCase):
         done = self.repo.tool('--ticket', '499')
         self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
 
+    def test_ticket_reads_only_what_no_ticket_base_has(self):
+        """The hook names the remote ref's old sha, so a commit already
+        pushed is not read again (#504 review); with none given, what any
+        remote ref has is left out, as for a new branch."""
+        old = self.repo.commit('old unnamed')
+        self.repo.commit('new (#7)')
+        self.assertEqual(self.repo.tool('--ticket', '7').returncode, 1)
+        done = self.repo.tool('--ticket', '7', '--ticket-base', old)
+        self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+        self.repo.git('update-ref', 'refs/remotes/origin/issue-7-x', old)
+        done = self.repo.tool('--ticket', '7')
+        self.assertEqual((done.returncode, done.stdout), (0, ''), done.stderr)
+
+    def test_ticket_base_leaves_the_closing_check_on_its_base(self):
+        old = self.repo.commit('old: Fixes #2 (#7)')
+        self.repo.commit('new (#7)')
+        done = self.repo.tool('--ticket', '7', '--ticket-base', old)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn('Fixes #2', done.stdout)
+
+    def test_ticket_base_needs_ticket(self):
+        done = self.repo.tool('--ticket-base', 'HEAD')
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn('--ticket-base goes with --ticket', done.stderr)
+
     def test_ticket_takes_an_issue_number(self):
         done = self.repo.tool('--ticket', '499x')
         self.assertEqual(done.returncode, 2, done.stderr)
@@ -401,7 +426,8 @@ class Sweep(unittest.TestCase):
                 self.assertIn('takes a whole number of PRs', done.stderr)
 
     def test_sweep_takes_no_other_option(self):
-        for other in (('--closes', '5'), ('--base', 'master'), ('--head', 'HEAD')):
+        for other in (('--closes', '5'), ('--base', 'master'), ('--head', 'HEAD'),
+                      ('--ticket', '5'), ('--ticket-base', 'HEAD')):
             with self.subTest(other=other):
                 done = subprocess.run([sys.executable, '-I', str(COMMIT_CLOSES), '--sweep', '1',
                                        *other], capture_output=True, text=True,

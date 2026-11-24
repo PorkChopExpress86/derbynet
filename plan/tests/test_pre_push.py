@@ -50,7 +50,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          environ: dict | None = None, base_message: str = 'base',
          origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
          checked_out: str = 'head', ahead: str | None = None,
-         ref: str = 'refs/heads/b', two_commits: bool = False) -> subprocess.CompletedProcess:
+         ref: str = 'refs/heads/b', two_commits: bool = False,
+         pushed: str | None = None) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -70,7 +71,11 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
     which b is cut from. `ref` is the ref pushed to. `two_commits` also
     pushes the base commit to refs/heads/m, so the checks read the working
     tree, not a copy of the pushed commit. The copy goes under the
-    XDG_CACHE_HOME `environ` names, or a scratch folder."""
+    XDG_CACHE_HOME `environ` names, or a scratch folder. `pushed` is the
+    message of a commit on b before the change, already on the remote: it is
+    the remote sha git sends, with no remote-tracking branch at it, as in a
+    clone that never fetched it; with `remote` 'new', a new branch stacked
+    on it, it is origin/pushed instead."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -121,6 +126,14 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             git('add', '.')
             git('commit', '-q', '-m', ahead)
         git('checkout', '-q', *(('--orphan',) if remote == 'orphan' else ('-b',)), 'b')
+        pushed_sha = None
+        if pushed is not None:
+            (repo / 'pushed.txt').write_text('pushed\n')
+            git('add', '.')
+            git('commit', '-q', '-m', pushed)
+            pushed_sha = git('rev-parse', 'HEAD')
+            if remote == 'new':
+                git('update-ref', 'refs/remotes/origin/pushed', pushed_sha)
         for name in (changed,) if isinstance(changed, str) else changed:
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -144,7 +157,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         result = subprocess.run(
             hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} {ref} '
-                  f'{REMOTES.get(remote, base)}\n'
+                  f'{pushed_sha if pushed_sha and remote == "base" else REMOTES.get(remote, base)}\n'
                   + (f'refs/heads/m {base} refs/heads/m {"0" * 40}\n' if two_commits else ''),
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
@@ -241,7 +254,7 @@ class GuideCommands(unittest.TestCase):
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
-REMOTES = {'orphan': '0' * 40, 'missing': '1' * 40}
+REMOTES = {'orphan': '0' * 40, 'new': '0' * 40, 'missing': '1' * 40}
 
 
 class Guides(unittest.TestCase):
@@ -715,6 +728,29 @@ class CommitClosingKeyword(unittest.TestCase):
             with self.subTest(ref=ref, message=message):
                 result = push('notes/x.md', PASSING, origin=True, message=message, ref=ref)
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_commit_the_remote_already_has_is_not_read_for_the_ticket(self):
+        """Only the commits the push sends: one already pushed can be mended
+        only by a force push (#504 review). A new branch stacked on a pushed
+        one leaves out what any remote ref has."""
+        for ref, remote in (('refs/heads/issue-7-x', 'base'), ('refs/heads/issue-8-y', 'new')):
+            n = ref.split('-')[1]
+            with self.subTest(ref=ref):
+                result = push('notes/x.md', PASSING, origin=True, ref=ref, remote=remote,
+                              pushed='old unnamed', message=f'new (#{n})')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                result = push('notes/x.md', PASSING, origin=True, ref=ref, remote=remote,
+                              pushed='old unnamed', message='new unnamed')
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertRegex(result.stdout, rf"names no #{n}, \w{{8}} 'new unnamed'")
+                self.assertNotIn('old unnamed', result.stdout)
+
+    def test_the_closing_check_still_reads_a_pushed_commit(self):
+        """Its base stays origin/master (#439): a keyword reaches master with
+        the squash whether or not the remote branch has it."""
+        result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
+                      pushed='old: Fixes #2 (#7)', message='new (#7)')
+        self.refused(result, 'Fixes #2')
 
     def test_a_ref_that_names_no_ticket_closes_none(self):
         for ref, words in (('refs/heads/issue-439', 'Closes #439'),
