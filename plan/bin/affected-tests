@@ -834,8 +834,7 @@ def runners(tree, citing):
         found.update(str(Path(c).parent) for c in conftests
                      if not c.startswith(BROWSER_DIR))
         if not is_browser_test(tree, rel):
-            found.update(t for t in tests if is_browser_test(tree, t)
-                         and module in tree.imports()[t])
+            found.update(t for t in tests if module in tree.imports()[t])
         if Path(rel).name.startswith('test_'):
             found.add(rel)
         if Path(rel).name == 'conftest.py':

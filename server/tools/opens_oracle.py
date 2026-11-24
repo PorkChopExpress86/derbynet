@@ -12,7 +12,7 @@ Usage, from server/, in a clean worktree, on the load lock for a long run:
 
 The plugin installs `sys.addaudithook` in each pytest process, and each
 process writes `DIR/<pid>.jsonl`. It records `open` of a tracked path under
-<repo>/testing/, `os.scandir` or `os.listdir` of a folder there, and
+<repo>/testing/, `os.scandir` of a folder there, and
 `subprocess.Popen` arguments that name a path there. Playwright's driver,
 a child process, reads the files a test hands `set_input_files`, so the
 plugin wraps Playwright's `convert_input_files` and records those paths as
@@ -35,12 +35,10 @@ import json
 import os
 import subprocess
 import sys
-import threading
 from pathlib import Path
 
 STATE = {"test": None, "fd": None, "repo": None, "tracked": frozenset()}
-LOCAL = threading.local()
-EVENTS = {"open", "os.scandir", "os.listdir", "subprocess.Popen"}
+EVENTS = {"open", "os.scandir", "subprocess.Popen"}
 
 
 def _write(row):
@@ -48,22 +46,20 @@ def _write(row):
 
 
 def _record(kind, path):
-    modules = []
-    if STATE["test"] is None:
-        frame = sys._getframe(2)
-        while frame is not None:
-            name = frame.f_code.co_filename
-            if frame.f_code.co_name == "<module>" and name.startswith(
-                STATE["repo"] + "/server/"
-            ):
-                modules.append(name[len(STATE["repo"]) + len("/server/") :])
-            frame = frame.f_back
+    modules, frame = [], sys._getframe(2)
+    while frame is not None:
+        name = frame.f_code.co_filename
+        if frame.f_code.co_name == "<module>" and name.startswith(
+            STATE["repo"] + "/server/"
+        ):
+            modules.append(name[len(STATE["repo"]) + len("/server/") :])
+        frame = frame.f_back
     _write({"kind": kind, "path": path, "test": STATE["test"], "modules": modules})
 
 
 def _rel(path):
     """`path` relative to the repository when it is under testing/."""
-    if isinstance(path, int):
+    if not isinstance(path, (str, bytes, os.PathLike)):
         return None
     path = os.fsdecode(path)
     if "testing" not in path:
@@ -75,29 +71,23 @@ def _rel(path):
 
 
 def _hook(event, args):
-    if event not in EVENTS or getattr(LOCAL, "busy", False):
+    if event not in EVENTS:
         return
-    LOCAL.busy = True
-    try:
-        if event == "open":
-            rel = _rel(args[0])
-            if rel in STATE["tracked"]:
-                _record("open", rel)
-        elif event in ("os.scandir", "os.listdir"):
-            rel = _rel("." if args[0] is None else args[0])
-            if rel:
-                _record("list", rel)
-        else:
-            argv = args[1]
-            argv = [argv] if isinstance(argv, (str, bytes)) else list(argv or ())
-            for arg in argv:
-                if isinstance(arg, (str, bytes, os.PathLike)):
-                    for word in os.fsdecode(arg).split():
-                        rel = _rel(word)
-                        if rel:
-                            _record("popen", rel)
-    finally:
-        LOCAL.busy = False
+    if event == "open":
+        rel = _rel(args[0])
+        if rel in STATE["tracked"]:
+            _record("open", rel)
+    elif event == "os.scandir":
+        rel = _rel(args[0])
+        if rel:
+            _record("list", rel)
+    else:
+        argv = args[1]
+        for arg in [argv] if isinstance(argv, (str, bytes)) else argv:
+            for word in os.fsdecode(arg).split():
+                rel = _rel(word)
+                if rel:
+                    _record("popen", rel)
 
 
 def _record_uploads():
@@ -111,10 +101,9 @@ def _record_uploads():
 
     async def recorded(files, context):
         for item in files if isinstance(files, (list, tuple)) else [files]:
-            if isinstance(item, (str, os.PathLike)):
-                rel = _rel(item)
-                if rel in STATE["tracked"]:
-                    _record("upload", rel)
+            rel = _rel(item)
+            if rel in STATE["tracked"]:
+                _record("upload", rel)
         return await convert(files, context)
 
     _frame.convert_input_files = recorded
@@ -137,7 +126,7 @@ def pytest_configure(config):
         check=True,
     ).stdout
     STATE["repo"] = os.path.realpath(repo)
-    STATE["tracked"] = frozenset(t for t in tracked.split("\0") if t)
+    STATE["tracked"] = frozenset(tracked.split("\0"))
     out = os.environ["ORACLE_DIR"]
     os.makedirs(out, exist_ok=True)
     STATE["fd"] = os.open(
@@ -167,29 +156,27 @@ def load_tool(repo):
     return module
 
 
-def imported_files(server, rel, seen=None):
+def imported_files(server, rel):
     """The server/ .py files `rel` imports, at any depth and inside
-    functions too: the oracle's own graph, not affected-tests'."""
-    seen = set() if seen is None else seen
-    try:
-        tree = ast.parse((server / rel).read_text())
-    except OSError, SyntaxError:
-        return seen
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            names = [a.name for a in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-            names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
-        else:
-            continue
-        for name in names:
-            for found in (
-                f"{name.replace('.', '/')}.py",
-                f"{name.replace('.', '/')}/__init__.py",
-            ):
-                if (server / found).is_file() and found not in seen:
-                    seen.add(found)
-                    imported_files(server, found, seen)
+    functions too: the oracle's own graph, not affected-tests'. A relative
+    import is not followed."""
+    seen, todo = set(), [rel]
+    while todo:
+        for node in ast.walk(ast.parse((server / todo.pop()).read_text())):
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and not node.level:
+                names = [node.module] + [f"{node.module}.{a.name}" for a in node.names]
+            else:
+                continue
+            for name in names:
+                for found in (
+                    f"{name.replace('.', '/')}.py",
+                    f"{name.replace('.', '/')}/__init__.py",
+                ):
+                    if found not in seen and (server / found).is_file():
+                        seen.add(found)
+                        todo.append(found)
     return seen
 
 
@@ -199,43 +186,28 @@ def read_rows(out):
 
 
 def pairs(rows, server, test_files):
-    """(testing/ path, test file) -> how it was read: `open`, `list` or
-    `popen` while the test ran, or `import-time` when a module the test file
-    imports read it at its top level."""
+    """(testing/ path, test file) -> how it was read: `open`, `list`,
+    `popen` or `upload` while the test ran, or `import-time` when a module
+    the test file imports read it at its top level."""
     found = collections.defaultdict(set)
-    imports = {}
+    imports = {test: imported_files(server, test) for test in test_files}
     for row in rows:
-        if row["kind"] not in ("open", "list", "popen", "upload"):
-            continue
         if row["test"] is not None:
             found[row["path"], row["test"].split("::")[0]].add(row["kind"])
             continue
         for module in row["modules"]:
             for test in test_files:
-                if test not in imports:
-                    imports[test] = imported_files(server, test)
                 if module in imports[test]:
                     found[row["path"], test].add("import-time")
     return found
 
 
 def mapped(tool, tree, path, test):
-    """Whether affected-tests maps testing/`path` to `test`: the file, or for
-    a listed folder each tracked file in it, as `k/n`."""
-    folder = tree.root / path
-    if folder.is_dir():
-        files = [
-            str(p.relative_to(tree.root))
-            for p in sorted(folder.iterdir())
-            if p.is_file()
-        ]
-        return f"{sum(mapped(tool, tree, f, test) for f in files)}/{len(files)}"
+    """Whether affected-tests' cover_testing names `test` among the targets
+    of testing/`path`. A folder or "everything" counts as no mapping."""
     plan = tool.Plan(root=tree.root, from_git=False, base="origin/master")
     tool.cover_testing(plan, tree, path)
-    targets = {t for _r, _n, ts in plan.covers[path] for t in ts}
-    return bool(plan.everything) or any(
-        test == t or test.startswith(t.rstrip("/") + "/") for t in targets
-    )
+    return test in {t for _r, _n, ts in plan.covers[path] for t in ts}
 
 
 def main(argv):
@@ -265,10 +237,12 @@ def main(argv):
     print(f"pairs {len(found)}; testing/ paths {len({path for path, _ in found})}")
     unmapped = 0
     for (path, test), kinds in sorted(found.items()):
-        how = mapped(tool, tree, path, test)
-        if isinstance(how, bool):
-            unmapped += not how
-            how = "mapped" if how else "UNMAPPED"
+        if kinds == {"list"}:
+            how = "listing"  # a folder: its files are read by name
+        elif mapped(tool, tree, path, test):
+            how = "mapped"
+        else:
+            how, unmapped = "UNMAPPED", unmapped + 1
         print(f"{how}\t{','.join(sorted(kinds))}\t{path}\t{test}")
     print(f"unmapped file pairs {unmapped}")
     return 0
