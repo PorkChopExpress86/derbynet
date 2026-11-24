@@ -25,8 +25,9 @@ class Role(models.Model):
     name = models.CharField(max_length=100, unique=True, blank=True)
     # Empty means no password, as `Timer` has.
     password_hash = models.CharField(max_length=256, blank=True)
-    # Whether the password is still the one a new install seeds the role
-    # with (`accounts.defaults`), so the D16 banner hashes nothing (#441).
+    # Whether a role with a password still has the one a new install seeds
+    # it with (`accounts.defaults`), so the D16 banner hashes nothing (#441).
+    # A role with no password may hold either value: the banner skips it.
     # The default is the seeded state: the seed migration cannot name this
     # field, and the browser tests re-seed with it after each flush. Every
     # later writer of `password_hash` goes through `set_password`.

@@ -100,6 +100,7 @@ def test_a_flush_and_re_seed_names_every_seeded_role_again(login):
     """As the browser conftest re-seeds after each test's flush."""
     for name in ("Photo", "RaceCrew", "RaceCoordinator"):
         change_password(name, f"new-{name}")
+    assert roles_with_default_password() == []
     Role.objects.all().delete()
 
     seed = import_module("accounts.migrations.0002_seed_default_roles").seed
@@ -135,6 +136,7 @@ def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
     """`config-roles-default.json` holds the passwords a new install seeds."""
     for name in ("Photo", "RaceCrew", "RaceCoordinator"):
         change_password(name, f"new-{name}")
+    assert roles_with_default_password() == []
 
     import_roles("config-roles-default.inc")
 
