@@ -399,6 +399,8 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     log = seen["log"]
     [started] = [e["at"] for e in log if e.get("message") == "replay-started"]
     [ended] = [e["at"] for e in log if e.get("message") == "replay-ended"]
+    # The rows page lands the places in place order.
+    assert [e["landed"] for e in log if "landed" in e] == ["1", "2", "3", "4"]
     landed = max(e["at"] for e in log if "landed" in e)
     [heat_2] = [e["at"] for e in log if e.get("title") == "Heat 2 of 4"]
     # The replay starts inside the landing's linger, which ends during it.
