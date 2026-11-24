@@ -326,7 +326,8 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
 # The now-racing frame logs, on its own clock, each replay message, a
 # snapshot of every animation's name and play state once kiosk.js has heard
 # the message, each animation that starts, each change of its banner title's
-# text, each place that lands and each lane that takes the winner's glow.
+# text, each place that lands, with how many places show a number then,
+# and each lane that takes the winner's glow.
 # A place lands, and a lane glows, when it takes the class it lacked, so a
 # landing is logged once however often the poll writes it again. Its
 # `query=poll` requests are read from the frame's resource timings on the
@@ -354,7 +355,9 @@ document.addEventListener('DOMContentLoaded', () => {
     && !(c.oldValue || '').split(' ').includes(name);
   new MutationObserver((changes) => changes.forEach((c) => {
     if (c.target.matches('[data-place]') && took(c, 'k-shown'))
-      window.__log.push({at: performance.now(), landed: c.target.textContent});
+      window.__log.push({at: performance.now(), landed: c.target.textContent,
+        shown: [...document.querySelectorAll('[data-place]')]
+          .filter((p) => p.textContent).length});
     if (c.target.matches('[data-lane]') && took(c, 'k-p1'))
       window.__log.push({at: performance.now(), glow: c.target.dataset.lane});
   })).observe(document.body,
@@ -486,9 +489,11 @@ def test_now_racing_lingers_through_a_replay_and_lands_again_after_it(login, eve
     `replay-started` and keeps heat 1 on the board; no animation pauses
     and none of the finished entry animations starts again after it
     (D137). On `replay-ended` it polls again, and the first poll's heat 1
-    results land the places again, 1 to 4, as PHP's flyers fly again
+    results land the places again, 1 to 4, from blank places, each with
+    its pop, as PHP hides its places and its flyers fly again
     (now-racing.js:15 `enable_flyers()`, now-racing.js:225
-    `should_animate`), with the winner's lane glowing again; the next
+    `should_animate`, now-racing.js:319-321), with the winner's lane
+    glowing again (D137, the glow riding on the landing); the next
     lineup waits `now-racing-linger-ms` after the last place lands again,
     PLACE_WAIT_MS after it (now-racing.js:333 `start_display_linger`).
 
@@ -500,8 +505,12 @@ def test_now_racing_lingers_through_a_replay_and_lands_again_after_it(login, eve
     assert_no_animation_paused_or_restarted(seen)
     landings = [e for e in log if "landed" in e]
     assert [e["landed"] for e in landings] == ["1", "2", "3", "4"] * 2
+    # Each landing starts from blank places, and each place pops again.
+    assert [e["shown"] for e in landings] == [1, 2, 3, 4] * 2
     again = [e["at"] for e in landings[4:]]
     assert ended < min(again)
+    pops = [e for e in log if e.get("start") == "k-pop" and e["at"] > ended]
+    assert len([e for e in pops if e["at"] < heat_2]) == 4
     # The places land again on the first poll after the replay.
     assert len([t for t in seen["polls"] if ended < t < min(again)]) == 1
     glows = [e["at"] for e in log if "glow" in e]
@@ -523,7 +532,9 @@ def test_now_racing_columns_take_the_next_lineup_at_the_first_poll_after_a_repla
     seen = replay_inside_the_linger(login, event, "now-racing-columnar")
     log, ended, heat_2 = seen["log"], seen["ended"], seen["heat_2"]
     assert_no_animation_paused_or_restarted(seen)
-    assert [e["landed"] for e in log if "landed" in e] == ["1", "2", "3", "4"]
+    landings = [e for e in log if "landed" in e]
+    assert [e["landed"] for e in landings] == ["1", "2", "3", "4"]
+    assert [e["shown"] for e in landings] == [1, 2, 3, 4]
     assert len([t for t in seen["polls"] if ended < t < heat_2]) == 1
     assert [
         e["start"] for e in log if "start" in e and seen["started"] < e["at"] < heat_2
