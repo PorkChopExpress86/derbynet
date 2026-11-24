@@ -76,10 +76,8 @@ class StrayShas(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        env = {**os.environ, 'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'}
-        for name in [n for n in env if n.startswith('GIT_') and n not in (
-                'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM')]:
-            del env[name]
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
 
         def run(*argv):
             subprocess.run(['git', '-C', str(self.root), *argv], check=True,
@@ -89,7 +87,8 @@ class StrayShas(unittest.TestCase):
         run('init', '-q', '-b', 'master')
         run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty',
             '-m', 'on')
-        self.on = run('update-ref', 'refs/remotes/origin/master', 'HEAD')
+        run('update-ref', 'refs/remotes/origin/master', 'HEAD')
+        self.on = git(self.root, 'rev-parse', 'HEAD').stdout.strip()
         run('checkout', '-q', '-b', 'side')
         self.off = run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q',
                        '--allow-empty', '-m', 'off')
