@@ -900,6 +900,7 @@ def test_a_press_that_spans_a_board_swap_still_taps(login, event, control):
     if control == "scene":
         with polls.post("/kiosks/scene/"):
             page.mouse.up()
+            page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     elif control == "page":
         with page.expect_response(lambda r: "/kiosks/page/" in r.url and r.ok):
             page.mouse.up()
@@ -964,6 +965,7 @@ def test_a_touch_that_spans_a_board_swap_waits_for_its_click(login, event):
     polls.answer(0)
     with polls.post("/kiosks/scene/"):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     log = board_log(page)
     down = after(log, "down")
     sent = after(log, "send", down)
@@ -1023,6 +1025,7 @@ def test_a_cancelled_press_applies_only_the_newest_held_board(login, event, canc
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     if cancel == "moved off":
         page.mouse.up()
+    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
@@ -1048,6 +1051,7 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     page.locator(IDENTIFY_BUTTON).focus()
     with polls.post("/kiosks/identify/"):
         page.keyboard.press("Enter")
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     log = board_log(page)
     down = after(log, "down")
     assert swaps_since(log, down) == [], log
@@ -1055,6 +1059,7 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     wait_for_a_swap_after(page, down)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     page.mouse.up()
+    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
@@ -1158,6 +1163,7 @@ def test_a_press_during_a_taps_request_still_taps(login, event):
     assert swaps_since(log, second) == [], log
     with polls.post("/kiosks/scene/"):
         page.mouse.up()
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     expect(welcome).to_have_attribute("aria-pressed", "true")
     log = board_log(page)
     click = after(log, "click", second)
@@ -1272,6 +1278,7 @@ def test_a_poll_with_no_change_during_a_press_swaps_nothing(login, event):
     polls.answer(0, status=204)
     move_off(page)
     page.mouse.up()
+    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     polls.settled()
     log = board_log(page)
     # one read: the move off applies a held board at once, before it returns.
@@ -1394,6 +1401,7 @@ def test_a_second_tap_that_aborts_a_taps_request_still_posts(
         else:
             press(page, welcome)
             page.mouse.up()
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     expect(welcome).to_have_attribute("aria-pressed", "true")
     log = board_log(page)
     click = after(log, "click", after(log, "down"))
@@ -1441,6 +1449,7 @@ def test_a_second_finger_keeps_the_hold(login, event):
     assert swaps_since(log, down) == [], log
     cdp.send("Input.dispatchTouchEvent", {"type": "touchCancel", "touchPoints": []})
     wait_for_a_swap_after(page, down)
+    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Lobby"], log
@@ -1534,6 +1543,7 @@ def test_a_space_press_that_spans_a_board_swap_still_taps(login, event, control)
     page.keyboard.down(" ")
     with polls.post(POST_PATHS[control]):
         page.keyboard.up(" ")
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     tapped(page, control)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Lobby")
     expect(target).to_be_focused()
@@ -1586,6 +1596,7 @@ def test_a_space_press_whose_focus_moves_off_applies_the_held_board(
     expect(moved_to).to_be_focused()
     page.keyboard.up(" ")
     page.wait_for_function("window.boardLog.some((r) => r.what === 'keyup')")
+    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     polls.settled()
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, keydown)] == ["Lobby"], log
@@ -1651,6 +1662,7 @@ def test_a_pointer_and_space_on_one_button_hold_until_both_end(
     assert swaps_since(log, start) == [], log
     with polls.post("/kiosks/scene/"):
         tap()
+        page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     expect(racing).to_have_attribute("aria-pressed", "true")
     log = board_log(page)
     click = after(log, "click", start)
