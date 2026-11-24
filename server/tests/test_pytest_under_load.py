@@ -2083,6 +2083,39 @@ def test_hand_offs_go_first_and_each_kind_keeps_the_order_it_came_in(tmp_path):
         finish(tmp_path, *runs.values())
 
 
+def test_an_entry_it_cannot_read_is_no_run_from_before_419(tmp_path):
+    """An entry its owner removes between the scan's flock and its read of
+    the kind, which an unreadable entry the test holds stands for, is no
+    entry: it neither turns the line back to the order runs came in nor
+    takes a place, so a hand-off that joins after it still goes ahead of
+    the load run waiting first."""
+    lock, held = held_lock(tmp_path)
+    line = Path(f"{os.path.realpath(lock)}.line")
+    runs = []
+    seed = None
+    try:
+        runs.append(join_at(tmp_path, SCRIPT, "load", lock, 1))
+        entry = line / f"{2:010d}.{os.getpid()}"
+        entry.write_text("kind hand-off\n")
+        seed = os.open(entry, os.O_RDONLY)
+        fcntl.flock(seed, fcntl.LOCK_EX)
+        entry.chmod(0)
+        runs.append(join_at(tmp_path, HOLD_LOCK, "handoff", lock, 1))
+        wait_until(
+            lambda: places(tmp_path / "load.out")[-1] == 2, "the load run at 2", 30
+        )
+        os.close(held)
+        held = None
+        assert [run.wait(timeout=90) for run in runs] == [0, 0]
+        assert order(tmp_path) == ["handoff", "load"]
+    finally:
+        if seed is not None:
+            os.close(seed)
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *runs)
+
+
 # The copies of the three scripts from before #419, which a worktree cut
 # before it still runs on the machine's lock.
 BEFORE_419 = Path(__file__).resolve().parent / "load_lock_before_419"
