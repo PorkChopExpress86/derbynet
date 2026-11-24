@@ -9,7 +9,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 
 ## Coverage & sync commit
 
-- **Last verified commit:** `48ae59bbb5d882031f104976fba928166449f55b`
+- **Last verified commit:** `3b4d1a32c20f16634b08f57e1f26dbde5893313f`
 - **Covered files and functions:**
   - `server/racing/engine/heat_state.py`: `State`, `Chart.allowed`, `Chart.round_complete`, `TABLE`, `decide`, `_RACING_ON_EXTRAS`
   - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `rebuild_waiting_final`, `results_locked`, `locked_failure`
@@ -19,7 +19,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 Before trusting a pass, check whether covered code changed since the sync commit:
 
 ```sh
-git diff --stat 48ae59bbb5d882031f104976fba928166449f55b -- \
+git diff --stat 3b4d1a32c20f16634b08f57e1f26dbde5893313f -- \
   server/racing/engine/heat_state.py \
   server/racing/services/heats.py \
   server/racing/services/results.py \
@@ -30,14 +30,14 @@ Move the sync commit forward **only** after confirming that `.agents/skills/heat
 
 ## Properties checked
 
-| Invariant | Promise | Harm if broken | Baseline at `48ae59bb` |
+| Invariant | Promise | Harm if broken | Baseline at `3b4d1a32` |
 | --- | --- | --- | --- |
-| `RacingHeatAllowed` | While racing mode is on, the current heat exists and has no results yet (`Chart.allowed`). | Timer stages or scores a heat that already has results, overwriting or corrupting scores. | **FAIL** (real bug: `restore_results` leaves `racing=True` on a scored heat) |
+| `RacingHeatAllowed` | While racing mode is on, the current heat exists and has no results yet (`Chart.allowed`). | Timer stages or scores a heat that already has results, overwriting or corrupting scores. | **PASS** (40,863 distinct states checked; failed before #499, when `restore_results` left `racing=True` on a scored heat) |
 | `WaitingFinalMatchesStandings` | While an intermission is open and the final has not raced, the waiting final's roster matches Round 1's current standings (D27). | The wrong kids race in the final after a Round 1 result change. | **FAIL** (real bug: `select_heat` + `rerun` + `timer_result` re-opens intermission with stale roster; also `ManualWriteR2` + `DiscardHeat` + `Rerun`) |
 | `NoIntermissionAfterFinalRaces` | Once any heat of the final has a result, the intermission for that final is closed (D28). | Intermission stays open after the final has started scoring; `skip_waiting_step` can skip an already-raced final. | **FAIL** (real bug: `record_manual_result` on paused waiting final does not close intermission) |
-| `LockedFeederProtected` | Once any heat of the final has a result, no caller without `CONTROL_RACE` can alter Round 1's results (D32). | A volunteer without race-control permission alters qualifying heats after the final has begun. | **PASS** (52,562 distinct states checked) |
+| `LockedFeederProtected` | Once any heat of the final has a result, no caller without `CONTROL_RACE` can alter Round 1's results (D32). | A volunteer without race-control permission alters qualifying heats after the final has begun. | **PASS** (40,863 distinct states checked) |
 
-TLC also checks `NoDeadlock` across all 52,562 states (**PASS**).
+TLC also checks `NoDeadlock` across all 40,863 states (**PASS**).
 
 ## How to run
 

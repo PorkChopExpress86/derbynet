@@ -118,3 +118,67 @@ def test_restore_rebuilds_a_waiting_final(wolves, monkeypatch):
     assert rebuilt == [[wolves.pk]]
     results.restore_results(event, wolves, 1, found)
     assert rebuilt == [[wolves.pk]], "nothing restored, nothing rebuilt"
+
+
+def test_undo_after_a_rerun_of_the_last_heat_turns_racing_off(wolves):
+    """Discard the last heat with a result, rerun it, then Undo: the rerun
+    made it the current heat with racing on, and Undo turns racing off over
+    the times it puts back (#499)."""
+    from racing.services import heats
+
+    event = wolves.event
+    scheduled(wolves)
+    run_heat(event, (2.1, 2.2, 2.3, 2.4))
+    _, found = results.discard_heat(event, wolves, 1)
+    assert heats.rerun(event, "last") is None
+    assert current(event) == (wolves.pk, 1, True)
+
+    assert results.restore_results(event, wolves, 1, found) is None
+    assert current(event) == (wolves.pk, 1, False)
+    assert times(wolves, 1) == [2.1, 2.2, 2.3, 2.4]
+
+
+def test_undo_in_another_round_leaves_racing_on():
+    """Undo of a heat with the current heat's number in another round is not
+    the current heat, so racing stays on (#499 out of scope)."""
+    event = EventFactory()
+    rounds = race_setup(event, groups=(("Wolves", 8), ("Lions", 8)))
+    wolves, lions = rounds["Wolves"], rounds["Lions"]
+    scheduled(wolves)
+    run_heat(event, (2.1, 2.2, 2.3, 2.4))
+    _, found = results.discard_heat(event, wolves, 1)
+    scheduled(lions)
+    assert current(event) == (lions.pk, 1, True)
+
+    results.restore_results(event, wolves, 1, found)
+    assert times(wolves, 1) == [2.1, 2.2, 2.3, 2.4]
+    assert current(event) == (lions.pk, 1, True)
+
+
+def test_undo_that_restores_nothing_leaves_racing_on(wolves):
+    """An Undo link with no lanes writes nothing onto the current heat, so
+    racing stays on (#499: racing goes off when Undo writes results)."""
+    event = wolves.event
+    scheduled(wolves)
+    assert current(event) == (wolves.pk, 1, True)
+
+    assert results.restore_results(event, wolves, 1, []) is None
+    assert current(event) == (wolves.pk, 1, True)
+
+
+def test_undo_on_the_current_heat_with_racing_off_keeps_the_refused_count(wolves):
+    """With racing already off, Undo leaves the race state alone: the count
+    of results the timer sent while racing was off stays."""
+    from core.models import RaceState
+    from racing.services import heats
+
+    event = wolves.event
+    scheduled(wolves)
+    run_heat(event, (2.1, 2.2, 2.3, 2.4))
+    heats.select_heat(event, round_id=wolves.pk, heat=1)
+    _, found = results.discard_heat(event, wolves, 1)
+    RaceState.objects.filter(event=event).update(refused_results=3)
+
+    results.restore_results(event, wolves, 1, found)
+    state = RaceState.objects.get(event=event)
+    assert (state.current_heat, state.racing, state.refused_results) == (1, False, 3)
