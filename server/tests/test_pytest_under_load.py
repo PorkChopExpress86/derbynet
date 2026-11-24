@@ -1769,8 +1769,8 @@ def test_a_stray_in_the_line_folder_is_ignored(
 # What a script says when a step before the lock fails.
 JOIN_FAILED = "it could not join the line or take the load lock"
 
-# A flock that fails its CALL-th call of `flock ARGS` with 65, the status
-# flock(1) gives a failed flock(2) (EX_DATAERR), read through BASH_ENV, and
+# A flock that fails its CALL-th call of `flock ARGS` with 65, neither the
+# 0 of a lock taken nor the 1 of a lock held, read through BASH_ENV, and
 # passes every other.
 FAIL_FLOCK = """flock() {
   if [ "$*" = "$FAIL_ARGS" ]; then
