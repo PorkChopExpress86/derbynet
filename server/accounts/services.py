@@ -4,17 +4,13 @@ from accounts.defaults import DEFAULT_ROLES
 from accounts.models import Role
 from accounts.permissions import Perm
 
-_SEEDED_NAMES = [name for name, _, _, _ in DEFAULT_ROLES]
-
 
 def roles_with_default_password() -> list[str]:
     """The roles, in login-page order, whose password is still the one a new
     install seeds (`accounts.defaults`). A role with no password, such as
     Timer, was seeded without one and is never listed. The answer is stored
     (`Role.keeps_seeded_password`), so no page hashes for it (#441)."""
-    roles = Role.objects.filter(
-        name__in=_SEEDED_NAMES, keeps_seeded_password=True
-    ).exclude(password_hash="")
+    roles = Role.objects.filter(keeps_seeded_password=True).exclude(password_hash="")
     return list(roles.values_list("name", flat=True))
 
 

@@ -2,8 +2,8 @@
 as each browser test seeds them (#430).
 
 The D16 banner reads whether each role keeps its seeded password from the
-database, so a fresh process's first logged-in page hashes nothing, where it
-used to check the three seeded hashes (#441). The test settings hash with
+database, so a fresh process's first logged-in page hashes nothing
+(#441). The test settings hash with
 MD5 (`conftest.py`); the production case keeps the real login on PBKDF2.
 """
 

@@ -118,8 +118,8 @@ def import_roles(name):
 
 
 def test_an_import_with_new_passwords_takes_the_banner_away(event):
-    """`config-roles-hand-edited.json` gives RaceCrew "10" and the
-    coordinator "n3w-pass", and has no Photo."""
+    """`config-roles-hand-edited.json` gives each seeded role it keeps a new
+    password, the coordinator "n3w-pass", and has no Photo."""
     import_roles("config-roles-hand-edited.inc")
     client = Client()
     response = client.post(
