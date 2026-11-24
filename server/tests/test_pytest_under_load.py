@@ -4,7 +4,8 @@ starts anything: #47 and #48 each lost a 25-repeat run to
 that already holds files: #220 reused one, and a wait for its `junit.xml`
 fired on an earlier session's results (#220 retro). A run holds a lock
 for the machine, a second waits for it, and a SIGKILL frees it (#316
-retro). Waiters take it in the order they came (#417)."""
+retro). Waiters take it in the order they came (#417), every hand-off
+ahead of the load runs (#419)."""
 
 import fcntl
 import os
@@ -471,17 +472,10 @@ def holder_block(out):
     return block
 
 
-def lock_waiter(pid):
-    """The pid of the `flock -x 9` under `pid` that waits on the load lock,
-    or None: the line's own flocks under it come and go."""
-    for child, _ in child_pids(pid):
-        try:
-            argv = Path(f"/proc/{child}/cmdline").read_bytes().split(b"\0")[:-1]
-        except OSError:
-            continue
-        if argv[1:] == [b"-x", b"9"]:
-            return child
-    return None
+def first_in_line(out):
+    """Whether the run whose output is `out` has printed that it is first
+    in the line: from then on it tries the load lock once a second."""
+    return "Place 1 in line" in out.read_text()
 
 
 def entries(lock):
@@ -523,8 +517,8 @@ def test_a_second_load_run_waits_for_the_first_and_names_it(tmp_path):
             "wait or start of the second run",
         )
         assert not (tmp_path / "second" / "started").exists(), out.read_text()
-        # It waits in flock, not in a sleep that would let it through later.
-        wait_until(lambda: lock_waiter(second.pid), "flock under it", 10)
+        # It waits first in the line, the place that takes the lock next.
+        wait_until(lambda: first_in_line(out), "it first in the line", 10)
         held = out.read_text()
         assert f"  pid {first.pid}, since " in held
         assert f"  cwd {tmp_path}\n" in held
@@ -646,7 +640,7 @@ def test_a_waiter_on_an_empty_lock_file_says_so(tmp_path):
     try:
         run = start(tmp_path, "second", lock, go=True)
         out = tmp_path / "second.out"
-        wait_until(lambda: lock_waiter(run.pid), "the run waiting")
+        wait_until(lambda: first_in_line(out), "the run waiting")
         assert holder_block(out) == ["  (no details yet)"], out.read_text()
     finally:
         os.close(fd)
@@ -854,7 +848,7 @@ def test_a_waiting_hand_off_goes_ahead_of_a_load_run_started_after_the_release(
     load = None
     try:
         out = tmp_path / "handoff.out"
-        wait_until(lambda: lock_waiter(handoff.pid), "flock under it", 30)
+        wait_until(lambda: first_in_line(out), "it first in the line", 30)
         assert "Waiting for the load lock" in out.read_text()
         assert holder_block(out) == ["  pid 1, since then"]
         fcntl.flock(held, fcntl.LOCK_UN)
@@ -864,14 +858,20 @@ def test_a_waiting_hand_off_goes_ahead_of_a_load_run_started_after_the_release(
         load_out = tmp_path / "load.out"
         wait_until(lambda: "Waiting" in load_out.read_text(), "the load run waiting")
         assert not (tmp_path / "load" / "started").exists()
-        # It prints the holder's lines, then waits in flock (a read on
-        # "Waiting" alone found none printed yet, 1 of 25 under load).
-        wait_until(lambda: lock_waiter(load.pid), "flock under the load run", 30)
-        block = holder_block(load_out)
-        assert block[0].startswith(f"  pid {handoff.pid}, since "), block
-        # The hand-off left the line once it held the lock.
-        assert entries(lock) == [f"0000000001.{load.pid}"]
-        assert block[3] == f"  args hold-load-lock.sh: bash -c {HAND_OFF}", block
+        # It prints the holder's lines, then its place (a read on
+        # "Waiting" alone found no holder printed yet, 1 of 25 under load).
+        wait_until(lambda: first_in_line(load_out), "its place", 30)
+        # It names the hand-off: as the holder, or as the run ahead of it
+        # when it joined in the up to 1 s before the hand-off's try took the
+        # lock.
+        said = load_out.read_text()
+        assert f"  pid {handoff.pid}, since " in said, said
+        assert f"; args hold-load-lock.sh: bash -c {HAND_OFF}" in said or (
+            f"\n  args hold-load-lock.sh: bash -c {HAND_OFF}\n" in said
+        ), said
+        # The hand-off left the line once it held the lock; the load run's
+        # ticket is 2 when it joined before that.
+        assert [entry.split(".")[1] for entry in entries(lock)] == [str(load.pid)]
         (tmp_path / "handoff" / "go").write_text("")
         assert handoff.wait(timeout=30) == 0
         assert load.wait(timeout=90) == 0
@@ -1012,11 +1012,11 @@ def held_lock(tmp_path):
 
 def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
     """`script`, or `copy`, a copy of it, started on `lock`, which the test
-    holds, once it waits in flock: (the run, its flock's pid); `under` is
-    start()'s, for pytest-under-load.sh only.  A run that ends first, such
-    as one refused under `timeout`, fails at once with the script's output:
-    #59's runs under a `timeout 300` read "no flock under it within 30 s"
-    (#407)."""
+    holds, once it is first in the line and tries the lock: the run; `under`
+    is start()'s, for pytest-under-load.sh only.  A run that ends first,
+    such as one refused under `timeout`, fails at once with the script's
+    output: #59's runs under a `timeout 300` read "no flock under it within
+    30 s" (#407)."""
     path = copy or script
     if script == SCRIPT:
         run = start(
@@ -1026,21 +1026,19 @@ def start_waiting(tmp_path, script, lock, extra_env=None, copy=None, under=()):
         assert not under, "hold() starts hold-load-lock.sh under nothing"
         run = hold(tmp_path, lock, name="waiter", extra_env=extra_env, script=path)
     out = tmp_path / "waiter.out"
-    # Its `flock -x 9`: before that, the flock under it may be the
-    # `flock -n` that found the lock held, or the line's.
     wait_until(
-        lambda: run.poll() is not None or lock_waiter(run.pid),
-        "flock under it",
+        lambda: run.poll() is not None or first_in_line(out),
+        "it first in the line",
         30,
     )
     if run.returncode is not None:
         raise AssertionError(
-            f"the run exited {run.returncode} before its flock; the script"
-            f" printed:\n{out.read_text()}"
+            f"the run exited {run.returncode} before it was first in the line;"
+            f" the script printed:\n{out.read_text()}"
         )
     # The run is the script asked for.
     assert str(path) in Path(f"/proc/{run.pid}/cmdline").read_text()
-    return run, lock_waiter(run.pid)
+    return run
 
 
 SCRIPTS = pytest.mark.parametrize("script", [SCRIPT, HOLD_LOCK], ids=lambda p: p.name)
@@ -1120,39 +1118,125 @@ def signal_at_the_pause(tmp_path, run, name):
     (tmp_path / f"go-{name}").write_text("")
 
 
-@SCRIPTS
-def test_a_signal_as_it_starts_its_flock_stops_that_flock(tmp_path, script):
-    """A TERM right after `flock -x 9 &`, before its pid is kept, held there
-    by pause_at: the flock was left waiting (#391 review)."""
-    copy = paused_copy(tmp_path, script, r"  flock -x 9 8>&- &", "forked")
+# The line right after a waiter's try of the load lock, under the mutex.
+TRIED = r"      flock -n -x 9 \|\| try_status=\$\?"
+
+
+def paused_at_a_try(tmp_path, script, status):
+    """A copy of `script` that runs `pause_at tried` right after a try of
+    the load lock whose flock exited `status`: 1 found it held, 0 took it."""
+    return injected_copy(
+        tmp_path,
+        script,
+        TRIED,
+        f'      if [ "$try_status" = {status} ]; then pause_at tried; fi\n',
+    )
+
+
+def at_a_try(tmp_path, script, took):
+    """A waiter on the test's held lock, paused right after a try that found
+    the lock held, or with `took`, right after the try that took it once the
+    test let it go: (the run, the lock, the test's fd or None)."""
+    copy = paused_at_a_try(tmp_path, script, 0 if took else 1)
     lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
-    try:
-        signal_at_the_pause(tmp_path, run, "forked")
-        status = run.wait(timeout=30)
-        wait_until(lambda: not alive(waiter), "its flock gone", 10)
-        assert status == 143
-    finally:
+    if took:
+        run = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
         os.close(held)
-        kill_all([waiter])
+        held = None
+    else:
+        run = join(tmp_path, script, "waiter", lock, logged_kill(tmp_path), copy)
+    wait_until((tmp_path / "at-tried").exists, "the pause after a try", 30)
+    return run, lock, held
+
+
+@pytest.mark.parametrize("took", [False, True], ids=["held", "took"])
+@SCRIPTS
+def test_a_signal_right_after_its_try_frees_both_locks(tmp_path, script, took):
+    """A TERM right after the try, under the line's mutex, held there by
+    pause_at: whether the try found the lock held or took it, the run ends
+    with 143 and leaves no entry, the mutex free, and runs no command
+    (plan/AGENT-BRIEF.md: a signal at each line between starting a child and
+    recording it)."""
+    run, lock, held = at_a_try(tmp_path, script, took)
+    try:
+        assert not free(f"{lock}.line/mutex")
+        signal_at_the_pause(tmp_path, run, "tried")
+        assert run.wait(timeout=30) == 143
+        assert entries(lock) == []
+        assert free(f"{lock}.line/mutex")
+        assert not (tmp_path / "waiter" / "started").exists()
+        if held is not None:
+            os.close(held)
+            held = None
+        assert free(lock)
+    finally:
+        if held is not None:
+            os.close(held)
         finish(tmp_path, run)
 
 
 @SCRIPTS
-def test_a_signal_as_its_wait_ends_signals_no_ended_flock(tmp_path, script):
-    """A TERM right after the wait for the flock returns, held there by
-    pause_at: that flock has exited, and its pid may be another process's,
-    so the cleanup signals none (#391 review)."""
-    copy = paused_copy(tmp_path, script, r"  wait .*", "waited")
-    lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
+def test_a_sigkill_as_it_takes_the_lock_lets_the_next_run_take_it(tmp_path, script):
+    """A SIGKILL right after a try that took the lock, while the run holds
+    the lock and the mutex: the kernel frees both, and the next run takes
+    the lock at once (plan/AGENT-BRIEF.md: a SIGKILL followed by the next
+    run)."""
+    run, lock, _ = at_a_try(tmp_path, script, took=True)
+    following = None
     try:
+        assert not free(lock)
+        os.kill(run.pid, signal.SIGKILL)
+        run.wait(timeout=10)
+        following = start(tmp_path, "next", lock)
+        wait_started(tmp_path, "next")
+        assert "Waiting" not in (tmp_path / "next.out").read_text()
+        assert entries(lock) == []
+    finally:
+        finish(tmp_path, run, *([following] if following else []))
+
+
+# PAUSE_AT, and a `sleep` that, called as the line's `sleep 1` between two
+# reads, writes `at-sleep` and waits for `go-sleep`, read through BASH_ENV.
+PAUSED_SLEEP = (
+    PAUSE_AT.replace("sleep 0.1", "command sleep 0.1")
+    + """sleep() {
+  if [ "$*" = 1 ]; then
+    : > "$PAUSE_DIR/at-sleep"
+    for _ in $(seq 300); do
+      [ -e "$PAUSE_DIR/go-sleep" ] && return
+      command sleep 0.1
+    done
+  else
+    command sleep "$@"
+  fi
+}
+"""
+)
+
+
+@SCRIPTS
+def test_a_waiter_killed_in_its_sleep_leaves_no_lock_held(tmp_path, script):
+    """The line's mutex is held only for a read and a try, never across the
+    sleep between tries, and the sleep gets no copy of the entry or the
+    load lock: with the run SIGKILLed while its sleep, held by
+    PAUSED_SLEEP, lives on, the mutex, its entry and, once the test lets
+    it go, the load lock are free."""
+    (tmp_path / "paused_sleep.sh").write_text(PAUSED_SLEEP)
+    env = {"BASH_ENV": str(tmp_path / "paused_sleep.sh"), "PAUSE_DIR": str(tmp_path)}
+    lock, held = held_lock(tmp_path)
+    run = start_waiting(tmp_path, script, lock, env)
+    try:
+        wait_until((tmp_path / "at-sleep").exists, "its sleep", 30)
+        os.kill(run.pid, signal.SIGKILL)
+        run.wait(timeout=10)
+        [entry] = entries(lock)
+        assert free(f"{lock}.line/mutex")
+        assert free(f"{os.path.realpath(lock)}.line/{entry}")
         os.close(held)
         held = None
-        signal_at_the_pause(tmp_path, run, "waited")
-        assert run.wait(timeout=30) == 143
-        assert str(waiter) not in kill_args(tmp_path)
+        assert free(lock)
     finally:
+        (tmp_path / "go-sleep").write_text("")
         if held is not None:
             os.close(held)
         finish(tmp_path, run)
@@ -1160,21 +1244,24 @@ def test_a_signal_as_its_wait_ends_signals_no_ended_flock(tmp_path, script):
 
 @pytest.mark.parametrize("sig", ["TERM", "INT", "HUP"])
 @SCRIPTS
-def test_a_signal_while_it_waits_for_the_lock_stops_its_flock(tmp_path, script, sig):
+def test_a_signal_while_it_waits_for_the_lock_stops_it(tmp_path, script, sig):
     """#372's implementer stopped a queued run of each script with TERM,
     and each left its `flock -x 9` waiting on the lock (#391); INT and HUP
-    reach the same trap."""
+    reach the same trap. First in the line, it now tries the lock once a
+    second and leaves no child waiting on it: once it ends, the test's
+    lock is the only one held."""
     lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock)
+    run = start_waiting(tmp_path, script, lock)
     try:
         os.kill(run.pid, getattr(signal, f"SIG{sig}"))
-        status = run.wait(timeout=30)
-        wait_until(lambda: not alive(waiter), "its flock gone", 10)
-        assert status == 143
+        assert run.wait(timeout=30) == 143
         assert entries(lock) == []
-    finally:
         os.close(held)
-        kill_all([waiter])
+        held = None
+        assert free(lock)
+    finally:
+        if held is not None:
+            os.close(held)
         finish(tmp_path, run)
 
 
@@ -1191,7 +1278,7 @@ def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, si
     try:
         assert f"SIG{sig}" in ignored(os.getpid())
         lock, held = held_lock(tmp_path)
-        run, waiter = start_waiting(tmp_path, script, lock)
+        run = start_waiting(tmp_path, script, lock)
     finally:
         signal.signal(number, before)
     try:
@@ -1202,10 +1289,9 @@ def test_a_signal_reaches_the_trap_though_pytest_ignores_it(tmp_path, script, si
         assert not ignored(run.pid) & five, ignored(run.pid)
         os.kill(run.pid, number)
         assert run.wait(timeout=30) == 143
-        wait_until(lambda: not alive(waiter), "its flock gone", 10)
+        assert entries(lock) == []
     finally:
         os.close(held)
-        kill_all([waiter])
         finish(tmp_path, run)
 
 
@@ -1248,35 +1334,6 @@ def test_a_command_the_scripts_start_ignores_sigint(tmp_path):
         assert "SIGTERM" not in ignored_in(text)
 
 
-# A stand-in flock(1) whose `flock -n` holds for 2 s before it runs the real
-# one, so a flock under the run is the one that found the lock held.
-SLOW_FLOCK_N = """#! /bin/sh
-[ "$1" = -n ] && sleep 2
-exec {flock} "$@"
-"""
-
-
-@SCRIPTS
-def test_the_flock_it_returns_is_the_one_that_waits(tmp_path, script):
-    """Before the run prints "Waiting", the flock under it may be the
-    `flock -n` that found the lock held, here held 2 s by SLOW_FLOCK_N;
-    start_waiting returns the `flock -x 9` that waits (#407)."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    (bin_dir / "flock").write_text(SLOW_FLOCK_N.format(flock=shutil.which("flock")))
-    (bin_dir / "flock").chmod(0o755)
-    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
-    lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, extra_env=env)
-    try:
-        argv = Path(f"/proc/{waiter}/cmdline").read_bytes().split(b"\0")
-        assert b"-n" not in argv and b"-x" in argv, argv
-    finally:
-        os.close(held)
-        kill_all([waiter])
-        finish(tmp_path, run)
-
-
 def test_start_waiting_starts_hold_load_lock_sh_under_nothing(tmp_path):
     """start_waiting's `under` is for pytest-under-load.sh only: hold()
     takes none, and it refuses one before it starts a run."""
@@ -1286,15 +1343,15 @@ def test_start_waiting_starts_hold_load_lock_sh_under_nothing(tmp_path):
 
 
 def test_a_run_refused_before_its_flock_is_named_at_once(tmp_path):
-    """Under `timeout` the script refuses before its flock, and the wait for
-    that flock says so at once: #59's runs under a `timeout 300` waited 30 s
+    """Under `timeout` the script refuses before the line, and the wait for
+    its place says so at once: #59's runs under a `timeout 300` waited 30 s
     each and read "no flock under it within 30 s" (#407)."""
     lock, held = held_lock(tmp_path)
     began = time.monotonic()
     try:
         with pytest.raises(AssertionError, match="it runs under timeout") as error:
             start_waiting(tmp_path, SCRIPT, lock, under=("timeout", "300"))
-        assert "exited 2 before its flock" in str(error.value)
+        assert "exited 2 before it was first in the line" in str(error.value)
         assert time.monotonic() - began < 30
     finally:
         os.close(held)
@@ -1304,75 +1361,38 @@ def test_a_run_refused_before_its_flock_is_named_at_once(tmp_path):
     "signals", [("TERM", "TERM"), ("TERM", "INT")], ids=["TERM-TERM", "TERM-INT"]
 )
 @SCRIPTS
-def test_a_second_signal_while_it_stops_its_wait_still_stops_its_flock(
+def test_a_second_signal_while_it_stops_its_wait_still_leaves_the_line(
     tmp_path, script, signals
 ):
-    """plan/AGENT-BRIEF.md: a second signal during the cleanup, held inside
-    it by PAUSED_KILL, here at the kill of the waiting flock (#391)."""
+    """plan/AGENT-BRIEF.md: a second signal during the cleanup, here held
+    inside it by pause_at, after it removes its entry: the cleanup goes on,
+    and the run ends with 143, no entry and the mutex free (#391). Waiting
+    first in the line, it has no child for the cleanup to kill."""
+    copy = paused_copy(tmp_path, script, r"    rm -f -- \"\$ENTRY\"", "left")
     lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, paused_kill(tmp_path))
+    run = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
     try:
-        second_signal_inside_the_cleanup(tmp_path, run.pid, signals)
-        status = run.wait(timeout=30)
-        wait_until(lambda: not alive(waiter), "its flock gone", 10)
-        assert status == 143
+        first, second = (getattr(signal, f"SIG{name}") for name in signals)
+        os.kill(run.pid, first)
+        wait_until((tmp_path / "at-left").exists, "the cleanup", 30)
+        os.kill(run.pid, second)
+        (tmp_path / "go-left").write_text("")
+        assert run.wait(timeout=30) == 143
         assert entries(lock) == []
+        assert free(f"{lock}.line/mutex")
+        assert kill_calls(tmp_path) == []
     finally:
         os.close(held)
-        kill_all([waiter])
-        finish(tmp_path, run)
-
-
-@SCRIPTS
-def test_a_flock_that_ends_without_the_lock_ends_the_run(tmp_path, script):
-    """The wait's status is the flock's: a flock killed before it takes
-    the lock fails the script, which writes no holder lines and runs no
-    command. Its cleanup then signals no flock: the one it waited on has
-    ended, and its pid may be another process's (#391 review)."""
-    lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path))
-    try:
-        os.kill(waiter, signal.SIGTERM)
-        assert run.wait(timeout=30) == 2
-        assert (
-            "it could not join the line or take the load lock"
-            in (tmp_path / "waiter.out").read_text()
-        )
-        assert lock.read_text() == "pid 1, since then\n"
-        assert not (tmp_path / "waiter" / "started").exists()
-        assert str(waiter) not in kill_args(tmp_path)
-    finally:
-        os.close(held)
-        kill_all([waiter])
-        finish(tmp_path, run)
-
-
-@SCRIPTS
-def test_a_run_that_took_the_lock_never_signals_its_ended_flock(tmp_path, script):
-    """Its cleanup kills the waiting flock only while it waits: once that
-    flock has exited, its pid may be another process's (#391)."""
-    lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path))
-    try:
-        os.close(held)
-        held = None
-        (tmp_path / "waiter" / "go").write_text("")
-        assert run.wait(timeout=90) == 0
-        assert str(waiter) not in kill_args(tmp_path)
-    finally:
-        if held is not None:
-            os.close(held)
         finish(tmp_path, run)
 
 
 @pytest.mark.parametrize("waits", [False, True], ids=["free", "after-a-wait"])
 @SCRIPTS
 def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script, waits):
-    """Its cleanup stops the wait's flock only during the wait, though
-    WAITING comes set from its environment, on a free lock or after a wait:
-    once it holds the lock, the cleanup kills each child it started once,
-    from its own list (#391)."""
-    env = {**logged_kill(tmp_path), "WAITING": "1"}
+    """On a free lock or after a wait: once it holds the lock, the cleanup
+    kills each child it started once, from its own list, and nothing else
+    (#391)."""
+    env = logged_kill(tmp_path)
     lock = tmp_path / "load.lock"
     held = None
     if waits:
@@ -1383,7 +1403,9 @@ def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script,
         run = hold(tmp_path, lock, extra_env=env)
     try:
         if waits:
-            wait_until(lambda: lock_waiter(run.pid), "flock under it", 30)
+            name = "first" if script == SCRIPT else "handoff"
+            out = tmp_path / f"{name}.out"
+            wait_until(lambda: first_in_line(out), "it first in the line", 30)
             os.close(held)
             held = None
         if script == SCRIPT:
@@ -1408,21 +1430,18 @@ def test_a_signal_after_it_took_the_lock_kills_each_child_once(tmp_path, script,
 
 @SCRIPTS
 def test_after_a_sigkill_while_it_waits_the_next_run_takes_the_lock(tmp_path, script):
-    """A SIGKILL skips the trap, so its flock lives on and waits; once the
-    lock frees, that flock takes it and exits, and the next run starts
-    (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
+    """A SIGKILL skips the trap; once the lock frees, the next run starts
+    at once (plan/AGENT-BRIEF.md: a SIGKILL followed by the next run)."""
     lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock)
+    run = start_waiting(tmp_path, script, lock)
     following = None
     try:
         os.kill(run.pid, signal.SIGKILL)
         run.wait(timeout=10)
-        assert alive(waiter)
         # Its entry stays until the next run finds its owner dead.
         assert entries(lock) == [f"0000000001.{run.pid}"]
         os.close(held)
         held = None
-        wait_until(lambda: not alive(waiter), "its flock gone", 10)
         following = start(tmp_path, "next", lock)
         wait_started(tmp_path, "next")
         assert "Waiting" not in (tmp_path / "next.out").read_text()
@@ -1430,7 +1449,6 @@ def test_after_a_sigkill_while_it_waits_the_next_run_takes_the_lock(tmp_path, sc
     finally:
         if held is not None:
             os.close(held)
-        kill_all([waiter])
         finish(tmp_path, run, *([following] if following else []))
 
 
@@ -1477,12 +1495,13 @@ def places(out):
 # for a waiter that skipped the line to start and take the free lock first.
 SLOW_HEAD_S = 3
 
-# PAUSE_AT, and an flock that runs `pause_at turn` before the wait on the
-# load lock, `flock -x 9`, read through BASH_ENV.
+# PAUSE_AT, and an flock that runs `pause_at turn` before a waiter's first
+# read of the line once it has joined (its `flock -x 7` with an entry),
+# read through BASH_ENV.
 SLOW_HEAD = (
     PAUSE_AT
     + """flock() {
-  if [ "$*" = "-x 9" ]; then pause_at turn; fi
+  if [ "$*" = "-x 7" ] && [ -n "$ENTRY" ]; then pause_at turn; fi
   command flock "$@"
 }
 """
@@ -1546,21 +1565,17 @@ def test_a_waiter_killed_in_line_does_not_block_the_ones_behind(
 ):
     """A SIGKILL skips the trap, so the killed waiter's entry stays in the
     line; its flock on that entry ends with it, and the waiters behind it
-    pass it, the first's flock on the load lock left waiting included. The
-    third prints its place again each time it moves up, and names the runs
+    pass it. The third prints its place again each time it moves up, and names the runs
     ahead of it."""
     lock, held = held_lock(tmp_path)
     names = ["first", "second", "third"]
     runs = {}
-    orphan = None
     try:
         for place, name in enumerate(names, 1):
             runs[name] = join_at(tmp_path, script, name, lock, place)
         third = (tmp_path / "third.out").read_text()
         for name in ("first", "second"):
             assert re.search(rf"^  pid {runs[name].pid}, since .*; cwd ", third, re.M)
-        orphan = lock_waiter(runs["first"].pid)
-        assert orphan
         os.kill(runs[killed].pid, signal.SIGKILL)
         runs[killed].wait(timeout=10)
         wait_until(
@@ -1576,7 +1591,6 @@ def test_a_waiter_killed_in_line_does_not_block_the_ones_behind(
     finally:
         if held is not None:
             os.close(held)
-        kill_all([orphan] if orphan else [])
         finish(tmp_path, *runs.values())
 
 
@@ -1592,7 +1606,9 @@ def test_a_signal_to_a_waiter_behind_another_takes_it_out_of_the_line(
     first = hold(tmp_path, lock, name="first")
     run = None
     try:
-        wait_until(lambda: lock_waiter(first.pid), "the first waiting", 30)
+        wait_until(
+            lambda: first_in_line(tmp_path / "first.out"), "the first waiting", 30
+        )
         run = join_at(tmp_path, script, "second", lock, 2)
         os.kill(run.pid, getattr(signal, f"SIG{sig}"))
         assert run.wait(timeout=30) == 143
@@ -1604,7 +1620,11 @@ def test_a_signal_to_a_waiter_behind_another_takes_it_out_of_the_line(
 
 @pytest.mark.parametrize(
     "after",
-    [r"  exec 8>\"\$ENTRY\"", r"  flock -x 8", r"  printf '%s\\n' \"\$1\" >&8"],
+    [
+        r"  exec 8>\"\$ENTRY\"",
+        r"  flock -x 8",
+        r"  printf 'kind %s\\n%s\\n' \"\$1\" \"\$2\" >&8",
+    ],
     ids=["created", "locked", "written"],
 )
 @SCRIPTS
@@ -1633,7 +1653,7 @@ def test_a_signal_as_it_leaves_the_line_leaves_no_entry(tmp_path, script):
     and the lock is free."""
     copy = paused_copy(tmp_path, script, r"    rm -f -- \"\$ENTRY\"", "left")
     lock, held = held_lock(tmp_path)
-    run, waiter = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
+    run = start_waiting(tmp_path, script, lock, logged_kill(tmp_path), copy)
     try:
         os.close(held)
         held = None
@@ -1644,7 +1664,6 @@ def test_a_signal_as_it_leaves_the_line_leaves_no_entry(tmp_path, script):
     finally:
         if held is not None:
             os.close(held)
-        kill_all([waiter])
         finish(tmp_path, run)
 
 
@@ -1728,9 +1747,9 @@ def test_a_stray_in_the_line_folder_is_ignored(
     stray_fd = os.open(stray, os.O_RDONLY)
     if held_by_test:
         fcntl.flock(stray_fd, fcntl.LOCK_EX)
-    run = waiter = None
+    run = None
     try:
-        run, waiter = start_waiting(tmp_path, script, lock)
+        run = start_waiting(tmp_path, script, lock)
         out = tmp_path / "waiter.out"
         assert "Place 1 in line: it takes the load lock next." in out.read_text()
         assert not (tmp_path / "waiter" / "started").exists()
@@ -1744,36 +1763,38 @@ def test_a_stray_in_the_line_folder_is_ignored(
         os.close(stray_fd)
         if held is not None:
             os.close(held)
-        kill_all([waiter] if waiter else [])
         finish(tmp_path, *([run] if run else []))
 
 
 # What a script says when a step before the lock fails.
 JOIN_FAILED = "it could not join the line or take the load lock"
 
-# A flock that fails its CALL-th call of `flock -x FD`, read through
-# BASH_ENV, and passes every other.
+# A flock that fails its CALL-th call of `flock ARGS` with 65, the status
+# flock(1) gives a failed flock(2) (EX_DATAERR), read through BASH_ENV, and
+# passes every other.
 FAIL_FLOCK = """flock() {
-  if [ "$*" = "-x $FAIL_FD" ]; then
+  if [ "$*" = "$FAIL_ARGS" ]; then
     FAILS_SEEN=$((${FAILS_SEEN:-0} + 1))
-    if [ "$FAILS_SEEN" = "$FAIL_CALL" ]; then return 1; fi
+    if [ "$FAILS_SEEN" = "$FAIL_CALL" ]; then return 65; fi
   fi
   command flock "$@"
 }
 """
 
 FAILING_STEPS = [
-    pytest.param("7", 1, id="the-mutex-of-the-join"),
-    pytest.param("8", 1, id="the-entry"),
-    pytest.param("7", 2, id="the-mutex-of-its-turn"),
-    pytest.param("9", 1, id="the-load-lock"),
+    pytest.param("-x 7", 1, id="the-mutex-of-the-join"),
+    pytest.param("-x 8", 1, id="the-entry"),
+    pytest.param("-x 7", 2, id="the-mutex-of-its-turn"),
+    # The first `flock -n -x 9` is the join's, which takes a failure as a
+    # held lock; the second is the first try of its turn.
+    pytest.param("-n -x 9", 2, id="the-try-of-the-load-lock"),
 ]
 
 
-@pytest.mark.parametrize(("fd", "call"), FAILING_STEPS)
+@pytest.mark.parametrize(("args", "call"), FAILING_STEPS)
 @SCRIPTS
 def test_a_step_that_fails_before_the_lock_ends_the_run_with_2_and_no_command(
-    tmp_path, script, fd, call
+    tmp_path, script, args, call
 ):
     """The test holds the lock, so a run that went on past the failure
     would run its command beside the holder. Each step from joining the
@@ -1782,7 +1803,7 @@ def test_a_step_that_fails_before_the_lock_ends_the_run_with_2_and_no_command(
     (tmp_path / "fail_flock.sh").write_text(FAIL_FLOCK)
     env = {
         "BASH_ENV": str(tmp_path / "fail_flock.sh"),
-        "FAIL_FD": fd,
+        "FAIL_ARGS": args,
         "FAIL_CALL": str(call),
     }
     lock, held = held_lock(tmp_path)
@@ -1906,7 +1927,9 @@ def test_a_run_from_before_the_line_never_runs_beside_a_holder(tmp_path):
     first = hold(tmp_path, lock, name="first")
     old = None
     try:
-        wait_until(lambda: lock_waiter(first.pid), "the first waiting", 30)
+        wait_until(
+            lambda: first_in_line(tmp_path / "first.out"), "the first waiting", 30
+        )
         (tmp_path / "old").mkdir()
         old = subprocess.Popen(
             ["flock", "-x", str(lock), "bash", "-c", HAND_OFF],
@@ -1933,6 +1956,203 @@ def test_a_run_from_before_the_line_never_runs_beside_a_holder(tmp_path):
         if held is not None:
             os.close(held)
         finish(tmp_path, first, *([old] if old else []))
+
+
+# An flock that adds a line to PAUSE_DIR/reads at each read of the line,
+# its `flock -x 7`, read through BASH_ENV.
+COUNTED_READS = """flock() {
+  if [ "$*" = "-x 7" ]; then echo >> "$PAUSE_DIR/reads"; fi
+  command flock "$@"
+}
+"""
+
+
+def counted_reads(tmp_path):
+    """The environment that gives a script COUNTED_READS, counting into a
+    folder of its own: (the environment, a function that reads the count)."""
+    folder = tmp_path / "counted"
+    folder.mkdir()
+    (folder / "hooks.sh").write_text(COUNTED_READS)
+    reads = folder / "reads"
+
+    def count():
+        return len(reads.read_text().splitlines()) if reads.exists() else 0
+
+    return {"BASH_ENV": str(folder / "hooks.sh"), "PAUSE_DIR": str(folder)}, count
+
+
+def behind(out):
+    """The pids of the runs a waiting run last printed itself behind."""
+    block = out.read_text().rsplit("in line, behind:\n", 1)[1]
+    pids = []
+    for line in block.splitlines():
+        if not line.startswith("  "):
+            break
+        pids.append(int(re.match(r"  pid (\d+), since ", line).group(1)))
+    return pids
+
+
+def test_a_hand_off_takes_the_lock_before_a_load_run_waiting_ahead_of_it(tmp_path):
+    """#406's 3-minute hand-off waited 7585 s, behind a 25-count load run
+    that had queued before it (#419). A load run waits first in the line,
+    then a hand-off joins behind it, held by SLOW_HEAD before its first
+    read of the line, and the test lets the lock go. The load run reads the
+    line twice with the lock free and takes nothing, since the hand-off is
+    ahead of it; once the test lets the hand-off go on, it runs first, and
+    the load run prints its place behind it, then first again."""
+    (tmp_path / "slow_head.sh").write_text(SLOW_HEAD)
+    slow = {"BASH_ENV": str(tmp_path / "slow_head.sh"), "PAUSE_DIR": str(tmp_path)}
+    counted, reads = counted_reads(tmp_path)
+    lock, held = held_lock(tmp_path)
+    runs = []
+    try:
+        runs.append(join(tmp_path, SCRIPT, "load", lock, counted))
+        load_out = tmp_path / "load.out"
+        wait_until(lambda: first_in_line(load_out), "the load run first in line", 30)
+        runs.append(join(tmp_path, HOLD_LOCK, "handoff", lock, slow))
+        wait_until((tmp_path / "at-turn").exists, "the hand-off in the line", 30)
+        os.close(held)
+        held = None
+        # Its first read from here may have begun before the release; the
+        # second begins once the first, and its try, have ended.
+        since = reads()
+        wait_until(
+            lambda: (tmp_path / "load" / "started").exists() or reads() >= since + 2,
+            "two reads by the load run",
+            30,
+        )
+        assert not (tmp_path / "load" / "started").exists()
+        assert free(lock)
+        (tmp_path / "go-turn").write_text("")
+        assert [run.wait(timeout=90) for run in runs] == [0, 0]
+        assert order(tmp_path) == ["handoff", "load"]
+        assert places(load_out) == [1, 2, 1]
+        assert behind(load_out) == [runs[1].pid]
+        assert places(tmp_path / "handoff.out") == [1]
+        assert entries(lock) == []
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *runs)
+
+
+def test_hand_offs_go_first_and_each_kind_keeps_the_order_it_came_in(tmp_path):
+    """Two load runs join, then two hand-offs: each hand-off goes ahead of
+    both load runs and behind the hand-off that came before it, and each
+    load run prints its place again as each hand-off passes it. Once the
+    test lets the lock go, they run hand-offs first, each kind in the order
+    it came."""
+    lock, held = held_lock(tmp_path)
+    runs = {}
+    try:
+        runs["load1"] = join_at(tmp_path, SCRIPT, "load1", lock, 1)
+        runs["load2"] = join_at(tmp_path, SCRIPT, "load2", lock, 2)
+        out = {name: tmp_path / f"{name}.out" for name in ("load1", "load2")}
+        for name, place in (("hand1", 1), ("hand2", 2)):
+            runs[name] = join_at(tmp_path, HOLD_LOCK, name, lock, place)
+            # Each load run reads the line once a second: each move shows
+            # once it has.
+            for load, moved in (("load1", place + 1), ("load2", place + 2)):
+                wait_until(
+                    lambda o=out[load], m=moved: places(o)[-1] == m,
+                    f"{load} at place {moved}",
+                    30,
+                )
+        out.update({name: tmp_path / f"{name}.out" for name in ("hand1", "hand2")})
+        assert behind(out["load2"]) == [
+            runs[name].pid for name in ("hand1", "hand2", "load1")
+        ]
+        assert behind(out["hand2"]) == [runs["hand1"].pid]
+        os.close(held)
+        held = None
+        assert [run.wait(timeout=90) for run in runs.values()] == [0, 0, 0, 0]
+        assert order(tmp_path) == ["hand1", "hand2", "load1", "load2"]
+        assert places(out["hand1"]) == [1]
+        assert places(out["hand2"]) == [2, 1]
+        # Each load run moved down once for each hand-off, then up to 1.
+        for name, start in (("load1", [1, 2, 3]), ("load2", [2, 3, 4])):
+            moved = places(out[name])
+            assert moved[:3] == start, (name, moved)
+            rest = moved[2:]
+            assert rest == sorted(set(rest), reverse=True), (name, moved)
+            assert rest[-1] == 1, (name, moved)
+        assert entries(lock) == []
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *runs.values())
+
+
+# The copies of the three scripts from before #419, which a worktree cut
+# before it still runs on the machine's lock.
+BEFORE_419 = Path(__file__).resolve().parent / "load_lock_before_419"
+
+
+def before_419(tmp_path, script):
+    """A copy of `script` from before #419, beside its own line file, in
+    `tmp_path/old/tools`."""
+    folder = tmp_path / "old" / "tools"
+    if not folder.exists():
+        folder.mkdir(parents=True)
+        for source in BEFORE_419.iterdir():
+            shutil.copy(source, folder / source.name)
+    copy = folder / script.name
+    assert copy.stat().st_mode & 0o111, copy
+    return copy
+
+
+# (name, script, from before #419) for each run of a mixed line.
+OLD_LOAD = ("oldload", SCRIPT, True)
+OLD_HAND_OFF = ("oldhand", HOLD_LOCK, True)
+NEW_LOAD = ("newload", SCRIPT, False)
+NEW_HAND_OFF = ("newhand", HOLD_LOCK, False)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param([OLD_LOAD, NEW_HAND_OFF], id="old-load-then-hand-off"),
+        pytest.param([NEW_HAND_OFF, OLD_LOAD], id="hand-off-then-old-load"),
+        pytest.param([OLD_HAND_OFF, NEW_LOAD], id="old-hand-off-then-load"),
+        pytest.param([NEW_LOAD, OLD_HAND_OFF], id="load-then-old-hand-off"),
+        # A rule that put hand-offs first beside an old run, which serves
+        # tickets in order, made a cycle here: the new load run waited for
+        # the hand-off, the hand-off for the old run, the old run for the
+        # load run.
+        pytest.param([NEW_LOAD, OLD_HAND_OFF, NEW_HAND_OFF], id="three"),
+    ],
+)
+def test_a_line_with_a_run_from_before_419_keeps_the_order_they_came(tmp_path, line):
+    """A worktree cut before #419 runs the old copies on the machine's lock
+    (#419's Risks), and they serve the line in the order runs came: with
+    one in the line, every run keeps that order, so none waits for ever,
+    and each prints its place in it. Each run joins once the one before it
+    has printed its place."""
+    lock, held = held_lock(tmp_path)
+    runs = []
+    try:
+        for place, (name, script, old) in enumerate(line, 1):
+            copy = before_419(tmp_path, script) if old else None
+            # An old load run's pytest starts in tmp_path/old, which holds
+            # no Django project for pytest-django to find; its stub needs
+            # none.
+            env = {"PYTEST_ADDOPTS": "-p no:django"} if old else None
+            runs.append(join(tmp_path, script, name, lock, env, copy))
+            out = tmp_path / f"{name}.out"
+            wait_until(
+                lambda o=out, n=place: f"Place {n} in line" in o.read_text(),
+                f"{name} at place {place}",
+                30,
+            )
+        os.close(held)
+        held = None
+        assert [run.wait(timeout=90) for run in runs] == [0] * len(line)
+        assert order(tmp_path) == [name for name, _, _ in line]
+        assert entries(lock) == []
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *runs)
 
 
 # A stand-in journalctl: it records its arguments and prints three veth
