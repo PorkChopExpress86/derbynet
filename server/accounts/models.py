@@ -6,6 +6,10 @@ Roles are site-level, as `config-roles.inc` is: one set for every event.
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
+from accounts.defaults import DEFAULT_ROLES
+
+_SEEDED_PASSWORDS = {name: password for name, password, _, _ in DEFAULT_ROLES}
+
 
 class RoleQuerySet(models.QuerySet):
     def named(self, name) -> Role | None:
@@ -21,6 +25,13 @@ class Role(models.Model):
     name = models.CharField(max_length=100, unique=True, blank=True)
     # Empty means no password, as `Timer` has.
     password_hash = models.CharField(max_length=256, blank=True)
+    # Whether a role with a password still has the one a new install seeds
+    # it with (`accounts.defaults`), so the D16 banner hashes nothing (#441).
+    # A role with no password may hold either value: the banner skips it.
+    # The default is the seeded state: the seed migration cannot name this
+    # field, and the browser tests re-seed with it after each flush. Every
+    # later writer of `password_hash` goes through `set_password`.
+    keeps_seeded_password = models.BooleanField(default=True)
     # -1 holds every bit.
     permissions = models.BigIntegerField()
     # A role that only machines log in as is left off the login page.
@@ -46,6 +57,7 @@ class Role(models.Model):
 
     def set_password(self, raw: str) -> None:
         self.password_hash = make_password(raw) if raw else ""
+        self.keeps_seeded_password = raw == _SEEDED_PASSWORDS.get(self.name)
 
     def check_password(self, raw: str) -> bool:
         if not self.password_hash:

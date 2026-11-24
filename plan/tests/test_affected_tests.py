@@ -623,19 +623,31 @@ class TestingReaders(unittest.TestCase):
 
     def test_a_module_that_names_a_file_maps_the_plain_tests_that_import_it(self):
         """A helper's cite reaches the plain tests and conftest folders that
-        import it, directly or through a test file; a browser test or the
-        browser conftest maps only through a cite of its own."""
+        import it, directly or through a test file, and the browser tests
+        that import it themselves, inside a function too (#470). A browser
+        test that imports it only through another module, or imports a
+        browser test that names the file, and the browser conftest, map
+        only through a cite of their own: the kiosk tests import open_kiosk
+        from test_kiosk_pages.py, where a test copies a headshot."""
         imports = 'from racing.tests.scenarios import CSV\n'
+        browser = 'import pytest\n\npytestmark = pytest.mark.browser\n'
         files = {'server/racing/tests/scenarios.py': 'CSV = TESTING / "data" / "outlaw-class.csv"\n',
                  'server/racing/tests/test_finals.py': imports,
                  'server/racing/tests/test_round.py': 'from racing.tests.test_finals import CSV\n',
                  'server/media/tests/conftest.py': imports,
                  'server/ui/tests/browser/conftest.py': imports,
-                 'server/ui/tests/browser/test_kiosk.py': imports,
-                 'server/ui/tests/browser/test_photos.py': 'PHOTO = "outlaw-class.csv"\n'}
+                 'server/ui/tests/browser/test_kiosk.py': browser + imports,
+                 'server/ui/tests/browser/test_day.py': (
+                     browser + 'def test_day():\n    from racing.tests import scenarios\n'),
+                 'server/ui/tests/browser/test_round.py': (
+                     browser + 'from racing.tests.test_finals import CSV\n'),
+                 'server/ui/tests/browser/test_photos.py': browser + 'PHOTO = "outlaw-class.csv"\n',
+                 'server/ui/tests/browser/test_banner.py': (
+                     browser + 'from ui.tests.browser.test_photos import PHOTO\n')}
         self.assertEqual(testing_targets(files, 'data/outlaw-class.csv'),
                          ['media/tests', 'racing/tests/test_finals.py',
-                          'racing/tests/test_round.py', 'ui/tests/browser/test_photos.py'])
+                          'racing/tests/test_round.py', 'ui/tests/browser/test_day.py',
+                          'ui/tests/browser/test_kiosk.py', 'ui/tests/browser/test_photos.py'])
 
     def test_a_conftest_that_names_a_file_maps_its_folder(self):
         files = {'server/media/tests/conftest.py': 'FACES = "testing/faces"\n'}
@@ -3893,6 +3905,28 @@ class RealTree(unittest.TestCase):
         self.assertIn('legacy_api/tests/test_testing_scripts.py', targets('testing/actionj'))
         self.assertIn('media/tests/test_faces.py', targets('testing/data/headshots/Cub-0033.jpg'))
         self.assertIn('tests/test_transcript_diff_live.py', targets('testing/README.md'))
+
+    def test_a_browser_test_maps_the_testing_files_it_opens(self):
+        """#470: the pairs the runtime oracle (tools/opens_oracle.py) saw a
+        browser test read through a helper it imports: test_dashboard.py and
+        test_kiosk_pages.py read outlaw-class.csv through
+        racing/tests/test_race_day.py's race_day(), and test_results.py
+        uploads the sample-names files through transfer/tests/import_golden.py."""
+        tree = TOOL.Tree(REPO)
+        names = ('MS-DOS', 'Mac', 'Windows', 'ascii', 'firstlast', 'last-comma-first',
+                 'plurals')
+        pairs = [('testing/data/outlaw-class.csv', 'ui/tests/browser/test_dashboard.py'),
+                 ('testing/data/outlaw-class.csv', 'ui/tests/browser/test_kiosk_pages.py'),
+                 ('testing/data/sample-names.csv', 'ui/tests/browser/test_results.py'),
+                 *((f'testing/data/sample-names-{n}.csv', 'ui/tests/browser/test_results.py')
+                   for n in names)]
+        unmapped = []
+        for path, test in pairs:
+            plan = TOOL.Plan(root=REPO, from_git=False, base='origin/master')
+            TOOL.cover_testing(plan, tree, path)
+            if test not in {t for _r, _n, ts in plan.covers[path] for t in ts}:
+                unmapped.append((path, test))
+        self.assertEqual(unmapped, [])
 
     def test_each_kind_reader_takes_its_files_from_its_row(self):
         """A row names the function its test lists files with: the test
