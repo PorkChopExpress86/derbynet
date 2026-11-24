@@ -17,7 +17,8 @@
 # in its body (#366), a shell function that records state
 # called in a subshell (#59 retro), a guide's command with no row in
 # docs/guide-commands.tsv (#414), a number a tool script reads with no
-# check that it is one (#417 retro),
+# check that it is one (#417 retro), a plan tool that credits a ruling to
+# the lead (#470 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -106,6 +107,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_pipefail_pipes.py \
   tests/test_subshell_state.py \
   tests/test_arithmetic_operands.py \
+  tests/test_lead_rulings.py \
   tests/test_listing_order.py \
   tests/test_plan_source_checks.py \
   tests/test_role_pages_fixture.py \
