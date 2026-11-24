@@ -22,9 +22,9 @@ value for the process, so a read in another thread, such as the live
 server's, counts for it.
 
 Blind spots: a child process's own reads are not traced (no strace); only
-the testing/ paths on its command line are recorded. An open whose path
-does not hold `testing`, such as a relative one from a cwd inside testing/,
-is not seen, and nor is a C library's open.
+the testing/ paths on its command line are recorded, and a relative one is
+read against the pytest process's cwd, not the child's `cwd=`. A C
+library's open is not seen.
 """
 
 import ast
@@ -48,11 +48,9 @@ def _write(row):
 def _record(kind, path):
     modules, frame = [], sys._getframe(2)
     while frame is not None:
-        name = frame.f_code.co_filename
-        if frame.f_code.co_name == "<module>" and name.startswith(
-            STATE["repo"] + "/server/"
-        ):
-            modules.append(name[len(STATE["repo"]) + len("/server/") :])
+        if frame.f_code.co_name == "<module>":
+            name = frame.f_code.co_filename
+            modules.append(os.path.relpath(name, STATE["repo"] + "/server"))
         frame = frame.f_back
     _write({"kind": kind, "path": path, "test": STATE["test"], "modules": modules})
 
@@ -61,10 +59,7 @@ def _rel(path):
     """`path` relative to the repository when it is under testing/."""
     if not isinstance(path, (str, bytes, os.PathLike)):
         return None
-    path = os.fsdecode(path)
-    if "testing" not in path:
-        return None
-    full = os.path.normpath(os.path.join(os.getcwd(), path))
+    full = os.path.normpath(os.path.join(os.getcwd(), os.fsdecode(path)))
     if full.startswith(STATE["repo"] + "/testing/"):
         return full[len(STATE["repo"]) + 1 :]
     return None
@@ -82,8 +77,7 @@ def _hook(event, args):
         if rel:
             _record("list", rel)
     else:
-        argv = args[1]
-        for arg in [argv] if isinstance(argv, (str, bytes)) else argv:
+        for arg in args[1]:  # POSIX's Popen hands the audit hook a list
             for word in os.fsdecode(arg).split():
                 rel = _rel(word)
                 if rel:

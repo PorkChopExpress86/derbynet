@@ -20,6 +20,8 @@ STAND_IN = {
     "testing/data/thread.csv": "",
     "testing/data/upload.csv": "",
     "testing/data/upload2.csv": "",
+    "testing/data/relative.csv": "",
+    "server/testing-notes/a.txt": "",
     "testing/shell.sh": "",
     "testing/alone.sh": "#!/bin/sh\n",
     "testing/data/faces/one.jpg": "",
@@ -71,6 +73,14 @@ STAND_IN = {
         "        pass\n\n\n"
         "def test_lists_elsewhere():\n"
         "    sorted(Path(os.getcwd()).iterdir())\n"
+        "    sorted(Path('testing-notes').iterdir())\n\n\n"
+        "def test_opens_relative():\n"
+        "    here = os.getcwd()\n"
+        "    os.chdir(TESTING / 'data')\n"
+        "    try:\n"
+        "        Path('relative.csv').read_text()\n"
+        "    finally:\n"
+        "        os.chdir(here)\n"
     ),
     "server/test_imports.py": "def test_a():\n    import helpers.rows\n",
     "server/test_top.py": "from helpers import rows\n\n\ndef test_b():\n    pass\n",
@@ -78,7 +88,8 @@ STAND_IN = {
 
 
 def test_each_read_maps_to_the_test_that_made_it(tmp_path):
-    """An open of a tracked file, in the test's thread or another, a
+    """An open of a tracked file, in the test's thread or another, by a
+    relative path from a cwd inside testing/ too, a
     listing, a command line, as a list, a shell string or a lone path, and
     a tracked file handed to Playwright's set_input_files, in a list or
     alone, count for the test running; a read at a module's top level during collection
@@ -129,6 +140,7 @@ def test_each_read_maps_to_the_test_that_made_it(tmp_path):
         ("testing/alone.sh", "test_reads.py"): ["popen"],
         ("testing/data/upload2.csv", "test_reads.py"): ["upload"],
         ("testing/data/thread.csv", "test_reads.py"): ["open"],
+        ("testing/data/relative.csv", "test_reads.py"): ["open"],
         ("testing/data/upload.csv", "test_reads.py"): ["upload"],
         ("testing/run.sh", "test_imports.py"): ["import-time"],
         ("testing/run.sh", "test_top.py"): ["import-time"],

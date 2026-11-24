@@ -628,7 +628,7 @@ class TestingReaders(unittest.TestCase):
         test that imports it only through another module, or imports a
         browser test that names the file, and the browser conftest, map
         only through a cite of their own: the kiosk tests import open_kiosk
-        from test_kiosk_pages.py, where one test copies a headshot."""
+        from test_kiosk_pages.py, where a test copies a headshot."""
         imports = 'from racing.tests.scenarios import CSV\n'
         browser = 'import pytest\n\npytestmark = pytest.mark.browser\n'
         files = {'server/racing/tests/scenarios.py': 'CSV = TESTING / "data" / "outlaw-class.csv"\n',
