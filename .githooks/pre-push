@@ -193,6 +193,9 @@ COPY=
 checks_pid=
 # Seconds the trap waits for a check that ignores TERM before it kills it.
 KILL_WAIT=${PRE_PUSH_KILL_WAIT:-10}
+case "$KILL_WAIT" in
+  '' | *[!0-9]* | 0?*) echo "pre-push: PRE_PUSH_KILL_WAIT takes a whole number of seconds, not '$KILL_WAIT'" >&2; exit 1 ;;
+esac
 if [ ${#shas[@]} -eq 1 ]; then
   MAIN="$ROOT"
   CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"

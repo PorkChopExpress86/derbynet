@@ -589,6 +589,12 @@ class CopySignals(unittest.TestCase):
         self.assertEqual(list(self.cache.glob('derbynet-pre-push-*')), [])
         self.assertEqual(self.git('worktree', 'list', '--porcelain').count('worktree '), 1)
 
+    def test_a_wait_that_is_no_whole_number_stops_the_push(self):
+        hook = self.start(PRE_PUSH_KILL_WAIT='2s')
+        _, err = hook.communicate(timeout=60)
+        self.assertEqual(hook.returncode, 1, err)
+        self.assertIn("PRE_PUSH_KILL_WAIT takes a whole number of seconds, not '2s'", err)
+
     def test_a_term_stops_the_checks_and_removes_the_copy(self):
         hook, pid = self.hanging()
         hook.send_signal(signal.SIGTERM)
