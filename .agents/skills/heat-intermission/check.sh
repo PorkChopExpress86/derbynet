@@ -46,7 +46,7 @@ for inv in "${INVARIANTS[@]}"; do
     echo "PASS  ${inv}  (${states})"
   else
     echo "FAIL  ${inv}"
-    grep -E 'Error:|State [0-9]+:|distinct states found' "$out" | head -n 30
+    grep -E 'Error:|State [0-9]+:|distinct states found' "$out" | sed -n '1,30p'
     status=1
   fi
 done
