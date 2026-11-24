@@ -58,14 +58,15 @@ a mixin; and each subclass of a class it names (#379 review). A test
 method's claims count as its class's, the scope this tool lists them
 under. Every module claim counts when the module's docstring or
 a module comment changes (D123), or any module-level statement other than
-a def or class does, an import included (the lead's choice on #374, beyond
-D123's words). Every claim of the file counts, as without `--base`, for a
-file new since the merge base, or one `changed_tests()` can't resolve
+a def or class does, an import included (beyond D123's words, since a
+comment above a constant describes that constant: #379's body). Every
+claim of the file counts, as without `--base`, for a file new since the
+merge base, or one `changed_tests()` can't resolve
 (it can't be parsed, `global`, an assignment expression or a name bound
 twice at module level), for a changed module-level statement that binds
 nothing (`CASES.append(2)`), and for a change to or through a hook, an
 xunit setup, `pytestmark` or an autouse fixture, which pytest applies to
-every test (the lead's choice on #379), and the output says why. #356 owed 37 rows and
+every test (#379's body), and the output says why. #356 owed 37 rows and
 #360 owed 75 for tests they never changed (D123). The scoped check trusts
 that the PR that last changed a test listed its claims.
 
@@ -89,8 +90,8 @@ rule was one "the lead confirmed for #65", where #65's own Q17 line stated
 it (#65 retro). What the lead does next ("which the lead posts after
 merge", "the lead decides on them") or still has to rule ("is the lead's
 call") credits no ruling, nor does "as the lead reported" ("per the lead"
-does). A sentence that states a policy about the lead's rulings is still
-named, as #275's was: the check cannot tell it from a ruling, so cite the
+does). A sentence that states a policy about rulings credited to the lead
+is still named, as #275's was: the check cannot tell it from a ruling, so cite the
 rule's own source.
 
 With `--base`, `--check` also names each test the merge base defines in a

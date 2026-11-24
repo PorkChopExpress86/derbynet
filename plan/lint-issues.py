@@ -20,6 +20,9 @@ Reads every issue labeled django-migration, then checks each body for:
 - forward-only ## Dependencies, with no cycles across the plan
 - open kind:ticket and kind:spec issues that a merged PR closes, unless a
   "## Still open" section names what is left
+- ready-for-agent on an open ticket that a merged PR is "Part of", unless a
+  "## Still open" section names what is left
+- in a --file draft, a `~/.cache/derbynet-drafts/` path this machine lacks
 - ready-for-agent on an open ticket with an open dependency that has no
   "## Still open" section
 - blocked on an open ticket whose dependencies are all closed or have a
@@ -31,7 +34,7 @@ checked before `gh issue edit N --body-file PATH`. A draft for an issue not
 created yet takes `--file 0=PATH`: it is linted as a new open issue with the
 labels `--labels` names (default kind:ticket). Exits 1 on any finding.
 """
-import json, os, re, subprocess, sys
+import glob, json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # -I leaves this script's folder off sys.path.
@@ -162,8 +165,25 @@ BASE = os.environ.get('LINT_BASE', 'origin/master')
 on_base = base_paths(BASE) if drafts else None
 
 
+# A --file draft's path under the drafts folder must exist on this machine,
+# the lead's, which runs the lint before `gh issue edit`: #400's body cited
+# #383's probe logs, which no folder held, and its implementer found none
+# (#400 retro). A live body is left alone, since CI has no drafts folder.
+DRAFTS = '~/.cache/derbynet-drafts/'
+
+
+def check_draft_path(n, p):
+    if n in drafts and not glob.glob(os.path.expanduser(p.split(' ')[0])):
+        findings.append(f'#{n}: drafts path `{p}` is on no disk here; commit what the '
+                        f'ticket needs, or cite where it is')
+
+
 def check_path(n, tok):
     p = re.sub(r':\d+(-\d+)?$', '', tok.strip())
+    if p.startswith(DRAFTS):
+        if not any(c in p for c in '<>{}$'):  # a placeholder: <N>, ${N}
+            check_draft_path(n, p)
+        return
     if any(c in p for c in '<>*{}?=&%$'):
         return
     if p.startswith(REPO_ROOTS) or p in ('build.xml', 'README.md'):
@@ -339,6 +359,16 @@ for s in sorted(deps):
     if s not in state:
         visit(s)
 
+# "Part of #N" outside code, as pr-evidence reads it in a PR body.
+PART_OF = re.compile(r'\bPart of #(\d+)\b', re.I)
+parts = {}  # {issue: [merged PRs that say "Part of #issue"]}, from merged_closers()
+
+
+def strip_fences(body):
+    body = re.sub(r'^(`{3,}|~{3,}).*?^\1', '', body, flags=re.S | re.M)
+    return re.sub(r'`[^`\n]*`', '', body)
+
+
 CLOSING = re.compile(r'\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b', re.I)
 
 
@@ -373,6 +403,8 @@ def merged_closers():
                    if r['repository']['name'] == name and r['repository']['owner']['login'] == owner}
         for n in closed:
             closers.setdefault(n, []).append(pr['number'])
+        for n in {int(n) for n in PART_OF.findall(strip_fences(pr['body'] or ''))} - closed:
+            parts.setdefault(n, []).append(pr['number'])
     return closers
 
 
@@ -396,6 +428,14 @@ for n, issue in sorted(issues.items()):
                         f'"## {STILL_OPEN}" section that names what is left')
     if k != 'ticket':
         continue
+    # A merged PR that is part of a ready ticket did some of its work, so the
+    # body names what is left, or the next pick builds it again: PR 438 was
+    # "Part of #430", whose body kept its boxes unticked and no "Still open",
+    # and #430 was dispatched with its work done (#470 retro).
+    if 'ready-for-agent' in labels and n in parts and not has_section(issue, STILL_OPEN):
+        prs_text = ', '.join(f'#{p}' for p in sorted(parts[n]))
+        findings.append(f'#{n}: ready-for-agent, but merged PR {prs_text} is part of it; add a '
+                        f'"## {STILL_OPEN}" section that names what is left, or close it')
     # A dependency whose work has merged and that stays open only for the boxes its
     # "Still open" section names no longer holds back the tickets after it.
     open_deps = [d for d in deps.get(n, [])

@@ -1517,6 +1517,115 @@ def moved(sheet=MOVED_SHEET, helpers=MOVED_HELPERS, base=BASE_SHEET, commit=True
             cwd=root, env=env, capture_output=True, text=True, check=True).stdout
 
 
+class MasterMoved(unittest.TestCase):
+    """The tool names each commit on BASE past the merge base that touches a
+    file the branch changes or a test it prints, or an area of pr-merge's
+    rule the branch changes too. #470's branch missed #468's change to one
+    of its tests, and PR 475's last push missed #484's plan/ change (#470
+    retro)."""
+
+    def test_it_names_a_commit_on_a_test_or_a_shared_area_only(self):
+        env = git_env()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def git(*argv):
+                subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                               capture_output=True)
+
+            def commit(message, files):
+                for rel, text in files.items():
+                    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (root / rel).write_text(text)
+                git('add', '.')
+                git('commit', '-q', '-m', message)
+
+            test = 'server/tests/test_management_commands.py'
+            git('init', '-q', '-b', 'master')
+            commit('base', {**TREE, 'plan/README.md': '', 'plan/notes/a.md': ''})
+            git('checkout', '-q', '-b', 'branch')
+            commit('branch', {test: 'APPS = [1]\n', 'plan/README.md': 'x\n'})
+            git('checkout', '-q', 'master')
+            commit('master touches the test', {test: '# a\nAPPS = []\n'})
+            commit('master touches plan', {'plan/notes/a.md': 'y\n'})
+            commit('master touches css', {'website/css/ondeck.css': 'z\n'})
+            git('checkout', '-q', 'branch')
+            out = subprocess.run([sys.executable, '-I', str(AFFECTED), 'master'], cwd=root,
+                                 env=env, capture_output=True, text=True, check=True).stdout
+        moved = out.split('master moved past the merge base', 1)[1]
+        self.assertRegex(moved, rf'master touches the test \({test}\)')
+        self.assertRegex(moved, r'master touches plan \(plan/\)')
+        self.assertNotIn('touches css', moved)
+
+    def test_each_area_of_pr_merge_s_rule(self):
+        for path, want in (('plan/README.md', 'plan/'), ('.githooks/pre-push', '.githooks/'),
+                           ('.github/workflows/x.yml', '.github/'),
+                           ('server/tools/mutate.py', 'server/tools/'),
+                           ('server/ui/conftest.py', 'conftest.py'),
+                           ('server/pyproject.toml', 'server/pyproject.toml'),
+                           ('server/uv.lock', 'server/uv.lock'),
+                           ('plan', None), ('server/ui/views.py', None)):
+            with self.subTest(path=path):
+                self.assertEqual(TOOL.area(path), want)
+
+    def test_a_stale_origin_master_is_fetched_first(self):
+        env = git_env()
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, root = Path(tmp, 'origin'), Path(tmp, 'clone')
+
+            def git(cwd, *argv):
+                subprocess.run(['git', *argv], cwd=cwd, env=env, check=True,
+                               capture_output=True)
+
+            origin.mkdir()
+            git(origin, 'init', '-q', '-b', 'master')
+            for rel, text in TREE.items():
+                (origin / rel).parent.mkdir(parents=True, exist_ok=True)
+                (origin / rel).write_text(text)
+            git(origin, 'add', '.')
+            git(origin, 'commit', '-q', '-m', 'base')
+            git(tmp, 'clone', '-q', str(origin), str(root))
+            (origin / 'plan').mkdir()
+            (origin / 'plan' / 'a.md').write_text('a\n')
+            git(origin, 'add', '.')
+            git(origin, 'commit', '-q', '-m', 'master touches plan after the clone')
+            (root / 'plan').mkdir()
+            (root / 'plan' / 'b.md').write_text('b\n')
+            git(root, 'add', '.')
+            git(root, 'commit', '-q', '-m', 'branch')
+            out = subprocess.run([sys.executable, '-I', str(AFFECTED)], cwd=root, env=env,
+                                 capture_output=True, text=True, check=True).stdout
+        self.assertIn('master touches plan after the clone (plan/)', out)
+
+    def test_a_fetch_that_hangs_reads_origin_master_as_last_fetched(self):
+        env = {**git_env(), 'AFFECTED_FETCH_TIMEOUT': '1'}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def git(*argv):
+                subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                               capture_output=True)
+
+            for rel, text in TREE.items():
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text(text)
+            git('init', '-q', '-b', 'master')
+            git('add', '.')
+            git('commit', '-q', '-m', 'base')
+            git('update-ref', 'refs/remotes/origin/master', 'HEAD')
+            git('config', 'protocol.ext.allow', 'always')
+            git('remote', 'add', 'origin', 'ext::sleep 3')
+            done = subprocess.run([sys.executable, '-I', str(AFFECTED)], cwd=root, env=env,
+                                  capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('git fetch took over 1.0 s, so this reads origin/master as last '
+                      'fetched', done.stdout)
+
+    def test_a_base_with_no_new_commit_names_none(self):
+        out = moved()
+        self.assertNotIn('moved past the merge base', out)
+
+
 def verdict(sheet=MOVED_SHEET, helpers=MOVED_HELPERS, base=BASE_SHEET, extra=None):
     """import_only() on test_sheet.py from `base` to `sheet`, with helpers.py
     as `helpers` and the stand-in's other modules, plus `extra`, at HEAD."""

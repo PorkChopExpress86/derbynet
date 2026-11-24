@@ -90,7 +90,9 @@ def test_plan_checks_runs_each_source_check_that_reads_plan():
 def test_the_list_is_the_checks_found_on_2026_11_16_and_by_431():
     """A rule that found none would pass above with an empty step. #431
     found test_subshell_state.py and test_arithmetic_operands.py, which lint
-    plan/'s scripts through shell_files() and name no literal."""
+    plan/'s scripts through shell_files() and name no literal. The #470
+    retro added test_lead_rulings.py and test_docstring_position.py, which
+    read plan/ through `git ls-files`."""
     assert plan_checks() == {
         "legacy_api/tests/test_registry.py",
         "tests/test_deviations.py",
@@ -99,6 +101,8 @@ def test_the_list_is_the_checks_found_on_2026_11_16_and_by_431():
         "tests/test_pipefail_pipes.py",
         "tests/test_subshell_state.py",
         "tests/test_arithmetic_operands.py",
+        "tests/test_lead_rulings.py",
+        "tests/test_docstring_position.py",
     }
 
 

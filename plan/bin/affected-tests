@@ -74,6 +74,10 @@ targets, then:
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
 - the commands, from server/.
+- last, each commit on BASE past the merge base that touches a file the
+  branch changes or a test it prints, or an area of pr-merge's rule the
+  branch changes too (`master_moved()`): merge BASE before the hand-off run.
+  It fetches origin/master first when BASE is origin/master.
 
 A test file maps to itself and, like a test helper (a module in a tests
 folder that is no test file or conftest), to each test file and conftest
@@ -226,6 +230,7 @@ class Plan:
     changed_helpers: list = field(default_factory=list)
     untracked: list = field(default_factory=list)
     merge_base: str = None
+    fetch_note: str = None  # master_moved()'s, when its fetch timed out
     # KIND_READERS modules the tree lacks, which skipped a row for a file
     # outside testing/ (#471).
     no_kind_modules: list = field(default_factory=list)
@@ -2486,6 +2491,57 @@ def load_repeats(rel, base, head, module_text, postgres=False):
     return out
 
 
+# Seconds master_moved() waits on its fetch; the variable is for plan/tests.
+FETCH_TIMEOUT = float(os.environ.get('AFFECTED_FETCH_TIMEOUT', '60'))
+
+
+def area(path):
+    """The area of `path` pr-merge's area rule counts (plan/bin/pr-merge,
+    areas()), or None."""
+    top = path.split('/', 1)[0]
+    if top in ('plan', '.githooks', '.github') and '/' in path:
+        return top + '/'
+    if path.startswith('server/tools/'):
+        return 'server/tools/'
+    if path.rsplit('/', 1)[-1] == 'conftest.py':
+        return 'conftest.py'
+    if path in ('server/pyproject.toml', 'server/uv.lock'):
+        return path
+    return None
+
+
+def master_moved(plan, targets):
+    """Each commit on BASE past the branch's merge base that touches a file
+    the branch changes or a test it prints, or an area of pr-merge's rule the
+    branch changes too, as (line, why). BASE is origin/master fetched first,
+    when it can be. #470's implementer read no master before its hand-off,
+    and #468 (c438678c) had changed tests/test_operand_mutants.py, one of its
+    tests; PR 475's last push left out #484 (c08dac58), in plan/ as it was,
+    and pr-merge refused it after CI (#470 retro)."""
+    if not plan.from_git:
+        return []
+    if plan.base == 'origin/master':
+        try:
+            with no_git_vars():
+                subprocess.run(['git', 'fetch', '-q', 'origin', 'master'], cwd=plan.root,
+                               capture_output=True, timeout=FETCH_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            plan.fetch_note = (f'git fetch took over {FETCH_TIMEOUT} s, so this reads '
+                               'origin/master as last fetched')
+    changed = changed_files(plan)
+    base = git(plan.root, 'merge-base', plan.base, 'HEAD').strip()
+    log = git(plan.root, 'log', '--format=%x00%h %s', '--name-only', f'{base}..{plan.base}')
+    mine = set(changed) | {f'{SERVER}/{t.split("::")[0]}' for t in targets}
+    areas = {area(f) for f in changed} - {None}
+    found = []
+    for entry in log.split('\0')[1:]:
+        line, *files = entry.splitlines()
+        why = sorted(set(files) & mine) + sorted({area(f) for f in files} & areas)
+        if why:
+            found.append((line, why))
+    return found
+
+
 def report(plan, tree):
     out = []
     say = out.append
@@ -2624,6 +2680,18 @@ def report(plan, tree):
     say('Before each push, from server/ (about a minute: the pre-push hook '
         'runs the whole script, about 15 min, #373 retro):')
     say('  tools/source-checks.sh --quick')
+    moved = master_moved(plan, all_targets)
+    if plan.fetch_note:
+        say('')
+        say(plan.fetch_note)
+    if moved:
+        say('')
+        say(f'{plan.base} moved past the merge base in what this branch reads. Merge it '
+            'before the hand-off run where a commit touches a file or test (D113); where '
+            'it touches only a shared area, pr-merge refuses after CI, so merge it or run '
+            'the combined checks for --base-checked:')
+        for line, why in moved:
+            say(f'  {line} ({", ".join(why)})')
     return '\n'.join(out) + '\n'
 
 
