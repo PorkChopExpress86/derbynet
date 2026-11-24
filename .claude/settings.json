@@ -87,5 +87,19 @@
       "Bash(git push origin +*)",
       "Bash(git reset --hard *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/refuse-duplicate-waiter.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
