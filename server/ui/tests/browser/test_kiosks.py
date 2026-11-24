@@ -1014,7 +1014,6 @@ def test_a_change_reply_during_a_press_waits_too(login, event):
     wait_for_a_swap_after(page, down)
     expect(card(page, "tv").locator("[data-name]")).to_have_text("Hall")
     page.mouse.up()
-    page.wait_for_timeout(2500)  # #446 probe: widen the settle's window
     htmx_settled(page)
     log = board_log(page)
     assert [r["name"] for r in swaps_since(log, down)] == ["Hall"], log
