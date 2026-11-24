@@ -63,6 +63,16 @@ arrow function outside `.filter()` are left out, and so is every branch
 that is no condition in either language (a tuple element such as
 `(ast.Global, ast.Nonlocal)`, a loop's bound): list those by hand.
 
+In a Python file read by its AST, a JavaScript `if (...)` is listed only
+inside a string literal, where the browser tests keep their JavaScript:
+heats.py's `next((n for n, r, h, _ in index if (r, h) == current), 0)`
+listed `r, h -> true`, JavaScript spliced into Python (#468). A literal
+runs from its first quote to its last, so a comment between the parts of
+an implicitly concatenated string counts as its text, and an `if (` there
+is listed. A Python file with no tree, one that can't be read or parsed,
+keeps the line rule: every `if (` but a line's leading Python `if` is read
+as JavaScript, a comprehension's too, beside its Python rows.
+
 A Python file read by its AST also lists each member of a set literal
 (`frozenset({...})`'s too) and of the tuple or list an `in` or `not in`
 tests, taken away with its comma (#356's review took `"range"` out of a
@@ -268,10 +278,16 @@ def is_python(root: Path | None, path: str) -> bool:
 
 
 def line_mutants(
-    path: str, text: str, python: bool, by_ast: bool = False
+    path: str,
+    text: str,
+    python: bool,
+    by_ast: bool = False,
+    strings: list[tuple[int, int]] | None = None,
 ) -> list[tuple[str, str, str]]:
     """The mutants one line holds; with `by_ast`, its Python conditions are
-    left to python_conditions()."""
+    left to python_conditions(). With `strings`, the (start, end) columns,
+    counted from the line's start, of the module's string literals, a
+    JavaScript `if (` is read only inside one."""
     found = call_mutants(text, python)
     py_if = None
     if python and (m := PY_IF.match(text)):
@@ -280,11 +296,14 @@ def line_mutants(
         py_if = len(text) - len(text.lstrip())
     if python and not by_ast:
         found += comprehension_mutants(text)
-        # JavaScript inside a Python string, as the browser tests keep it; a
-        # Python `if (a, b) in seen:` is no JavaScript `if (...)`.
+        # With `strings`, a JavaScript `if (...)` is read only inside a
+        # Python string literal, as the browser tests keep it; with none,
+        # every `if (` is, but a line's leading Python `if (a, b) in seen:`.
     if not path.endswith(".css"):
         for m in JS_IF.finditer(text):
             if m.start() == py_if:
+                continue
+            if strings is not None and not any(a <= m.start() < b for a, b in strings):
                 continue
             end = closing(text, m.end())
             if end is not None:
@@ -318,6 +337,28 @@ def offsets(text: str) -> list[int]:
         if c == "\n":
             starts.append(i + 1)
     return starts
+
+
+def ast_offset(lines: list[str], starts: list[int], line: int, col: int) -> int:
+    """The offset in the text of ast's `line` and `col`; ast's columns count
+    UTF-8 bytes."""
+    return starts[line] + len(lines[line - 1].encode()[:col].decode())
+
+
+def string_spans(text: str) -> list[tuple[int, int]]:
+    """The (start, end) offsets of each literal in a Python module, its
+    strings and bytes (no other literal holds an `if (`): an f-string's
+    text parts, not its `{...}` fields. An implicitly concatenated string
+    spans its parts and any comment between them."""
+    lines, starts = text.split("\n"), offsets(text)
+    return [
+        (
+            ast_offset(lines, starts, n.lineno, n.col_offset),
+            ast_offset(lines, starts, n.end_lineno, n.end_col_offset),
+        )
+        for n in ast.walk(ast.parse(text))
+        if isinstance(n, ast.Constant)
+    ]
 
 
 # More members than this in one collection make a table, not a rule: its
@@ -365,8 +406,7 @@ def python_conditions(
     starts = offsets(text)
 
     def at(line: int, col: int) -> int:
-        # ast's columns count UTF-8 bytes.
-        return starts[line] + len(lines[line - 1].encode()[:col].decode())
+        return ast_offset(lines, starts, line, col)
 
     def entry(node: ast.expr, kind: str, new: str):
         span = (
@@ -517,10 +557,11 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
             is_python(root, path),
             source(root, path),
         )
-        conditions = []
+        conditions, spans = [], None
         if python and text is not None:
             try:
                 conditions = python_conditions(text, {line for line, _ in rows})
+                spans = string_spans(text)
                 by_ast = True
             except SyntaxError:
                 by_ast = False
@@ -532,7 +573,10 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
         for line, row in rows:
             if code is not None and line <= len(code):
                 row = code[line - 1]
-            for kind, old, new in line_mutants(path, row, python, by_ast):
+            strings = None
+            if spans is not None and line <= len(lines):
+                strings = [(a - starts[line], b - starts[line]) for a, b in spans]
+            for kind, old, new in line_mutants(path, row, python, by_ast, strings):
                 span = None
                 if (
                     lines is not None
@@ -544,7 +588,8 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
                 found.append((line, 0, Mutant(path, line, kind, old, new, span)))
         for line, kind, old, new, span in conditions:
             found.append((line, 1, Mutant(path, line, kind, old, new, span)))
-        # JavaScript inside a Python string is left to hand mutants.
+        # A moved call in JavaScript inside a Python string is left to hand
+        # mutants.
         if lines is not None and path.endswith(".js"):
             for line, old, new, span in moved_calls(lines, starts, rows):
                 found.append((line, 0, Mutant(path, line, "moved", old, new, span)))
