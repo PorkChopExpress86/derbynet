@@ -64,9 +64,14 @@ that is no condition in either language (a tuple element such as
 `(ast.Global, ast.Nonlocal)`, a loop's bound): list those by hand.
 
 In a Python file read by its AST, a JavaScript `if (...)` is listed only
-inside a string, where the browser tests keep their JavaScript: heats.py's
-`next((n for n, r, h, _ in index if (r, h) == current), 0)` listed
-`r, h -> true`, JavaScript spliced into Python (#468).
+inside a string literal, where the browser tests keep their JavaScript:
+heats.py's `next((n for n, r, h, _ in index if (r, h) == current), 0)`
+listed `r, h -> true`, JavaScript spliced into Python (#468). A literal
+runs from its first quote to its last, so a comment between the parts of
+an implicitly concatenated string counts as its text, and an `if (` there
+is listed. A Python file with no tree, one that can't be read or parsed,
+keeps the line rule: every `if (` but a line's leading Python `if` is read
+as JavaScript, a comprehension's too, beside its Python rows.
 
 A Python file read by its AST also lists each member of a set literal
 (`frozenset({...})`'s too) and of the tuple or list an `in` or `not in`
@@ -291,8 +296,9 @@ def line_mutants(
         py_if = len(text) - len(text.lstrip())
     if python and not by_ast:
         found += comprehension_mutants(text)
-        # JavaScript inside a Python string, as the browser tests keep it; a
-        # Python `if (a, b) in seen:` is no JavaScript `if (...)`.
+        # With `strings`, a JavaScript `if (...)` is read only inside a
+        # Python string literal, as the browser tests keep it; with none,
+        # every `if (` is, but a line's leading Python `if (a, b) in seen:`.
     if not path.endswith(".css"):
         for m in JS_IF.finditer(text):
             if m.start() == py_if:
@@ -342,7 +348,8 @@ def ast_offset(lines: list[str], starts: list[int], line: int, col: int) -> int:
 def string_spans(text: str) -> list[tuple[int, int]]:
     """The (start, end) offsets of each literal in a Python module, its
     strings and bytes (no other literal holds an `if (`): an f-string's
-    text parts, not its `{...}` fields."""
+    text parts, not its `{...}` fields. An implicitly concatenated string
+    spans its parts and any comment between them."""
     lines, starts = text.split("\n"), offsets(text)
     return [
         (
@@ -581,7 +588,8 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
                 found.append((line, 0, Mutant(path, line, kind, old, new, span)))
         for line, kind, old, new, span in conditions:
             found.append((line, 1, Mutant(path, line, kind, old, new, span)))
-        # JavaScript inside a Python string is left to hand mutants.
+        # A moved call in JavaScript inside a Python string is left to hand
+        # mutants.
         if lines is not None and path.endswith(".js"):
             for line, old, new, span in moved_calls(lines, starts, rows):
                 found.append((line, 0, Mutant(path, line, "moved", old, new, span)))

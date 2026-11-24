@@ -396,10 +396,9 @@ def added_at(path: str, needle: str) -> str:
 def test_a_comprehension_s_if_is_python_and_a_browser_test_s_string_javascript():
     """heats.py's `next((n for n, r, h, _ in index if (r, h) == current), 0)`
     listed `r, h -> true` and `r, h -> false`, JavaScript spliced into
-    Python, which
-    `mutate.py --listed` refused (#468). Its comprehension's condition is
-    listed by AST only, and a browser test's JavaScript `if (` in a string
-    keeps its mutants."""
+    Python, which `mutate.py --listed` refused (#468). Its comprehension's
+    condition is listed by AST only, and a browser test's JavaScript `if (`
+    in a string keeps its mutants."""
     heats = added_at("server/racing/services/heats.py", "index if (r, h) == current")
     assert [(m.kind, m.old, m.new) for m in om.mutants(heats, ROOT)] == [
         ("condition", "(r, h) == current", "True"),
@@ -418,11 +417,11 @@ def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path)
     """By AST, a JavaScript `if (` in a Python file is listed inside a
     string, a triple-quoted one's inner line, an f-string's text and a
     bytes literal too, and not in code: a comprehension's `if (`, a Python
-    `if (`, a comment, an f-string's `{...}` field, or a ternary's `if (`
-    right after a string's closing quote (#468). ast's columns count UTF-8
-    bytes, so the `é`s before line 7's string leave it holding its `if (`.
-    A line the diff adds past the file's end is read by line, as with no
-    tree."""
+    `if (`, a comment outside a literal, an f-string's `{...}` field, or a
+    ternary's `if (` right after a string's closing quote (#468). ast's
+    columns count UTF-8 bytes, so the `é`s before line 7's string leave it
+    holding its `if (`. A line the diff adds past the file's end is read by
+    line, as with no tree."""
     text = (
         "seen = [n for n in xs if (n, 1) in done]\n"
         "if (a, b) in seen:  # if (c) in a comment\n"
@@ -436,7 +435,7 @@ def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path)
         'y2 = "x"if (t) else "z"\n'
     )
     (tmp_path / "t.py").write_text(text)
-    diff = "+++ b/t.py\n@@ -0,0 +1,11 @@\n" + "".join(
+    diff = "+++ b/t.py\n@@ -0,0 +1,10 @@\n" + "".join(
         f"+{line}\n" for line in text.splitlines()
     )
     diff += "@@ -11,0 +12 @@\n+if (late) {}\n"
@@ -472,6 +471,28 @@ def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path)
         (8, "q"),
         (10, "t"),
     }
+
+
+def test_the_string_rule_s_limits_a_concatenation_s_comment_and_no_tree(tmp_path):
+    """A comment between the parts of an implicitly concatenated string
+    sits inside the literal's span, so its `if (` is listed as JavaScript.
+    A file with no tree keeps the line rule, so a comprehension's `if (`
+    is listed as JavaScript beside its Python condition (#468)."""
+    (tmp_path / "cat.py").write_text('x = ("a"  # if (c) go\n     "b")\n')
+    diff = '+++ b/cat.py\n@@ -0,0 +1 @@\n+x = ("a"  # if (c) go\n'
+    assert [(m.line, m.kind, m.old, m.new) for m in om.mutants(diff, tmp_path)] == [
+        (1, "condition", "c", "true"),
+        (1, "condition", "c", "false"),
+    ]
+    line = "seen = [n for n in xs if (n, 1) in done]"
+    (tmp_path / "bad.py").write_text(f"{line}\ndef (:\n")
+    diff = f"+++ b/bad.py\n@@ -0,0 +1 @@\n+{line}\n"
+    assert [(m.line, m.kind, m.old, m.new) for m in om.mutants(diff, tmp_path)] == [
+        (1, "condition", "(n, 1) in done", "True"),
+        (1, "condition", "(n, 1) in done", "False"),
+        (1, "condition", "n, 1", "true"),
+        (1, "condition", "n, 1", "false"),
+    ]
 
 
 def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path):
