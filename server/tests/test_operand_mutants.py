@@ -395,7 +395,8 @@ def added_at(path: str, needle: str) -> str:
 
 def test_a_comprehension_s_if_is_python_and_a_browser_test_s_string_javascript():
     """heats.py's `next((n for n, r, h, _ in index if (r, h) == current), 0)`
-    listed `r, h -> true` twice, JavaScript spliced into Python, which
+    listed `r, h -> true` and `r, h -> false`, JavaScript spliced into
+    Python, which
     `mutate.py --listed` refused (#468). Its comprehension's condition is
     listed by AST only, and a browser test's JavaScript `if (` in a string
     keeps its mutants."""
@@ -415,10 +416,13 @@ def test_a_comprehension_s_if_is_python_and_a_browser_test_s_string_javascript()
 
 def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path):
     """By AST, a JavaScript `if (` in a Python file is listed inside a
-    string, a triple-quoted one's inner line and an f-string's text too,
-    and not in code: a comprehension's `if (`, a Python `if (`, a comment,
-    or an f-string's `{...}` field (#468). ast's columns count UTF-8 bytes,
-    so the `é`s before line 7's string leave it holding its `if (`."""
+    string, a triple-quoted one's inner line, an f-string's text and a
+    bytes literal too, and not in code: a comprehension's `if (`, a Python
+    `if (`, a comment, an f-string's `{...}` field, or a ternary's `if (`
+    right after a string's closing quote (#468). ast's columns count UTF-8
+    bytes, so the `é`s before line 7's string leave it holding its `if (`.
+    A line the diff adds past the file's end is read by line, as with no
+    tree."""
     text = (
         "seen = [n for n in xs if (n, 1) in done]\n"
         "if (a, b) in seen:  # if (c) in a comment\n"
@@ -428,11 +432,14 @@ def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path)
         '"""\n'
         'ééééé = "if (k) x"\n'
         'y = f"{z if (q) else w} if (v) run()"\n'
+        'raw = b"if (u) go()"\n'
+        'y2 = "x"if (t) else "z"\n'
     )
     (tmp_path / "t.py").write_text(text)
-    diff = "+++ b/t.py\n@@ -0,0 +1,8 @@\n" + "".join(
+    diff = "+++ b/t.py\n@@ -0,0 +1,11 @@\n" + "".join(
         f"+{line}\n" for line in text.splitlines()
     )
+    diff += "@@ -11,0 +12 @@\n+if (late) {}\n"
     found = om.mutants(diff, tmp_path)
     javascript = [(m.line, m.old, m.new) for m in found if m.new in ("true", "false")]
     assert javascript == [
@@ -452,10 +459,19 @@ def test_a_javascript_if_in_a_python_file_is_read_only_inside_a_string(tmp_path)
         (7, "k", "false"),
         (8, "v", "true"),
         (8, "v", "false"),
+        (9, "u", "true"),
+        (9, "u", "false"),
+        (12, "late", "true"),
+        (12, "late", "false"),
     ]
     # The Python conditions are still listed, by AST.
     python = {(m.line, m.old) for m in found if m.new in ("True", "False")}
-    assert python == {(1, "(n, 1) in done"), (2, "(a, b) in seen"), (8, "q")}
+    assert python == {
+        (1, "(n, 1) in done"),
+        (2, "(a, b) in seen"),
+        (8, "q"),
+        (10, "t"),
+    }
 
 
 def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path):

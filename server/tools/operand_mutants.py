@@ -280,9 +280,9 @@ def line_mutants(
     strings: list[tuple[int, int]] | None = None,
 ) -> list[tuple[str, str, str]]:
     """The mutants one line holds; with `by_ast`, its Python conditions are
-    left to python_conditions(). With `strings`, the (start, end) columns of
-    the line's Python string literals, a JavaScript `if (` is read only
-    inside one."""
+    left to python_conditions(). With `strings`, the (start, end) columns,
+    counted from the line's start, of the module's string literals, a
+    JavaScript `if (` is read only inside one."""
     found = call_mutants(text, python)
     py_if = None
     if python and (m := PY_IF.match(text)):
@@ -340,8 +340,9 @@ def ast_offset(lines: list[str], starts: list[int], line: int, col: int) -> int:
 
 
 def string_spans(text: str) -> list[tuple[int, int]]:
-    """The (start, end) offsets of each string literal in a Python module:
-    an f-string's text parts, not its `{...}` fields."""
+    """The (start, end) offsets of each literal in a Python module, its
+    strings and bytes (no other literal holds an `if (`): an f-string's
+    text parts, not its `{...}` fields."""
     lines, starts = text.split("\n"), offsets(text)
     return [
         (
@@ -349,7 +350,7 @@ def string_spans(text: str) -> list[tuple[int, int]]:
             ast_offset(lines, starts, n.end_lineno, n.end_col_offset),
         )
         for n in ast.walk(ast.parse(text))
-        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        if isinstance(n, ast.Constant)
     ]
 
 
@@ -567,8 +568,7 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
                 row = code[line - 1]
             strings = None
             if spans is not None and line <= len(lines):
-                s, e = starts[line], starts[line] + len(lines[line - 1])
-                strings = [(max(a, s) - s, b - s) for a, b in spans if a < e and b > s]
+                strings = [(a - starts[line], b - starts[line]) for a, b in spans]
             for kind, old, new in line_mutants(path, row, python, by_ast, strings):
                 span = None
                 if (
