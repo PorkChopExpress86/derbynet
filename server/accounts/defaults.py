@@ -1,8 +1,8 @@
 """The roles and passwords `write_config_roles_file()` writes for a new PHP
 install, so `testing/default.passwords` stays true (#15, D16).
 
-The seed migration and `accounts.services.roles_with_default_password()` both
-read this one list.
+The seed migration and `Role.set_password()`, which records whether a role
+keeps its seeded password (#441), both read this one list.
 """
 
 # (name, password, permissions, interactive). RaceCrew's 8687 is
