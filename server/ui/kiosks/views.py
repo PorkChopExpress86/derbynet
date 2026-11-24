@@ -28,10 +28,10 @@ dialog takes the repeat of an Enter held as it opens: it focuses the name
 field 210 ms after it opens (modal.js:59), and the repeat submits the name
 and closes it (kiosk-dashboard.js:255, 262). An Enter pressed in its name
 field submits once there too: the dialog closes before its POST
-(kiosk-dashboard.js:261-263), and the repeats land on the page's body. After a save PHP gives
-the focus back to nothing (modal.js:63), so the rebuild leaves it on the
-page's body (kiosk-dashboard.js:99). PHP picks a kiosk's page with a
-`<select>` (kiosk-dashboard.js:158), not a dialog.
+(kiosk-dashboard.js:261-263), and the repeats land on the page's body.
+After a save PHP gives the focus back to nothing (modal.js:63), so the
+rebuild leaves it on the page's body (kiosk-dashboard.js:99). PHP picks a
+kiosk's page with a `<select>` (kiosk-dashboard.js:158), not a dialog.
 
 The page needs PRESENT_AWARDS, its page gate, but every change needs
 CONTROL_RACE, as `kiosk.assign`, `kiosk.reload` and `scene.apply` do: a role
