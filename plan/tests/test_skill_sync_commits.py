@@ -14,11 +14,13 @@ squash commit is newer than the fetch fails until `git fetch origin`.
 
 Run: python3 -I -m unittest discover -s plan/tests
 """
+import contextlib
 import os
 import re
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
@@ -27,8 +29,21 @@ ROOT = Path(__file__).resolve().parents[2]
 SHA = re.compile(r'(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])')
 
 
+@contextlib.contextmanager
+def no_git_vars():
+    """os.environ without its GIT_* variables while the block runs: a hook's
+    or a caller's GIT_DIR names another repository than the tree, as in
+    plan/bin/affected-tests (#431)."""
+    hidden = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith('GIT_')}
+    try:
+        yield
+    finally:
+        os.environ.update(hidden)
+
+
 def git(root, *argv) -> subprocess.CompletedProcess:
-    return subprocess.run(['git', '-C', str(root), *argv], capture_output=True, text=True)
+    with no_git_vars():
+        return subprocess.run(['git', '-C', str(root), *argv], capture_output=True, text=True)
 
 
 def stray_shas(root, base: str = 'origin/master') -> list[str]:
@@ -128,6 +143,21 @@ class StrayShas(unittest.TestCase):
     def test_an_untracked_file_is_not_read(self):
         self.write(f'{self.off}\n', track=False)
         self.assertEqual(stray_shas(self.root), [])
+
+    def test_a_hooks_git_variables_name_no_other_repository(self):
+        """Git runs the pre-push hook with GIT_DIR set, and a caller may set
+        GIT_INDEX_FILE: neither reaches the repository stray_shas reads
+        (#431, #504 review)."""
+        other = tempfile.TemporaryDirectory()
+        self.addCleanup(other.cleanup)
+        subprocess.run(['git', 'init', '-q', other.name], check=True, capture_output=True,
+                       env={k: v for k, v in os.environ.items() if not k.startswith('GIT_')})
+        self.write(f'{self.off}\n')
+        expected = [f'.agents/skills/x/SKILL.md:1: {self.off} is not on origin/master']
+        for name, value in (('GIT_DIR', f'{other.name}/.git'),
+                            ('GIT_INDEX_FILE', f'{other.name}/.git/index')):
+            with self.subTest(name=name), unittest.mock.patch.dict(os.environ, {name: value}):
+                self.assertEqual(stray_shas(self.root), expected)
 
     def test_a_clone_without_origin_master_fails(self):
         self.write(f'{self.on}\n')
