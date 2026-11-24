@@ -768,10 +768,13 @@ class HeldPolls:
         an abort ends the poll before, and the hold keeps that poll out,
         with the board's `.htmx-request`, until the test answers it, so
         `htmx_settled()` timed out whenever a poll had gone out (#446). The
-        board sends one poll at a time (`hx-sync="this:drop"`), `answer()`
-        waits until the page has handled each poll it lets through, and a
-        board control's change aborts the poll out, so any board request
-        left out during the hold is the one the hold keeps.
+        board sends one poll at a time (`hx-sync="this:drop"`), and a board
+        control's change aborts the poll out. `answer(i)` waits until the
+        board log holds `i + 1` polls, which is poll `i`'s reply only while
+        no board control's request has ended as a logged poll before it, as
+        Identify's does (`end()`); every `answer()` here follows none. So
+        any board request left out during the hold is the one the hold
+        keeps.
         `test_a_settle_waits_on_no_held_poll` fails every run with
         `htmx_settled()` in its place."""
         self.page.wait_for_function(SETTLED_PAST_THE_HOLD)
