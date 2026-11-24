@@ -24,8 +24,9 @@
 #
 #   git config core.hooksPath .githooks
 #
-# It checks the working tree, which is what was just committed when the tree
-# is clean, and fails when the tree changes while it runs (#373 retro).
+# It checks a detached copy of the pushed commit, so the working tree may
+# change while it runs (#470 retro), or, for a push of two commits, the
+# working tree, and fails when that changes while it runs (#373 retro).
 # `git push --no-verify` skips it.
 
 set -e -o pipefail
@@ -165,34 +166,57 @@ for push in ${pushes[@]+"${pushes[@]}"}; do
   python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${args[@]+"${args[@]}"} \
     ${closes_args[@]+"${closes_args[@]}"} --head "$sha"
 done
-# The checks read the working tree, so an edit while they run tests a tree
-# that is no commit: #373's implementer edited network_changed.py during the
-# hook: the committed pytest-under-load.sh still passed `--` where the
-# edited tool took a file path, so the tool wrote a file named `--`, and the
-# run left rerun pytests behind.  The head, the status, the tracked changes
-# and the contents of the untracked files are compared at exit, which names
-# the edit but prevents nothing.  `diff HEAD` skips an untracked file and
-# `status` prints `?? path` before and after an edit of one, so the contents
-# of the untracked files are summed too (#390 review).
-tree_state() {
-  git -C "$ROOT" rev-parse HEAD
-  git -C "$ROOT" status --porcelain -uall
-  git -C "$ROOT" diff HEAD | cksum
-  (cd "$ROOT" && git ls-files -o --exclude-standard -z | xargs -0 -r cksum || true)
-}
-START_TREE="$(tree_state)"
-check_tree() {
-  local status=$?
-  if [ "$(tree_state)" != "$START_TREE" ]; then
-    echo "pre-push: the working tree changed while the checks ran, so their" \
-         "results are for no commit. Leave the tree alone until the push" \
-         "ends, then push again (#373 retro). It is now:" >&2
-    git -C "$ROOT" status --short >&2
-    [ "$status" -ne 0 ] || status=1
-  fi
-  exit "$status"
-}
-trap check_tree EXIT
+# The checks run in a detached copy of the pushed commit, so the working
+# tree is free while they run, about 15 min: #400's implementer edited it
+# during the hook, which then refused the push, about 25 min late, and
+# #470's sat idle through six pushes (#470 retro). The copy is a worktree
+# under ${XDG_CACHE_HOME:-~/.cache}, removed at exit; `uv run --locked`
+# builds its server/.venv from uv's cache, as pr-merge's does. A SIGKILL
+# leaves it behind: `git worktree remove --force <it>`. When the push sends
+# more than one commit, the checks read the working tree as before, and
+# fail when it changes while they run: #373's implementer edited
+# network_changed.py during the hook, and the run left rerun pytests
+# behind. The head, the status, the tracked changes and the contents of the
+# untracked files are compared at exit (#390 review).
+mapfile -t shas < <(for push in ${pushes[@]+"${pushes[@]}"}; do echo "${push%% *}"; done |
+                    sort -u)
+if [ ${#shas[@]} -eq 1 ]; then
+  MAIN="$ROOT"
+  COPY="${XDG_CACHE_HOME:-$HOME/.cache}/derbynet-pre-push-$$"
+  remove_copy() {
+    local status=$?
+    cd "$MAIN"
+    git worktree remove --force "$COPY" 2>/dev/null || rm -rf "$COPY"
+    git worktree prune
+    exit "$status"
+  }
+  trap remove_copy EXIT
+  mkdir -p "$(dirname "$COPY")"
+  echo "pre-push: the checks run in $COPY, at ${shas[0]:0:8}" >&2
+  git worktree add -q --detach "$COPY" "${shas[0]}"
+  ROOT="$COPY"
+  cd "$ROOT"
+else
+  tree_state() {
+    git -C "$ROOT" rev-parse HEAD
+    git -C "$ROOT" status --porcelain -uall
+    git -C "$ROOT" diff HEAD | cksum
+    (cd "$ROOT" && git ls-files -o --exclude-standard -z | xargs -0 -r cksum || true)
+  }
+  START_TREE="$(tree_state)"
+  check_tree() {
+    local status=$?
+    if [ "$(tree_state)" != "$START_TREE" ]; then
+      echo "pre-push: the working tree changed while the checks ran, so their" \
+           "results are for no commit. Leave the tree alone until the push" \
+           "ends, then push again (#373 retro). It is now:" >&2
+      git -C "$ROOT" status --short >&2
+      [ "$status" -ne 0 ] || status=1
+    fi
+    exit "$status"
+  }
+  trap check_tree EXIT
+fi
 # The guides' check, as plan-checks.yml runs it, printing only its failures
 # and its count, whatever the push changes: a guide can cite any path.
 if [ -n "$pushed" ]; then

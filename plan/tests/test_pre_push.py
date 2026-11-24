@@ -48,7 +48,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          environ: dict | None = None, base_message: str = 'base',
          origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
          checked_out: str = 'head', ahead: str | None = None,
-         ref: str = 'refs/heads/b') -> subprocess.CompletedProcess:
+         ref: str = 'refs/heads/b', two_commits: bool = False) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -65,7 +65,10 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
     commit checked out while the head is pushed. The change is committed on
     branch b, cut from master; `ahead` is the message of a commit on local
     master atop the base, as a pull leaves it when origin/master is stale,
-    which b is cut from. `ref` is the ref pushed to."""
+    which b is cut from. `ref` is the ref pushed to. `two_commits` also
+    pushes the base commit to refs/heads/m, so the checks read the working
+    tree, not a copy of the pushed commit. The copy goes under the
+    XDG_CACHE_HOME `environ` names, or a scratch folder."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -95,14 +98,14 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         stubs.mkdir()
         (stubs / 'uv').write_text(UV)
         (stubs / 'uv').chmod(0o755)
-        env.update(PATH=f'{stubs}:{os.environ["PATH"]}', STUB_LOG=str(Path(tmp, 'ran')),
-                   **(environ or {}))
+        env.update({'PATH': f'{stubs}:{os.environ["PATH"]}', 'STUB_LOG': str(Path(tmp, 'ran')),
+                    'XDG_CACHE_HOME': str(Path(tmp, 'cache')), **(environ or {})})
         (repo / 'plan' / 'tests').mkdir(parents=True)
         (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
         # The stand-ins' log and the plan test's bytecode, which the hook
         # would count as a change of the tree, as the clone's own
         # .gitignore files keep its bytecode out.
-        (repo / '.gitignore').write_text('/ran\n__pycache__/\n')
+        (repo / '.gitignore').write_text('/ran\n/cache/\n__pycache__/\n')
         for name, body in (base_files or {}).items():
             (repo / name).parent.mkdir(parents=True, exist_ok=True)
             (repo / name).write_text(body)
@@ -139,7 +142,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         result = subprocess.run(
             hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} {ref} '
-                  f'{REMOTES.get(remote, base)}\n',
+                  f'{REMOTES.get(remote, base)}\n'
+                  + (f'refs/heads/m {base} refs/heads/m {"0" * 40}\n' if two_commits else ''),
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
         result.ran = ran.read_text() if ran.exists() else ''
@@ -366,7 +370,8 @@ class ChainedPush(unittest.TestCase):
 class TreeChanged(unittest.TestCase):
     """#373's implementer edited network_changed.py while the hook's tests
     ran it, and the run left rerun pytests behind and a file named `--` in
-    server/ (#373 retro). A plan test stands in for the edit."""
+    server/ (#373 retro). A plan test stands in for the edit. A push of one
+    commit checks a copy of it (TreeCopy), so these push two."""
 
     CHANGED = 'pre-push: the working tree changed while the checks ran'
 
@@ -380,7 +385,7 @@ class TreeChanged(unittest.TestCase):
     def test_an_edit_of_a_tracked_file_fails_the_push(self):
         for path in ('notes/x.md', 'server/tools/parity_gate.py'):
             with self.subTest(path=path):
-                result = push(path, self.edit(
+                result = push(path, two_commits=True, plan_test=self.edit(
                     f"(REPO / '{path}').write_text('edited\\n')"))
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn(self.CHANGED, result.stderr)
@@ -388,13 +393,14 @@ class TreeChanged(unittest.TestCase):
                 self.assertNotIn('the plan test failed', result.stderr)
 
     def test_a_second_edit_of_a_changed_file_fails_the_push(self):
-        result = push('notes/x.md', self.edit(
+        result = push('notes/x.md', two_commits=True, plan_test=self.edit(
             "(REPO / 'notes/x.md').write_text('again\\n')"), shell='echo dirty > notes/x.md')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(self.CHANGED, result.stderr)
 
     def test_a_new_file_fails_the_push(self):
-        result = push('notes/x.md', self.edit("(REPO / 'server' / '--').write_text('x')"))
+        result = push('notes/x.md', two_commits=True,
+                      plan_test=self.edit("(REPO / 'server' / '--').write_text('x')"))
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('?? server/--', result.stderr)
         self.assertNotIn('the plan test failed', result.stderr)
@@ -403,7 +409,7 @@ class TreeChanged(unittest.TestCase):
         """`git diff HEAD` skips untracked files and `status` prints
         `?? path` before and after, so the hook compares their contents too
         (#390 review)."""
-        result = push('notes/x.md', self.edit(
+        result = push('notes/x.md', two_commits=True, plan_test=self.edit(
             "(REPO / 'notes/new.md').write_text('again\\n')"), shell='echo first > notes/new.md')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(self.CHANGED, result.stderr)
@@ -411,7 +417,7 @@ class TreeChanged(unittest.TestCase):
         self.assertNotIn('the plan test failed', result.stderr)
 
     def test_a_failing_check_keeps_its_status_and_names_the_change(self):
-        result = push('notes/x.md', self.edit(
+        result = push('notes/x.md', two_commits=True, plan_test=self.edit(
             "(REPO / 'notes/x.md').write_text('edited\\n')", passes=False))
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('the plan test failed', result.stderr)
@@ -420,9 +426,48 @@ class TreeChanged(unittest.TestCase):
     def test_a_tree_left_alone_passes_dirty_or_clean(self):
         for shell in ('', 'echo dirty > notes/x.md', 'echo first > notes/new.md'):
             with self.subTest(shell=shell):
-                result = push('notes/x.md', PASSING, shell=shell)
+                result = push('notes/x.md', two_commits=True, plan_test=PASSING, shell=shell)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn(self.CHANGED, result.stderr)
+
+
+class TreeCopy(unittest.TestCase):
+    """A push of one commit runs its checks in a detached copy of it, so the
+    working tree is free while they run: #400's implementer edited it during
+    the hook, which refused the push about 25 min late, and #470's sat idle
+    through six pushes (#470 retro). The plan test runs in the copy; the main
+    checkout is the first worktree git lists."""
+
+    CHANGED = TreeChanged.CHANGED
+    edit = TreeChanged.edit
+    MAIN = ("import subprocess\n            MAIN = Path(subprocess.run(['git', '-C', "
+            "str(REPO), 'worktree', 'list', '--porcelain'], capture_output=True, "
+            "text=True).stdout.split()[1])\n            ")
+
+    def test_an_edit_of_the_working_tree_during_the_checks_passes(self):
+        result = push('notes/x.md', self.edit(
+            self.MAIN + "(MAIN / 'notes/x.md').write_text('edited\\n')"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(self.CHANGED, result.stderr)
+        self.assertIn('pre-push: the checks run in ', result.stderr)
+
+    def test_the_checks_read_the_pushed_commit_not_the_working_tree(self):
+        line = "assert (REPO / 'notes/x.md').read_text() == 'changed\\n', 'read the tree'"
+        result = push('notes/x.md', self.edit(line), shell='echo dirty > notes/x.md')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = push('notes/x.md', self.edit(line.replace("'changed", "'dirty")),
+                      shell='echo dirty > notes/x.md')
+        self.assertEqual(result.returncode, 1, result.stderr)
+
+    def test_the_copy_is_removed_after_a_pass_or_a_failure(self):
+        for passes in (True, False):
+            with self.subTest(passes=passes), tempfile.TemporaryDirectory() as cache:
+                result = push('notes/x.md', self.edit('pass', passes=passes),
+                              environ={'XDG_CACHE_HOME': cache})
+                self.assertEqual(result.returncode, 0 if passes else 1, result.stderr)
+                self.assertIn(f'pre-push: the checks run in {cache}/derbynet-pre-push-',
+                              result.stderr)
+                self.assertEqual(os.listdir(cache), [])
 
 
 class CommitClosingKeyword(unittest.TestCase):
