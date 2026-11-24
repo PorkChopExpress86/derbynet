@@ -14,8 +14,9 @@
 # seconds of each other, so its gate waited for a 5-minute free window
 # (#348, #350 retro).  This script waits in the same line as the load runs
 # instead, ahead of every load run that waits there and behind the hand-offs
-# that came before it, so it waits for the holder and those hand-offs only
-# (tools/load-lock-line.sh, #417, #419).  Whatever fails on
+# that came before it, so it waits for the holder and those hand-offs only;
+# while a run from a branch cut before #419 waits in the line, every run
+# keeps the order runs came in (tools/load-lock-line.sh, #417, #419).  Whatever fails on
 # the way to the lock, it exits 2 with a message and runs no COMMAND.  It takes
 # no option: -h or --help as its first argument prints the Usage line and
 # exits 0, and a first argument that starts with any other - is refused with

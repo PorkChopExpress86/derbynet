@@ -121,7 +121,8 @@ line_join() {
   fi
   flock -x 7
   line_scan
-  if [ ${#LINE_ENTRIES[@]} = 0 ] && flock -n -x 9; then
+  # `7>&- 8>&-`: the try's flock gets no copy of the mutex or an entry.
+  if [ ${#LINE_ENTRIES[@]} = 0 ] && flock -n -x 9 7>&- 8>&-; then
     exec 7>&-
     LINE_STATE=took
     return
@@ -155,7 +156,7 @@ line_wait_turn() {
     try_status=1
     if [ ${#ahead[@]} = 0 ]; then
       try_status=0
-      flock -n -x 9 || try_status=$?
+      flock -n -x 9 7>&- 8>&- || try_status=$?
     fi
     exec 7>&-
     if [ ${#ahead[@]} = 0 ]; then

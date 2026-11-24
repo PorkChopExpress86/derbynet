@@ -48,8 +48,9 @@
 # then waited 74 min for a slot the lead handed out by message (#316 retro).
 # Runs wait in a line, each printing its place and the runs ahead of it,
 # again whenever that changes, and take the lock in the order they came,
-# behind every hand-off waiting in tools/hold-load-lock.sh
-# (tools/load-lock-line.sh, #417, #419).  Whatever fails on the way to the lock,
+# behind every hand-off waiting in tools/hold-load-lock.sh; while a run from
+# a branch cut before #419 waits in the line, every run keeps the order
+# runs came in (tools/load-lock-line.sh, #417, #419).  Whatever fails on the way to the lock,
 # the run ends with 2 and a message and starts nothing; a file in the line
 # folder that it did not make is ignored.
 # Only this script holds the lock (its loops and pytest get no copy of it),

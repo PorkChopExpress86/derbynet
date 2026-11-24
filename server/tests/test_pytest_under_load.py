@@ -1119,7 +1119,7 @@ def signal_at_the_pause(tmp_path, run, name):
 
 
 # The line right after a waiter's try of the load lock, under the mutex.
-TRIED = r"      flock -n -x 9 \|\| try_status=\$\?"
+TRIED = r"      flock -n -x 9 7>&- 8>&- \|\| try_status=\$\?"
 
 
 def paused_at_a_try(tmp_path, script, status):
@@ -1218,15 +1218,18 @@ PAUSED_SLEEP = (
 def test_a_waiter_killed_in_its_sleep_leaves_no_lock_held(tmp_path, script):
     """The line's mutex is held only for a read and a try, never across the
     sleep between tries, and the sleep gets no copy of the entry or the
-    load lock: with the run SIGKILLed while its sleep, held by
-    PAUSED_SLEEP, lives on, the mutex, its entry and, once the test lets
-    it go, the load lock are free."""
+    load lock: while the live run sleeps, held there by PAUSED_SLEEP, the
+    mutex is free; with the run SIGKILLed while its sleep lives on, the
+    mutex, its entry and, once the test lets it go, the load lock are
+    free."""
     (tmp_path / "paused_sleep.sh").write_text(PAUSED_SLEEP)
     env = {"BASH_ENV": str(tmp_path / "paused_sleep.sh"), "PAUSE_DIR": str(tmp_path)}
     lock, held = held_lock(tmp_path)
     run = start_waiting(tmp_path, script, lock, env)
     try:
         wait_until((tmp_path / "at-sleep").exists, "its sleep", 30)
+        assert alive(run.pid)
+        assert free(f"{lock}.line/mutex")
         os.kill(run.pid, signal.SIGKILL)
         run.wait(timeout=10)
         [entry] = entries(lock)
@@ -1237,6 +1240,45 @@ def test_a_waiter_killed_in_its_sleep_leaves_no_lock_held(tmp_path, script):
         assert free(lock)
     finally:
         (tmp_path / "go-sleep").write_text("")
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, run)
+
+
+# A stand-in flock(1) first on PATH: a `flock -n -x 9`, a try of the load
+# lock, lists the descriptors it was started with into a file of its own in
+# PAUSE_DIR, then runs the real one.
+FD_FLOCK = """#! /bin/sh
+if [ "$*" = "-n -x 9" ]; then ls /proc/$$/fd > "$PAUSE_DIR/fds.$$"; fi
+exec {flock} "$@"
+"""
+
+
+@SCRIPTS
+def test_a_try_of_the_load_lock_gets_no_copy_of_the_mutex_or_the_entry(
+    tmp_path, script
+):
+    """No child keeps a copy of either lock (#419): each `flock -n -x 9`,
+    the join's and each try of its turn, starts with neither fd 7, the
+    line's mutex, nor fd 8, its entry. Its join and at least two tries of
+    its turn find the test's lock held, then a try takes it."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "flock").write_text(FD_FLOCK.format(flock=shutil.which("flock")))
+    (bin_dir / "flock").chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "PAUSE_DIR": str(tmp_path)}
+    lock, held = held_lock(tmp_path)
+    run = join(tmp_path, script, "waiter", lock, env)
+    try:
+        wait_until(lambda: len(list(tmp_path.glob("fds.*"))) >= 3, "three tries", 30)
+        os.close(held)
+        held = None
+        assert run.wait(timeout=90) == 0
+        tries = [path.read_text().split() for path in tmp_path.glob("fds.*")]
+        assert len(tries) >= 4, tries
+        for fds in tries:
+            assert "9" in fds and "7" not in fds and "8" not in fds, fds
+    finally:
         if held is not None:
             os.close(held)
         finish(tmp_path, run)
@@ -2148,6 +2190,10 @@ NEW_HAND_OFF = ("newhand", HOLD_LOCK, False)
         pytest.param([NEW_HAND_OFF, OLD_LOAD], id="hand-off-then-old-load"),
         pytest.param([OLD_HAND_OFF, NEW_LOAD], id="old-hand-off-then-load"),
         pytest.param([NEW_LOAD, OLD_HAND_OFF], id="load-then-old-hand-off"),
+        pytest.param([OLD_LOAD, NEW_LOAD], id="old-load-then-load"),
+        pytest.param([NEW_LOAD, OLD_LOAD], id="load-then-old-load"),
+        pytest.param([OLD_HAND_OFF, NEW_HAND_OFF], id="old-hand-off-then-hand-off"),
+        pytest.param([NEW_HAND_OFF, OLD_HAND_OFF], id="hand-off-then-old-hand-off"),
         # A rule that put hand-offs first beside an old run, which serves
         # tickets in order, made a cycle here: the new load run waited for
         # the hand-off, the hand-off for the old run, the old run for the
