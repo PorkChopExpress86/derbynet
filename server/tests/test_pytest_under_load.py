@@ -1246,12 +1246,24 @@ def test_a_waiter_killed_in_its_sleep_leaves_no_lock_held(tmp_path, script):
 
 
 # A stand-in flock(1) first on PATH: a `flock -n -x 9`, a try of the load
-# lock, lists the descriptors it was started with into a file of its own in
-# PAUSE_DIR, then runs the real one.
+# lock, lists the descriptors it was started with into PAUSE_DIR/fds.PID,
+# runs the real one, and once it has ended writes its exit status into
+# PAUSE_DIR/status.PID.
 FD_FLOCK = """#! /bin/sh
-if [ "$*" = "-n -x 9" ]; then ls /proc/$$/fd > "$PAUSE_DIR/fds.$$"; fi
+if [ "$*" = "-n -x 9" ]; then
+  ls /proc/$$/fd > "$PAUSE_DIR/fds.$$"
+  {flock} "$@"
+  status=$?
+  echo "$status" > "$PAUSE_DIR/status.$$"
+  exit "$status"
+fi
 exec {flock} "$@"
 """
+
+
+def try_statuses(folder):
+    """The exit status of each try of the load lock FD_FLOCK has seen end."""
+    return [path.read_text().strip() for path in folder.glob("status.*")]
 
 
 @SCRIPTS
@@ -1261,7 +1273,10 @@ def test_a_try_of_the_load_lock_gets_no_copy_of_the_mutex_or_the_entry(
     """No child keeps a copy of either lock (#419): each `flock -n -x 9`,
     the join's and each try of its turn, starts with neither fd 7, the
     line's mutex, nor fd 8, its entry. Its join and at least two tries of
-    its turn find the test's lock held, then a try takes it."""
+    its turn have ended finding the test's lock held before the test lets
+    it go, then a try takes it. A count of the tries begun, not ended, let
+    the test free the lock during the third, which then took it, and CI
+    saw 3 tries where the test wanted 4 (bc28196f)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "flock").write_text(FD_FLOCK.format(flock=shutil.which("flock")))
@@ -1270,12 +1285,19 @@ def test_a_try_of_the_load_lock_gets_no_copy_of_the_mutex_or_the_entry(
     lock, held = held_lock(tmp_path)
     run = join(tmp_path, script, "waiter", lock, env)
     try:
-        wait_until(lambda: len(list(tmp_path.glob("fds.*"))) >= 3, "three tries", 30)
+        wait_until(
+            lambda: try_statuses(tmp_path).count("1") >= 3,
+            "three tries ended finding the lock held",
+            30,
+        )
         os.close(held)
         held = None
         assert run.wait(timeout=90) == 0
+        statuses = try_statuses(tmp_path)
+        assert statuses.count("0") == 1, statuses
+        assert statuses.count("1") >= 3, statuses
         tries = [path.read_text().split() for path in tmp_path.glob("fds.*")]
-        assert len(tries) >= 4, tries
+        assert len(tries) == len(statuses), (tries, statuses)
         for fds in tries:
             assert "9" in fds and "7" not in fds and "8" not in fds, fds
     finally:
