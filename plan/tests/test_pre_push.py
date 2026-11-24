@@ -701,6 +701,21 @@ class CommitClosingKeyword(unittest.TestCase):
                       ref='refs/heads/issue-439-commit-closing-keyword')
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_a_commit_on_a_ticket_branch_that_names_no_ticket_is_refused(self):
+        """Each commit on issue-<n>- names #n (#499 retro); a branch with no
+        ticket in its name is held to none."""
+        ref = 'refs/heads/issue-499-undo-racing-off'
+        result = push('notes/x.md', PASSING, origin=True, message='Says nothing', ref=ref)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertRegex(result.stdout, r"names no #499, \w{8} 'Says nothing'")
+        self.assertIn("refused: name the ticket in each commit's subject", result.stderr)
+        self.assertEqual(result.ran, '', 'a refusal comes before every other check')
+        for ref, message in ((ref, 'Says it (#499)'), ('refs/heads/b', 'Says nothing'),
+                             ('refs/heads/issue-499', 'Says nothing')):
+            with self.subTest(ref=ref, message=message):
+                result = push('notes/x.md', PASSING, origin=True, message=message, ref=ref)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_a_ref_that_names_no_ticket_closes_none(self):
         for ref, words in (('refs/heads/issue-439', 'Closes #439'),
                            ('refs/heads/issue-0439-x', 'Closes #439'),

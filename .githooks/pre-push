@@ -137,7 +137,8 @@ done
 # reads the PR body only (#439, #415 retro). It reads `git log`, about a second.
 # DERBYNET_PUSH_CLOSES="64 65" names the issues the push closes on purpose,
 # and a ref pushed as issue-<n>-<slug> may close its ticket, n, as the PR
-# body may. Neither origin/master nor local master is read, unless the push
+# body may, and each commit it sends, merges left out, names #n (--ticket,
+# #499 retro). Neither origin/master nor local master is read, unless the push
 # is to master itself: a stale origin/master behind local master read
 # master's own `fixes #64` and `Closes #316` again (#439 review). With no
 # origin/master, every commit no remote-tracking branch has is read.
@@ -162,7 +163,7 @@ for push in ${pushes[@]+"${pushes[@]}"}; do
     fi
   fi
   if [[ $ref =~ ^refs/heads/issue-([1-9][0-9]*)- ]]; then
-    args+=(--closes "${BASH_REMATCH[1]}")
+    args+=(--closes "${BASH_REMATCH[1]}" --ticket "${BASH_REMATCH[1]}")
   fi
   echo "pre-push: plan/bin/commit-closes $sha ($ref)" >&2
   python3 -I "$HOOK_DIR/../plan/bin/commit-closes" ${args[@]+"${args[@]}"} \
