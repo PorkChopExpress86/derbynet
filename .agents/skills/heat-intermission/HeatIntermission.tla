@@ -356,11 +356,12 @@ DiscardHeat(rnd, h, isCoord) ==
     /\ UNCHANGED <<curRound, curHeat, racing, waiting, finalBuilt,
                    lastHeatRound, lastHeatNum, lastHeatSaved>>
 
-(* restore_results: results.py:336-374 *)
+(* restore_results: results.py:336-378. Racing goes off when the restored
+   heat is the current heat (#499), as reinstate turns it off. *)
 RestoreResults(isCoord) ==
     /\ discardRound /= "none"
     /\ ~HeatHasResult(discardRound, discardNum)
-    /\ (isCoord \/ discardRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in results.py:354
+    /\ (isCoord \/ discardRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in results.py:355
     /\ IF discardRound = "R1" THEN
          LET r1New == [r1 EXCEPT ![discardNum] = discardVal]
          IN
@@ -371,8 +372,9 @@ RestoreResults(isCoord) ==
          /\ r1' = r1
          /\ r2' = discardVal
          /\ finalRoster' = finalRoster
+    /\ racing' = IF discardRound = curRound /\ discardNum = curHeat THEN FALSE ELSE racing
     /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ discardRound = "R1" /\ FinalHasResult(r2)))
-    /\ UNCHANGED <<curRound, curHeat, racing, waiting, finalBuilt,
+    /\ UNCHANGED <<curRound, curHeat, waiting, finalBuilt,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal>>
 

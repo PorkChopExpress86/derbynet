@@ -344,8 +344,9 @@ def restore_results(
 ) -> hs.Failure | None:
     """Undo a discard (#41): write back the times and places
     `delete_results` cleared from one heat. A lane that has a result again,
-    from the timer or by hand, keeps it. The current heat and racing stay as
-    they are, as for `delete_results`."""
+    from the timer or by hand, keeps it. The current heat stays. Racing goes
+    off when Undo writes results onto the current heat, so the timer's next
+    FINISHED can't overwrite them, as `reinstate` turns it off (#499)."""
     now = timezone.now()
     restored = False
     with transaction.atomic():
@@ -367,6 +368,9 @@ def restore_results(
                     finish_time=found.time, finish_place=found.place, completed=now
                 )
             )
+        current = (state.current_round_id, state.current_heat) == (round.id, heat)
+        if restored and current and state.racing:
+            transition(state, hs.RacingOff())
         if restored:
             rebuild_waiting_final(event, [round.id], ended, finalists_for)
     if restored:
