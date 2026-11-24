@@ -8,6 +8,7 @@ folder, so those are what is checked (D80). Nothing here writes a setting.
 """
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from django.db.migrations.executor import MigrationExecutor
 from core import race_settings
 from core.models import Event, RaceSettings
 from core.setup_event import inside
+from derbynet.nginx_size import nginx_bytes
 
 # The photo stand posts MAX_FILE_SIZE=30000000 (`photo-stand` in `extras/`,
 # and `PHOTO_UPLOAD_MAX_BYTES` in `derbynet/settings.py`).
@@ -145,23 +147,63 @@ def _megabytes(n: int) -> str:
     return f"{round(n / 1_000_000, 1):g} MB"
 
 
+_NGINX_CAP = re.compile(r"^\s*client_max_body_size\s+(\S+?)\s*;", re.MULTILINE)
+
+
+def _nginx_cap() -> tuple[str, int] | None:
+    """nginx's `client_max_body_size` in the nginx.conf the image's
+    entrypoint renders at each start (#58), as written and as bytes; 0 bytes
+    means no cap, as in nginx. None when the file or the directive can't be
+    read."""
+    try:
+        found = _NGINX_CAP.search(Path(settings.NGINX_CONF).read_text())
+    except OSError:
+        return None
+    size = nginx_bytes(found.group(1)) if found else None
+    return None if size is None else (found.group(1), size)
+
+
 def upload_limit() -> Check:
-    """Django's photo upload cap against the 30 MB the photo stand sends.
-    The proxy in front of Django (nginx in the image from #58, whose
-    `MAX_UPLOAD_SIZE` sets it) has its own `client_max_body_size`, which the
-    server cannot read, so the page says to check it.
+    """The upload caps against the 30 MB the photo stand sends (#48 Scope):
+    Django's photo cap, and in the image (#58) nginx's
+    `client_max_body_size`, which `MAX_UPLOAD_SIZE` sets. Outside the image
+    the server cannot see the proxy in front of it, so the page says to
+    check it; in the image a proxy can still sit in front of nginx
+    (docs/install-docker.md), so the page says that too.
     `DATA_UPLOAD_MAX_MEMORY_SIZE` caps only the form fields beside a file
     (Django streams the file itself), so it is shown, not compared."""
     cap = settings.PHOTO_UPLOAD_MAX_BYTES
     fields = settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+    ok = cap >= PHOTO_STAND_BYTES
     detail = (
         f"Photos up to {_megabytes(cap)} are accepted (DERBYNET_PHOTO_UPLOAD_MAX_MB);"
         f" the photo stand sends up to {_megabytes(PHOTO_STAND_BYTES)}."
         f" Form fields beside a file are capped at {_megabytes(fields or 0)}."
-        " A proxy in front of the server must allow at least as much"
-        " (nginx client_max_body_size)."
     )
-    status = Status.OK if cap >= PHOTO_STAND_BYTES else Status.TROUBLE
+    if not Path(settings.DOCKER_IMAGE_MARKER).exists():
+        detail += (
+            " A proxy in front of the server must allow at least as much"
+            " (nginx client_max_body_size)."
+        )
+    else:
+        nginx = _nginx_cap()
+        if nginx is None:
+            ok = False
+            detail += (
+                " The image's nginx client_max_body_size could not be read from"
+                f" {settings.NGINX_CONF}."
+            )
+        elif nginx[1] == 0:
+            detail += " nginx in the image takes requests of any size."
+        else:
+            written, size = nginx
+            ok = ok and size >= PHOTO_STAND_BYTES
+            detail += (
+                f" nginx in the image (MAX_UPLOAD_SIZE) takes requests up to"
+                f" {written} ({_megabytes(size)})."
+            )
+        detail += " A proxy in front of the image must allow as much."
+    status = Status.OK if ok else Status.TROUBLE
     return Check("upload", "Upload size limit", status, detail)
 
 

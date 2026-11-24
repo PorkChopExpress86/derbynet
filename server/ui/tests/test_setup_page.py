@@ -129,6 +129,85 @@ def test_health_checks_compare_the_upload_limit(coordinator, event, settings):
     assert _check(body, "upload") == "trouble"
     assert "Photos up to 8 MB are accepted" in body
     assert "the photo stand sends up to 30 MB" in body
+    assert "A proxy in front of the server must allow" in body
+
+
+def _in_image(settings, tmp_path, conf: str | None):
+    """Stands in for the image (#58): its marker, and the nginx.conf its
+    entrypoint renders, holding `conf` (no file for None)."""
+    marker = tmp_path / "docker-image"
+    marker.write_text("")
+    settings.DOCKER_IMAGE_MARKER = marker
+    settings.NGINX_CONF = tmp_path / "nginx.conf"
+    if conf is not None:
+        settings.NGINX_CONF.write_text(conf)
+
+
+@pytest.mark.parametrize(
+    ("size", "status", "shown"),
+    [
+        ("16M", "trouble", "16M (16.8 MB)"),
+        ("28M", "trouble", "28M (29.4 MB)"),
+        ("29M", "ok", "29M (30.4 MB)"),
+        ("30000000", "ok", "30000000 (30 MB)"),
+        ("29999999", "trouble", "29999999 (30 MB)"),
+        ("100M", "ok", "100M (104.9 MB)"),
+    ],
+)
+def test_health_checks_compare_nginx_cap_in_the_image(
+    coordinator, event, settings, tmp_path, size, status, shown
+):
+    """In the image the check reads nginx's `client_max_body_size` from the
+    nginx.conf the entrypoint rendered, and compares it with the photo
+    stand's 30000000 bytes (#48 Scope). Django's own limits stay at their
+    defaults, so only nginx's cap decides."""
+    _in_image(
+        settings,
+        tmp_path,
+        f"http {{\n    sendfile on;\n    client_max_body_size {size};\n}}\n",
+    )
+    body = html(coordinator.get("/setup/"))
+    assert _check(body, "upload") == status
+    assert f"nginx in the image (MAX_UPLOAD_SIZE) takes requests up to {shown}." in body
+    assert "A proxy in front of the image must allow as much" in body
+
+
+def test_health_checks_take_nginx_zero_as_no_cap(
+    coordinator, event, settings, tmp_path
+):
+    _in_image(settings, tmp_path, "client_max_body_size 0;\n")
+    body = html(coordinator.get("/setup/"))
+    assert _check(body, "upload") == "ok"
+    assert "nginx in the image takes requests of any size" in body
+
+
+@pytest.mark.parametrize("conf", [None, "http {\n    sendfile on;\n}\n"])
+def test_health_checks_flag_an_unreadable_nginx_cap(
+    coordinator, event, settings, tmp_path, conf
+):
+    _in_image(settings, tmp_path, conf)
+    body = html(coordinator.get("/setup/"))
+    assert _check(body, "upload") == "trouble"
+    assert (
+        "The image&#x27;s nginx client_max_body_size could not be read from"
+        f" {settings.NGINX_CONF}."
+    ) in body
+
+
+def test_health_checks_keep_django_cap_in_the_image(
+    coordinator, event, settings, tmp_path
+):
+    _in_image(settings, tmp_path, "client_max_body_size 100M;\n")
+    settings.PHOTO_UPLOAD_MAX_BYTES = 8_000_000
+    body = html(coordinator.get("/setup/"))
+    assert _check(body, "upload") == "trouble"
+    assert "Photos up to 8 MB are accepted" in body
+
+
+def test_image_marker_is_manage_py_marker(settings):
+    import manage
+
+    assert settings.DOCKER_IMAGE_MARKER == manage.IMAGE_MARKER
 
 
 def test_health_checks_explain_an_unwritable_config(

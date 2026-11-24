@@ -14,6 +14,8 @@ import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
 
+from derbynet.nginx_size import nginx_bytes
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -291,18 +293,15 @@ PHOTO_MAX_PIXELS = _env_millions("DERBYNET_PHOTO_MAX_MEGAPIXELS", 50, "megapixel
 
 
 def _nginx_size(name, default):
-    """An nginx size (`16M`, `512k`, `1g`, or bytes) as bytes, as nginx reads
-    `client_max_body_size`, so the image's nginx and Django share one value."""
+    """An nginx size, as bytes, so the image's nginx and Django share one
+    value."""
     value = os.environ.get(name, "").strip() or default
-    units = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
-    number, unit = value[:-1], value[-1].lower()
-    if unit.isdigit():
-        number, unit = value, ""
-    if not number.isdigit() or unit not in units or int(number) <= 0:
+    size = nginx_bytes(value)
+    if not size:
         raise ImproperlyConfigured(
             f"{name} must be a size such as 16M, 512k or 1G, not {value!r}"
         )
-    return int(number) * units[unit]
+    return size
 
 
 # MAX_UPLOAD_SIZE is the Docker image's nginx client_max_body_size (#58) and
@@ -310,6 +309,12 @@ def _nginx_size(name, default):
 # the largest upload, a replay clip (DERBYNET_VIDEO_UPLOAD_MAX_MB); the image's
 # entrypoint passes the same value to nginx.
 DATA_UPLOAD_MAX_MEMORY_SIZE = _nginx_size("MAX_UPLOAD_SIZE", "100M")
+
+# In the image (its marker, manage.py's IMAGE_MARKER), the upload health
+# check reads nginx's client_max_body_size from the nginx.conf the entrypoint
+# renders at each start (#48).
+DOCKER_IMAGE_MARKER = Path("/opt/derbynet/docker-image")
+NGINX_CONF = Path("/etc/nginx/nginx.conf")
 
 # PHP's DERBYNET_FACEDETECT autocrop hook: an executable that takes an image
 # path and prints `x y width height`. Unset, OpenCV finds the face.
