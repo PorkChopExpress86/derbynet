@@ -1969,14 +1969,15 @@ COUNTED_READS = """flock() {
 
 def counted_reads(tmp_path):
     """The environment that gives a script COUNTED_READS, counting into a
-    folder of its own: (the environment, a function that reads the count)."""
+    folder of its own: (the environment, a function that reads the count
+    once the script has read the line)."""
     folder = tmp_path / "counted"
     folder.mkdir()
     (folder / "hooks.sh").write_text(COUNTED_READS)
     reads = folder / "reads"
 
     def count():
-        return len(reads.read_text().splitlines()) if reads.exists() else 0
+        return len(reads.read_text().splitlines())
 
     return {"BASH_ENV": str(folder / "hooks.sh"), "PAUSE_DIR": str(folder)}, count
 
@@ -2125,10 +2126,9 @@ def before_419(tmp_path, script):
     """A copy of `script` from before #419, beside its own line file, in
     `tmp_path/old/tools`."""
     folder = tmp_path / "old" / "tools"
-    if not folder.exists():
-        folder.mkdir(parents=True)
-        for source in BEFORE_419.iterdir():
-            shutil.copy(source, folder / source.name)
+    folder.mkdir(parents=True, exist_ok=True)
+    for source in BEFORE_419.iterdir():
+        shutil.copy(source, folder / source.name)
     copy = folder / script.name
     assert copy.stat().st_mode & 0o111, copy
     return copy
