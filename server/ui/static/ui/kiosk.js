@@ -14,10 +14,10 @@
 // - `kioskNudge()` runs the kiosk poll and every content poll at once. #56
 //   calls it when the push stream says something changed (D21, ADR-15); a
 //   browser with no EventSource keeps the polls above.
-// - Inside replay.php, `replay-started` pauses the page's animations and its
-//   content polls, and `replay-ended` resumes them, as now-racing.js:3-16
-//   suspends its poller and holds its lineup; the other PHP pages ignore the
-//   messages, and only now-racing pages hold their lineup here too.
+// - Inside replay.php, `replay-started` pauses the page's content polls and
+//   `replay-ended` resumes them, as now-racing.js:3-16 suspends its poller;
+//   the other PHP pages ignore the messages. A reply still out is handled,
+//   and no animation pauses, as PHP pauses none (D137).
 (function () {
   'use strict';
 
@@ -169,10 +169,8 @@
   window.addEventListener('message', function (e) {
     if (e.data === 'replay-started') {
       Kiosk.paused = true;
-      document.getAnimations().forEach(function (a) { a.pause(); });
     } else if (e.data === 'replay-ended') {
       Kiosk.paused = false;
-      document.getAnimations().forEach(function (a) { a.play(); });
     } else {
       return;
     }

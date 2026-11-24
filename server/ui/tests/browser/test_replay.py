@@ -11,7 +11,9 @@ Chromium's two fake cameras.
   stored, which the server drops (#259), and C32's websocket flush.
 - The screenshots of the setup screen and the camera page at both sizes.
 - Now racing inside the replay page holds its board through a replay and
-  lingers after it (#52).
+  lingers after it (#52); through a replay it pauses no animation, applies
+  a poll reply still out, and after it lands the rows page's places again
+  while the columnar page takes the next lineup at once (#494, D137).
 """
 
 import re
@@ -321,14 +323,24 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     assert video.stat().st_size > 0
 
 
-# The now-racing frame logs, on its own clock, each replay message, each
-# change of its banner title's text and each place that lands. Its
+# The now-racing frame logs, on its own clock, each replay message, a
+# snapshot of every animation's name and play state once kiosk.js has heard
+# the message, each animation that starts, each change of its banner title's
+# text, each place that lands and each lane that takes the winner's glow.
+# A place lands, and a lane glows, when it takes the class it lacked, so a
+# landing is logged once however often the poll writes it again. Its
 # `query=poll` requests are read from the frame's resource timings on the
 # same clock.
 RECORD_NOW_RACING = """window.__log = [];
 performance.setResourceTimingBufferSize(10000);
-window.addEventListener('message', (e) =>
-  window.__log.push({at: performance.now(), message: e.data}));
+window.addEventListener('message', (e) => {
+  window.__log.push({at: performance.now(), message: e.data});
+  setTimeout(() => window.__log.push({after: e.data,
+    animations: document.getAnimations().map((a) =>
+      ({name: a.animationName || '', state: a.playState}))}), 0);
+});
+document.addEventListener('animationstart', (e) =>
+  window.__log.push({at: performance.now(), start: e.animationName}), true);
 document.addEventListener('DOMContentLoaded', () => {
   const title = document.querySelector('[data-banner-title]');
   if (!title) return;
@@ -338,11 +350,16 @@ document.addEventListener('DOMContentLoaded', () => {
     shown = title.textContent;
     window.__log.push({at: performance.now(), title: shown});
   }).observe(title, {childList: true, characterData: true, subtree: true});
+  const took = (c, name) => c.target.classList.contains(name)
+    && !(c.oldValue || '').split(' ').includes(name);
   new MutationObserver((changes) => changes.forEach((c) => {
-    if (c.target.matches('[data-place]') && c.target.classList.contains('k-shown'))
+    if (c.target.matches('[data-place]') && took(c, 'k-shown'))
       window.__log.push({at: performance.now(), landed: c.target.textContent});
+    if (c.target.matches('[data-lane]') && took(c, 'k-p1'))
+      window.__log.push({at: performance.now(), glow: c.target.dataset.lane});
   })).observe(document.body,
-    {attributes: true, attributeFilter: ['class'], subtree: true});
+    {attributes: true, attributeFilter: ['class'], attributeOldValue: true,
+     subtree: true});
 });"""
 
 READ_NOW_RACING = """() => ({
@@ -354,57 +371,51 @@ READ_NOW_RACING = """() => ({
 SKIPBACK_MS = 4000
 POST_ROLL_MS = 500
 RING_FILL_MS = 5000
+REPLAY_LINGER_MS = 3000
 # kiosk-now-racing.js `results()` starts the landing's linger after the
 # last place's wait.
 PLACE_WAIT_MS = 400
+# The entry animations of kiosk.css: a lane's slide-in, a time's and a
+# speed's fade, a column's rise.
+ENTRY_ANIMATIONS = {"k-slide-in", "k-fade", "k-rise"}
 
 
-@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
-def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
-    """#52: now-racing inside the replay page stops polling on
-    `replay-started`, keeps heat 1 on the board, and polls again on
-    `replay-ended`; the next lineup waits `now-racing-linger-ms` after
-    `replay-ended` (now-racing.js:3-16: `Poller.suspended`, then
-    `start_display_linger`).
-
-    Heat 1's places land and start their own linger. The right-click replay
-    starts inside that linger, and the linger ends while the replay plays,
-    both asserted, so a board that did not hold would take heat 2 during
-    the replay, and one that did not linger again would take it at once
-    after.
+def replay_inside_the_linger(login, event, kiosk) -> dict:
+    """`kiosk` inside the replay page: heat 1's places land and start their
+    own linger, a right-click replay starts inside that linger, and the
+    linger ends while the replay plays, both asserted. Returns the frame's
+    log, read once the board shows heat 2.
 
     The bounds, each with its slack:
     - The ring fills for `RING_FILL_MS` before the heat, and the clip takes
       the last `SKIPBACK_MS` before the right-click: slack
       `RING_FILL_MS - SKIPBACK_MS`, plus the time heat 1 takes to land.
     - The replay starts `POST_ROLL_MS` after the right-click, plus the
-      click's latency, and must start before `landed + linger_ms`: slack
-      `linger_ms - POST_ROLL_MS - latency`.
+      click's latency, and must start before `landed + REPLAY_LINGER_MS`:
+      slack `REPLAY_LINGER_MS - POST_ROLL_MS - latency`.
     - The replay ends `POST_ROLL_MS + SKIPBACK_MS + POST_ROLL_MS` after the
       right-click (the post-roll, then the clip at rate 100), and the
-      landing's linger ends at `landed + PLACE_WAIT_MS + linger_ms`, which
-      must come first: slack `2 * POST_ROLL_MS + SKIPBACK_MS - PLACE_WAIT_MS
-      - linger_ms`, plus the click's latency.
-    - Heat 2 is awaited `linger_ms + 5000` ms from the replay page's
-      `watching`: it comes `linger_ms` after `replay-ended`, then at the
-      next poll, sent 500 ms after the reply before it (kiosk.js `queue()`),
-      and that poll's reply.
-    - `heat_2 - ended >= linger_ms` has no slack: the test's own listener
-      logs `replay-ended` before kiosk.js's listener starts the linger."""
-    linger_ms = 3000
+      landing's linger ends at `landed + PLACE_WAIT_MS + REPLAY_LINGER_MS`,
+      which must come first: slack `2 * POST_ROLL_MS + SKIPBACK_MS -
+      PLACE_WAIT_MS - REPLAY_LINGER_MS`, plus the click's latency.
+    - Heat 2 is awaited `2 * REPLAY_LINGER_MS + 5000` ms from the replay
+      page's `watching`: on the rows page it comes `REPLAY_LINGER_MS` after
+      the places land again (4 places, `PLACE_WAIT_MS` apart), which the
+      first poll after `replay-ended` starts, 500 ms after the reply before
+      it (kiosk.js `queue()`), then at the next poll and its reply."""
     fast_replays(
         event,
         replay_skipback_ms=SKIPBACK_MS,
         replay_post_roll_ms=POST_ROLL_MS,
         replay_max_clip_ms=5000,
-        now_racing_linger_ms=linger_ms,
+        now_racing_linger_ms=REPLAY_LINGER_MS,
     )
     lions = scheduled(race_setup(event, groups=(("Lions", 4),))["Lions"], race=False)
     page = login("RaceCoordinator")
     post(page, action="heat.select", roundid=str(lions.pk), heat="1", now_racing="1")
     page.context.add_init_script(RECORD_NOW_RACING)
     open_replay(page)
-    page.locator("#inner_url").fill("/kiosk.php?page=kiosks/now-racing.kiosk")
+    page.locator("#inner_url").fill(f"/kiosk.php?page=kiosks/{kiosk}.kiosk")
     proceed(page)
     board = page.frame_locator("#interior")
     title = board.locator("[data-banner-title]")
@@ -420,26 +431,161 @@ def test_now_racing_holds_through_a_replay_and_lingers_after_it(login, event):
     expect(replay_state(page)).to_have_attribute(
         "data-replay-state", "watching", timeout=15_000
     )
-    expect(title).to_have_text("Heat 2 of 4", timeout=linger_ms + 5000)
+    expect(title).to_have_text("Heat 2 of 4", timeout=2 * REPLAY_LINGER_MS + 5000)
 
-    frame = kiosk_frame(page)
     # one read: the whole run, logged by the frame as it happened.
-    seen = frame.evaluate(READ_NOW_RACING)
+    seen = kiosk_frame(page).evaluate(READ_NOW_RACING)
     log = seen["log"]
     [started] = [e["at"] for e in log if e.get("message") == "replay-started"]
     [ended] = [e["at"] for e in log if e.get("message") == "replay-ended"]
-    # The rows page lands the places in place order.
-    assert [e["landed"] for e in log if "landed" in e] == ["1", "2", "3", "4"]
-    landed = max(e["at"] for e in log if "landed" in e)
+    first = [e["at"] for e in log if "landed" in e][:4]
+    landed = max(first)
     assert [e["title"] for e in log if "title" in e] == ["Heat 1 of 4", "Heat 2 of 4"]
-    [heat_2] = [e["at"] for e in log if e.get("title") == "Heat 2 of 4"]
     # The replay starts inside the landing's linger, which ends during it.
-    lingered = landed + PLACE_WAIT_MS + linger_ms
-    assert landed < started < landed + linger_ms, (landed, started)
-    assert lingered < ended, (landed, ended)
+    assert landed < started < landed + REPLAY_LINGER_MS, (landed, started)
+    assert landed + PLACE_WAIT_MS + REPLAY_LINGER_MS < ended, (landed, ended)
     assert [t for t in seen["polls"] if started < t < ended] == []
-    assert any(t > ended for t in seen["polls"] if t < heat_2)
-    assert heat_2 - ended >= linger_ms, (ended, heat_2)
+    [heat_2] = [e["at"] for e in log if e.get("title") == "Heat 2 of 4"]
+    return {
+        "log": log,
+        "polls": seen["polls"],
+        "started": started,
+        "ended": ended,
+        "heat_2": heat_2,
+    }
+
+
+def snapshot(log, message) -> list:
+    [found] = [e["animations"] for e in log if e.get("after") == message]
+    return found
+
+
+def assert_no_animation_paused_or_restarted(seen):
+    """D137: no animation pauses during a replay, and after it no finished
+    entry animation starts again before heat 2's lineup. The snapshot
+    after `replay-started` holds heat 1's entry animations, so the checks
+    below are not run on an empty page."""
+    during = snapshot(seen["log"], "replay-started")
+    assert ENTRY_ANIMATIONS & {a["name"] for a in during}, during
+    assert [a for a in during if a["state"] == "paused"] == []
+    after = snapshot(seen["log"], "replay-ended")
+    assert [
+        a for a in after if a["name"] in ENTRY_ANIMATIONS and a["state"] != "finished"
+    ] == []
+    restarted = [
+        e["start"]
+        for e in seen["log"]
+        if "start" in e and seen["started"] < e["at"] < seen["heat_2"]
+    ]
+    assert ENTRY_ANIMATIONS.isdisjoint(restarted), restarted
+
+
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
+def test_now_racing_lingers_through_a_replay_and_lands_again_after_it(login, event):
+    """#52, #494: now-racing inside the replay page stops polling on
+    `replay-started` and keeps heat 1 on the board; no animation pauses
+    and none of the finished entry animations starts again after it
+    (D137). On `replay-ended` it polls again, and the first poll's heat 1
+    results land the places again, 1 to 4, as PHP's flyers fly again
+    (now-racing.js:15 `enable_flyers()`, now-racing.js:225
+    `should_animate`), with the winner's lane glowing again; the next
+    lineup waits `now-racing-linger-ms` after the last place lands again,
+    PLACE_WAIT_MS after it (now-racing.js:333 `start_display_linger`).
+
+    `heat_2 - again >= PLACE_WAIT_MS + REPLAY_LINGER_MS` has no slack: the
+    frame logs the place as it lands, and `results()` starts the linger
+    after the place's wait."""
+    seen = replay_inside_the_linger(login, event, "now-racing")
+    log, ended, heat_2 = seen["log"], seen["ended"], seen["heat_2"]
+    assert_no_animation_paused_or_restarted(seen)
+    landings = [e for e in log if "landed" in e]
+    assert [e["landed"] for e in landings] == ["1", "2", "3", "4"] * 2
+    again = [e["at"] for e in landings[4:]]
+    assert ended < min(again)
+    # The places land again on the first poll after the replay.
+    assert len([t for t in seen["polls"] if ended < t < min(again)]) == 1
+    glows = [e["at"] for e in log if "glow" in e]
+    assert len(glows) == 2 and glows[0] < seen["started"] and ended < glows[1]
+    assert heat_2 - max(again) >= PLACE_WAIT_MS + REPLAY_LINGER_MS, (again, heat_2)
+
+
+@pytest.mark.sizes("desktop", reason="the replay station is a laptop")
+def test_now_racing_columns_take_the_next_lineup_at_the_first_poll_after_a_replay(
+    login, event
+):
+    """#494: the columnar page inside the replay page keeps heat 1 through
+    the replay, and on `replay-ended` neither lingers again nor lands the
+    places again (D137; now-racing-columnar.js:5-12 only suspends the
+    poller, and `results_written` keeps `onHeatResults` from running
+    again), so the first poll after `replay-ended` shows heat 2. No
+    animation pauses during the replay, and none starts again before heat
+    2's lineup."""
+    seen = replay_inside_the_linger(login, event, "now-racing-columnar")
+    log, ended, heat_2 = seen["log"], seen["ended"], seen["heat_2"]
+    assert_no_animation_paused_or_restarted(seen)
+    assert [e["landed"] for e in log if "landed" in e] == ["1", "2", "3", "4"]
+    assert len([t for t in seen["polls"] if ended < t < heat_2]) == 1
+    assert [
+        e["start"] for e in log if "start" in e and seen["started"] < e["at"] < heat_2
+    ] == []
+
+
+@pytest.mark.sizes("desktop", reason="the kiosk is a TV")
+def test_a_poll_reply_that_lands_during_a_replay_is_applied(login, event):
+    """#494: a `query=poll` reply still out when `replay-started` comes is
+    applied, so heat 2's lineup shows during the replay, since PHP's
+    suspended poller stops only the next poll (now-racing-poller.js:47)
+    and `Lineup.hold()` sets a flag `ok_to_change()` never reads
+    (now-racing.js:36, now-racing.js:53; D137). The poll is held at the
+    route until the page has paused. On `replay-ended` the board lingers
+    `now-racing-linger-ms` before heat 3 (now-racing.js:11).
+
+    `heat_3 - ended >= REPLAY_LINGER_MS` has no slack: the page's listener
+    logs `replay-ended` before kiosk.js's listener starts the linger."""
+    RaceSettings.objects.filter(event=event).update(
+        now_racing_linger_ms=REPLAY_LINGER_MS
+    )
+    lions = scheduled(race_setup(event, groups=(("Lions", 4),))["Lions"], race=False)
+    page = login("RaceCoordinator")
+    post(page, action="heat.select", roundid=str(lions.pk), heat="1", now_racing="1")
+    held = []
+
+    def hold_one_poll(route):
+        if page_ready and not held:
+            held.append(route)
+        else:
+            route.continue_()
+
+    page_ready = False
+    page.add_init_script(RECORD_NOW_RACING)
+    page.route(lambda url: "query=poll&" in url, hold_one_poll)
+    page.goto("/kiosk.php?page=kiosks/now-racing.kiosk")
+    title = page.locator("[data-banner-title]")
+    expect(title).to_have_text("Heat 1 of 4")
+    page_ready = True
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(50)
+    assert len(held) == 1
+    post(page, action="heat.select", roundid=str(lions.pk), heat="2", now_racing="1")
+    page.evaluate("() => window.postMessage('replay-started', '*')")
+    page.wait_for_function("window.Kiosk.paused === true")
+    held[0].continue_()
+    expect(title).to_have_text("Heat 2 of 4")
+    assert page.evaluate("window.Kiosk.paused") is True
+
+    post(page, action="heat.select", roundid=str(lions.pk), heat="3", now_racing="1")
+    page.evaluate("() => window.postMessage('replay-ended', '*')")
+    expect(title).to_have_text("Heat 3 of 4", timeout=REPLAY_LINGER_MS + 5000)
+    # one read: the whole run, logged by the page as it happened.
+    log = page.evaluate(READ_NOW_RACING)["log"]
+    [started] = [e["at"] for e in log if e.get("message") == "replay-started"]
+    [ended] = [e["at"] for e in log if e.get("message") == "replay-ended"]
+    titles = [e for e in log if "title" in e]
+    assert [e["title"] for e in titles] == ["Heat 1 of 4", "Heat 2 of 4", "Heat 3 of 4"]
+    assert started < titles[1]["at"] < ended
+    assert titles[2]["at"] - ended >= REPLAY_LINGER_MS, (ended, titles[2])
 
 
 @pytest.mark.sizes("desktop", reason="the replay station is a laptop")
