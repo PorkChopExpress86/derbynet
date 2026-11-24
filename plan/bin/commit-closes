@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""Refuses a closing keyword in the message of a commit a push would send,
+before GitHub reads it (#439).
+
+Usage: plan/bin/commit-closes [--closes N]... [--base REV]... [--head REV]
+       plan/bin/commit-closes --sweep N
+
+`plan/bin/pr-merge` squashes. GitHub closes an issue that a closing keyword in
+a commit's message names when the commit reaches master: #316's closing event
+carries the oid of #339's squash commit, whose message holds "Closes #316."
+The squash message can list each commit's message: #410's does, with `fixes
+#64` among them. `pr-evidence --check` reads only the PR body file it is
+given, so a keyword in a commit message got through: #415's first commit
+(73a1c975) quoted `Closes #399.`, and the agent caught it by hand and pushed a
+new branch, since a pushed commit can only be mended by a force push.
+
+The check reads every commit reachable from --head (default HEAD) and from no
+--base (default origin/master; repeat it to name several, and with none
+given every commit no remote-tracking branch has), by the matcher that
+pr-evidence uses for a PR body (its `closing_refs`, loaded from that file): a close, closes, closed, fix, fixes, fixed,
+resolve, resolves or resolved before #N, GH-N, owner/repo#N or an issue URL,
+outside a code span or a closed code fence, is refused for any issue not named
+by `--closes N`. A reference into another repo is refused whatever its number.
+Exits 1 on a refusal, naming each commit and line, and 2 when git can't read a
+revision or `--sweep`'s gh fails. `--closes` takes N or #N, as it does for pr-evidence.
+
+.githooks/pre-push runs it on each ref pushed, before any other check and
+before git sends the commits, with origin/master and local master as bases:
+`DERBYNET_PUSH_CLOSES="64 65"` names the issues the push closes on purpose,
+and a ref pushed as issue-<n>-<slug> may close its ticket. The hook, not `pr-merge`, is where it runs
+because `pr-merge` runs after the commits are on GitHub, where only a force
+push can mend one. `git push --no-verify`, a clone whose `core.hooksPath` is
+unset and an edit made on github.com skip the hook.
+
+What it does not know: whether GitHub reads a keyword inside backticks in a
+commit message as quoted. The ticket asks that a quoted keyword pass, and the
+PR body's rule is the same; no commit on the fork or in its PRs holds an issue
+number only inside a code span, so GitHub's reading of a quoted keyword in a
+commit message is unverified. Until it is, reword a commit rather than quote.
+
+`--sweep N` is the oracle for that matcher (oracle-sweeps note, #415 retro):
+over the commits of the last N merged PRs on $REPO (the fork) it prints each
+refusal with what GitHub did, from the PR's `mergeCommit` and the issue's
+events: `GitHub closed it with the merge commit`, `the PR's own link closed it`,
+`GitHub could not act, it was closed before the merge`, or `GitHub left it
+open (a false refusal)`. It exits 1 on that last,
+and prints the count of PRs and refusals.
+"""
+
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+FIX = ("reword the commit before pushing it (`git commit --amend`, or `git rebase -i` for "
+       "an older one), or name an issue the push closes on purpose with --closes N or "
+       "DERBYNET_PUSH_CLOSES=\"N ...\" (#439)")
+
+
+def load_matcher():
+    """pr-evidence as a module: its matcher is the one this check runs."""
+    loader = importlib.machinery.SourceFileLoader(
+        "pr_evidence_tool", os.path.join(HERE, "pr-evidence"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+MATCHER = load_matcher()
+
+
+def fail(message: str):
+    """Exit 2: git or gh could not answer, so nothing was checked."""
+    print(f"commit-closes: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+def run_git(*argv: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *argv], capture_output=True, text=True)
+
+
+def resolve(rev: str) -> str:
+    """The commit a revision names, or exit 2: a name that git reads as an option
+    never reaches `git log`."""
+    done = run_git("rev-parse", "--verify", "-q", "--end-of-options", f"{rev}^{{commit}}")
+    if done.returncode:
+        fail(f"{rev} names no commit in this clone (git fetch origin?)")
+    return done.stdout.strip()
+
+
+def commits(heads: list[str], bases: list[str]) -> list[tuple[str, str]]:
+    """Each commit from `heads` and from none of `bases`, as (sha, message);
+    with no base, from none of the remote-tracking branches."""
+    exclude = [f"^{resolve(b)}" for b in bases] or ["--not", "--remotes"]
+    done = run_git("log", "-z", "--format=%H%n%B", *[resolve(h) for h in heads], *exclude)
+    if done.returncode:
+        fail(f"git log failed:\n{done.stderr.strip()}")
+    found = []
+    for record in done.stdout.split("\0")[:-1]:
+        sha, _, message = record.partition("\n")
+        found.append((sha, message))
+    return found
+
+
+def refusals(found: list[tuple[str, str]], closes: set[str]) -> list[tuple[str, str, str, str, bool]]:
+    """Each closing keyword for an issue not in `closes`, or in another repo, as
+    (sha, subject, `line N: words`, issue number, whether it is this repo's):
+    the filter of pr-evidence's `foreign_closes`, over its `closing_refs`."""
+    return [(sha, message.splitlines()[0], f"line {n}: {words}", number, in_fork)
+            for sha, message in found
+            for n, words, number, in_fork in MATCHER.closing_refs(message)
+            if number not in closes or not in_fork]
+
+
+def gh_json(*argv: str):
+    gh = os.environ.get("GH", "gh")
+    done = subprocess.run([gh, *argv], capture_output=True, text=True)
+    if done.returncode:
+        fail(f"gh {' '.join(argv[:2])} failed:\n{done.stderr.strip()}")
+    return json.loads(done.stdout)
+
+
+def verdict(issue: str, pr: dict, repo: str) -> str:
+    """What GitHub did with `issue` at PR's merge, from the issue's events."""
+    pages = gh_json("api", f"repos/{repo}/issues/{issue}/events", "--paginate", "--slurp")
+    events = [event for page in pages for event in page]
+    merged = pr["mergedAt"]
+    merge_oid = pr["mergeCommit"]["oid"]
+    closed = [e for e in events if e["event"] == "closed"]
+    if any(e["commit_id"] == merge_oid for e in closed):
+        return "GitHub closed it with the merge commit"
+    if any(r["number"] == int(issue) for r in pr["closingIssuesReferences"]):
+        return "the PR's own link closed it (closingIssuesReferences), not shown to be the commit's keyword"
+    if any(e["created_at"] < merged for e in closed):
+        return "GitHub could not act, it was closed before the merge"
+    return "GitHub left it open (a false refusal)"
+
+
+def positive(text: str) -> int:
+    if not text.isdigit() or int(text) < 1:
+        raise argparse.ArgumentTypeError(f"takes a whole number of PRs, 1 or more, not {text!r}")
+    return int(text)
+
+
+def sweep(count: int) -> int:
+    repo = os.environ.get("REPO", "PorkChopExpress86/derbynet")
+    listed = gh_json("pr", "list", "--repo", repo, "--state", "merged", "--limit", "1000",
+                     "--json", "number,mergedAt")
+    last = sorted(listed, key=lambda p: p["mergedAt"])[-count:]
+    false = 0
+    refused = 0
+    for item in last:
+        pr = gh_json("pr", "view", str(item["number"]), "--repo", repo, "--json",
+                     "number,mergedAt,mergeCommit,closingIssuesReferences,commits")
+        found = [(c["oid"], f'{c["messageHeadline"]}\n\n{c["messageBody"]}') for c in pr["commits"]]
+        for sha, _subject, hit, number, in_fork in refusals(found, set()):
+            what = verdict(number, pr, repo) if in_fork else "in another repo, not read"
+            refused += 1
+            false += what.endswith("(a false refusal)")
+            print(f"PR #{pr['number']} {sha[:8]} {hit}: {what}")
+    print(f"{len(last)} PRs, {refused} refusals, {false} of them on an issue GitHub left open")
+    return 1 if false else 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="plan/bin/commit-closes", allow_abbrev=False,
+                                     description=__doc__.split("\n\n")[0])
+    parser.add_argument("--closes", metavar="N", type=MATCHER.issue_number, action="append",
+                        default=[])
+    parser.add_argument("--base", metavar="REV", action="append", default=[])
+    parser.add_argument("--head", metavar="REV", action="append", default=[])
+    parser.add_argument("--sweep", metavar="N", type=positive)
+    args = parser.parse_args(argv)
+    if args.sweep is not None:
+        if args.closes or args.base or args.head:
+            parser.error("--sweep takes no other option")
+        return sweep(args.sweep)
+    found = commits(args.head or ["HEAD"], args.base)
+    bad = refusals(found, set(args.closes))
+    for sha, subject, hit, _number, _in_fork in bad:
+        print(f"closes another issue, {sha[:8]} {subject!r}, {hit}: GitHub closes it when the "
+              "commit reaches master")
+    if bad:
+        print(f"refused: {FIX}", file=sys.stderr)
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
