@@ -816,17 +816,26 @@ def runners(tree, citing):
     itself, a conftest's folder, and the plain test files and conftest
     folders that import one. test_finalists.py reads
     testing/data/outlaw-class.csv through test_round_scenarios.py, which
-    names it (#431). A browser test maps only through its own cite: the
-    kiosk tests import open_kiosk from test_kiosk_pages.py, where one test
-    copies a headshot. Some browser importers do read the file, as
-    test_dashboard.py reads outlaw-class.csv; CI's full run covers them,
-    and mapping them is a follow-up (#431 review, round 2)."""
+    names it (#431). A browser test file maps through its own cite, and
+    through a file it imports itself, inside a function too, that is no
+    browser test: test_dashboard.py reads outlaw-class.csv through
+    racing/tests/test_race_day.py, and test_results.py uploads the
+    sample-names files through transfer/tests/import_golden.py (#470).
+    Neither an import through another module nor one of a browser test
+    counts: the kiosk tests import open_kiosk from test_kiosk_pages.py,
+    where one test copies a headshot, and the files test_round_scenarios.py
+    names reached every kiosk file through test_race_day.py (#470's oracle
+    sweep)."""
     found = set()
     for rel in citing:
-        tests, conftests = tree.importers(module_name(rel))
+        module = module_name(rel)
+        tests, conftests = tree.importers(module)
         found.update(t for t in tests if not is_browser_test(tree, t))
         found.update(str(Path(c).parent) for c in conftests
                      if not c.startswith(BROWSER_DIR))
+        if not is_browser_test(tree, rel):
+            found.update(t for t in tests if is_browser_test(tree, t)
+                         and module in tree.imports()[t])
         if Path(rel).name.startswith('test_'):
             found.add(rel)
         if Path(rel).name == 'conftest.py':
