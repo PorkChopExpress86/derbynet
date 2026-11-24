@@ -13,8 +13,10 @@
 # and waited about 2 h: #348's queued load runs took the lock again within
 # seconds of each other, so its gate waited for a 5-minute free window
 # (#348, #350 retro).  This script waits in the same line as the load runs
-# instead, and takes the lock in the order it came, ahead of any run that
-# starts waiting after it (tools/load-lock-line.sh, #417).  Whatever fails on
+# instead, ahead of every load run that waits there and behind the hand-offs
+# that came before it, so it waits for the holder and those hand-offs only;
+# while a run from a branch cut before #419 waits in the line, every run
+# keeps the order runs came in (tools/load-lock-line.sh, #417, #419).  Whatever fails on
 # the way to the lock, it exits 2 with a message and runs no COMMAND.  It takes
 # no option: -h or --help as its first argument prints the Usage line and
 # exits 0, and a first argument that starts with any other - is refused with
@@ -87,40 +89,27 @@ LINE_FILE="$(dirname "${BASH_SOURCE[0]}")/load-lock-line.sh"
   exit 2
 }
 
-WAITING=
 CHILD=
 stop_child() {
-  # `jobs -p` names the waiting flock only until `wait` reaps it, as in
-  # pytest-under-load.sh, which says why (#391 review).
-  if [ -n "$WAITING" ]; then
-    waiter=$(jobs -p)
-    if [ -n "$waiter" ]; then kill "$waiter" 2>/dev/null || true; fi
-  fi
   if [ -n "$CHILD" ]; then kill -TERM -- "-$CHILD" 2>/dev/null || true; fi
   line_leave
 }
 trap stop_child EXIT
 # A signal ignores further signals, as in pytest-under-load.sh, which says
 # why.  Its cleanup needs no ignore of its own: a command that fails under
-# `set -e` leaves it nothing to stop, since a failed `wait` has reaped its
-# flock, which `jobs -p` then no longer names, and no command between
+# `set -e` before the lock leaves it no child to stop, and no command between
 # `CHILD=$!` and `CHILD=` can fail.  The traps come before the wait for the
 # lock, as there (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 trap 'line_fail "$BASH_COMMAND"' ERR
-line_join "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s' \
+line_join hand-off "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs hold-load-lock.sh: %s' \
   "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$*")"
 if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
   since=$(date +%s)
-  # Waited on in the background, as in pytest-under-load.sh, which says why.
-  WAITING=1
   line_wait_turn
-  flock -x 9 8>&- &
-  wait "$!"
-  WAITING=
   echo "Got the load lock after $(( $(date +%s) - since )) s"
 elif [ "$LINE_STATE" != took ]; then
   line_fail "the join gave no place and no lock"

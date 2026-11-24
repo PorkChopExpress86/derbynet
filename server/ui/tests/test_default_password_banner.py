@@ -1,10 +1,15 @@
 """D16: every manager page warns while a role keeps its seeded password."""
 
-from unittest import mock
+from importlib import import_module
+from io import StringIO
+from pathlib import Path
 
 import pytest
+from django.apps import apps
+from django.contrib.auth.hashers import make_password
+from django.core.management import call_command
+from django.test import Client
 
-from accounts import services
 from accounts.models import Role
 from accounts.services import roles_with_default_password
 
@@ -69,14 +74,96 @@ def test_the_seed_migration_reads_the_same_list():
     assert seed.DEFAULT_ROLES is defaults.DEFAULT_ROLES
 
 
-def test_each_hash_is_checked_once(event):
-    services._checked.clear()
-    real = services.check_password
-    with mock.patch.object(services, "check_password", side_effect=real) as check:
-        roles_with_default_password()
-        roles_with_default_password()
-        assert check.call_count == 3
+def test_a_change_on_the_roles_page_takes_its_role_off(login):
+    """`accounts.services.change_password`, which the roles page calls."""
+    client = login("RaceCoordinator")
 
-        change_password("RaceCrew", "new-crew")
-        assert roles_with_default_password() == ["Photo", "RaceCoordinator"]
-        assert check.call_count == 4
+    client.post("/settings/roles/Photo/password/", {"password": "zoom"})
+
+    page = client.get("/").content.decode()
+    # The span starts the list, so the three-role sentence does not match.
+    assert "<span>RaceCrew, RaceCoordinator still use their default passwords." in page
+
+
+def test_a_password_changed_back_to_the_seeded_one_is_named_again(login):
+    client = login("RaceCoordinator")
+    client.post("/settings/roles/Photo/password/", {"password": "zoom"})
+
+    client.post("/settings/roles/Photo/password/", {"password": "flashbulb"})
+
+    page = client.get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )
+
+
+def test_a_flush_and_re_seed_names_every_seeded_role_again(login):
+    """As the browser conftest re-seeds after each test's flush."""
+    before = login("RaceCrew")
+    for name in ("Photo", "RaceCrew", "RaceCoordinator"):
+        change_password(name, f"new-{name}")
+    assert BANNER not in before.get("/").content.decode()
+    Role.objects.all().delete()
+
+    seed = import_module("accounts.migrations.0002_seed_default_roles").seed
+    seed(apps, None)
+
+    page = login("RaceCrew").get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )
+
+
+ROLE_FILES = Path(__file__).parents[2] / "accounts" / "tests" / "data"
+
+
+def import_roles(name):
+    call_command("import_roles", str(ROLE_FILES / name), stdout=StringIO())
+
+
+def test_an_import_with_new_passwords_takes_the_banner_away(event):
+    """`config-roles-hand-edited.json` gives each seeded role it keeps a new
+    password, the coordinator "n3w-pass", and has no Photo."""
+    import_roles("config-roles-hand-edited.inc")
+    client = Client()
+    response = client.post(
+        "/login/", {"name": "RaceCoordinator", "password": "n3w-pass"}
+    )
+    assert response.status_code == 302, response.content
+
+    assert BANNER not in client.get("/").content.decode()
+
+
+def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
+    """`config-roles-default.json` holds the passwords a new install seeds."""
+    before = login("RaceCrew")
+    for name in ("Photo", "RaceCrew", "RaceCoordinator"):
+        change_password(name, f"new-{name}")
+    assert BANNER not in before.get("/").content.decode()
+
+    import_roles("config-roles-default.inc")
+
+    page = login("RaceCrew").get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )
+
+
+def test_a_hash_written_without_set_password_leaves_the_named_roles_as_before(login):
+    """A role whose hash is written without `set_password` keeps whatever
+    flag it had, so the banner names only the roles seeded with a password,
+    as before #441: not a new role, not Timer, seeded with none, and not a
+    seeded role left with no password."""
+    Role.objects.create(
+        name="Judge", password_hash=make_password("x"), permissions=258, position=9
+    )
+    Role.objects.filter(name="Timer").update(
+        password_hash=make_password("tick"), keeps_seeded_password=True
+    )
+    Role.objects.filter(name="Photo").update(password_hash="")
+
+    page = login("RaceCrew").get("/").content.decode()
+
+    assert "<span>RaceCrew, RaceCoordinator still use their default" in page
+    assert "Judge" not in page
+    assert "Timer" not in page

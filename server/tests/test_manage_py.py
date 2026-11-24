@@ -222,3 +222,11 @@ def test_a_host_with_no_geteuid_runs(monkeypatch, tmp_path):
     monkeypatch.setattr(manage, "IMAGE_MARKER", tmp_path / "docker-image")
     monkeypatch.delattr(os, "geteuid")
     manage.refuse_root(["manage.py", "check"])
+
+
+def test_the_upload_check_reads_manage_py_marker():
+    """The upload health check (#48) knows the image by the marker
+    manage.py reads."""
+    from django.conf import settings
+
+    assert settings.DOCKER_IMAGE_MARKER == load_manage().IMAGE_MARKER
