@@ -567,3 +567,64 @@ def test_a_control_pressed_during_the_hold_keeps_the_held_heat(login, event):
     sheet(page).get_by_role("button", name="Save").click()
     expect(page.locator("#toasts")).to_contain_text("Replay settings saved.")
     expect(note).to_contain_text("Results of heat 1")
+
+
+def test_a_held_enter_in_manual_results_saves_once(login, event):
+    """#400: Enter goes down in lane 1's time field of the Manual results
+    sheet, with a time typed in each lane, and submits the form. The POST is held at
+    its route while two auto-repeat keydowns land in the field, then the
+    keyup: htmx sends one POST. Before, each repeat sent another, and the
+    form's hx-sync, which replaces, aborted the earlier ones (#400's survey
+    of the sheet forms). The held POST then saves, the sheet closes, and
+    racing moves on to heat 2."""
+    wolves = race_setup(event)["Wolves"]
+    scheduled(wolves)
+    page = open_dashboard(login("RaceCoordinator"))
+    stop_polling(page)
+    page.get_by_role("button", name="Manual results").click()
+    form = sheet(page).locator("[data-results-form]")
+    expect(form).to_be_visible()
+    for lane, time in enumerate(("2.5", "2.6", "2.7", "2.8"), 1):
+        sheet(page).get_by_label(f"Time, lane {lane}").fill(time)
+    held = []
+    page.route(
+        "**/dashboard/results/",
+        lambda route: (
+            held.append(route) if route.request.method == "POST" else route.continue_()
+        ),
+    )
+    page.evaluate(
+        """() => {
+          const log = window.sends = [];
+          document.addEventListener('htmx:beforeSend', (e) => {
+            if (e.detail.requestConfig.verb === 'post')
+              log.push(e.detail.requestConfig.path);
+          }, true);
+          document.addEventListener('keydown', (e) => {
+            if (e.repeat) log.push('repeat');
+          }, true);
+          document.addEventListener('keyup', () => log.push('keyup'), true);
+        }"""
+    )
+    sheet(page).get_by_label("Time, lane 1").focus()
+    page.keyboard.down("Enter")
+    page.wait_for_function("window.sends.length > 0", timeout=10_000)
+    page.keyboard.down("Enter")
+    page.keyboard.down("Enter")
+    page.keyboard.up("Enter")
+    page.wait_for_function("window.sends.includes('keyup')")
+    # one read: the box is about the repeats, all logged before the keyup
+    # waited on above; a send after the keyup would be no repeat's.
+    assert page.evaluate("window.sends") == [
+        "/dashboard/results/",
+        "repeat",
+        "repeat",
+        "keyup",
+    ]
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/dashboard/results/" in r.url
+    ):
+        held[0].continue_()
+    expect(sheet(page)).to_be_hidden()
+    expect(page.locator("[data-hold-note]")).to_contain_text("Results of heat 1")
+    assert current(event)[1] == 2

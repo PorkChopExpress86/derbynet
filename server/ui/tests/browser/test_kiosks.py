@@ -2374,9 +2374,9 @@ def test_a_held_enter_in_a_sheet_form_submits_once(
     submits the form. The POST is held at its route while two auto-repeat
     keydowns land on the same control, then the keyup: htmx sends one
     POST. Before, each repeat sent another, and the form's hx-sync, which
-    replaces, aborted the earlier ones (the PR's red run). PHP's naming
-    dialog posts once for the same press, its repeats landing on the page's
-    body (the PR's php-scratch run). The held POST then
+    replaces, aborted the earlier ones (#400). PHP's naming dialog posts
+    once for the same press, its repeats landing on the page's body
+    (#400's php-scratch run). The held POST then
     saves and the sheet closes. Near miss: a fresh Enter press in the
     reopened sheet submits it again."""
     kiosk(event, "tv", name="Main")
@@ -2405,8 +2405,8 @@ def test_a_held_enter_in_a_sheet_form_submits_once(
     log = page.evaluate("window.sheetLog")
     repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
     assert len(repeats) == 2 and all(r["inSheet"] for r in repeats), log
-    # one read: htmx sends a repeat's POST in the repeat keydown's task,
-    # before keyboard.down() returns.
+    # one read: the box is about the repeats, all logged before the keyup
+    # waited on above; a send after the keyup would be no repeat's.
     assert [r["path"] for r in log if r["what"] == "send"] == [post], log
     with htmx_post(page, post):
         held[0].continue_()
@@ -2472,7 +2472,7 @@ def test_a_held_enter_after_a_refusal_sends_nothing_more(login, event):
     is a name the scenes already use, so Enter in the field sends the POST,
     whose reply refuses it and leaves the sheet open, the focus back in the
     field. Two auto-repeat keydowns then land in the field and send
-    nothing. Before, the first repeat sent the refused POST again (the PR's
+    nothing. Before, the first repeat sent the refused POST again (#400's
     survey of the sheet forms). Near miss: a fresh Enter press sends it
     again, and is refused again."""
     page = login("RaceCoordinator")
@@ -2499,7 +2499,8 @@ def test_a_held_enter_after_a_refusal_sends_nothing_more(login, event):
     log = page.evaluate("window.sheetLog")
     repeats = [r for r in log if r["what"] == "keydown" and r["repeat"]]
     assert len(repeats) == 2 and all(r["inSheet"] for r in repeats), log
-    # one read: htmx sends a repeat's POST in the repeat keydown's task.
+    # one read: the box is about the repeats, all logged before the keyup
+    # waited on above; a send after the keyup would be no repeat's.
     assert [r["path"] for r in log if r["what"] == "send"] == [
         "/kiosks/scenes/name/"
     ], log

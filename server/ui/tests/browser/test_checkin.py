@@ -1011,7 +1011,7 @@ def test_a_held_enter_adds_a_racer_and_saves_nothing_more(login, event):
     Ada Lovelace typed, and adds her as 101. The reply turns the sheet into
     her edit form, with the focus back in First name, and two auto-repeat
     keydowns then land there and send nothing. Before, the first repeat
-    posted her edit form, an extra save of the same values (the PR's survey
+    posted her edit form, an extra save of the same values (#400's survey
     of the sheet forms). Near miss: a fresh Enter press saves the edit form."""
     page = open_checkin(login("RaceCoordinator"))
     page.get_by_role("button", name="New racer").click()
@@ -1042,7 +1042,8 @@ def test_a_held_enter_adds_a_racer_and_saves_nothing_more(login, event):
     page.keyboard.down("Enter")
     page.keyboard.up("Enter")
     page.wait_for_function("window.sends.includes('keyup')")
-    # one read: htmx sends a repeat's POST in the repeat keydown's task.
+    # one read: the box is about the repeats, all logged before the keyup
+    # waited on above; a send after the keyup would be no repeat's.
     assert page.evaluate("window.sends") == [
         "/checkin/racer/new/",
         "repeat",

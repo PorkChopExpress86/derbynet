@@ -78,7 +78,7 @@ function carryHeldKeys() {
 // test_a_held_enter_adds_a_racer_and_saves_nothing_more). PHP's naming
 // dialog posts once for the same press: it closes before its POST
 // (kiosk-dashboard.js:261-263), and the repeats land on the page's body
-// (the PR's php-scratch run). A form off any sheet keeps its repeats
+// (#400's php-scratch run). A form off any sheet keeps its repeats
 // (test_a_held_enter_in_a_form_off_a_sheet_still_repeats).
 document.addEventListener('submit', (e) => {
   if (e.target.closest('[data-sheet]')) carriedKeys.add('Enter');
