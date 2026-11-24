@@ -26,8 +26,7 @@ Exits 1 on a refusal, naming each commit and line, and 2 when git can't read a
 revision or `--sweep`'s gh fails. `--closes` takes N or #N, as it does for pr-evidence.
 
 `--ticket N` also refuses each commit reachable from --head and from no
---ticket-base (with none given, from no remote-tracking branch), merges left
-out, whose subject and body name no #N (#4990 and #49 are no #499), such as 06b4ddaa on
+--ticket-base and no remote-tracking branch, merges left out, whose subject and body name no #N (#4990 and #49 are no #499), such as 06b4ddaa on
 issue-37-transcript-differ. #503's 08ae49fd names #499 mid-subject with no
 `(#499)` after it, and passes (#499 retro). Its range is the commits the push
 sends, not --base's: a commit the remote already has can be mended only by a
@@ -37,7 +36,10 @@ force push (#504 review).
 before git sends the commits, with origin/master and local master as bases:
 `DERBYNET_PUSH_CLOSES="64 65"` names the issues the push closes on purpose,
 and a ref pushed as issue-<n>-<slug> may close its ticket and is read with
-`--ticket n`, and `--ticket-base` the remote ref's old sha when it has one. The hook, not `pr-merge`, is where it runs
+`--ticket n`, and `--ticket-base` for the remote ref's old sha when this
+clone has it and for local master when it is a --base, so master's commits
+that a merge or a rebase brings in are not read as the branch's (#504
+review round 2). The hook, not `pr-merge`, is where it runs
 because `pr-merge` runs after the commits are on GitHub, where only a force
 push can mend one. `git push --no-verify`, a clone whose `core.hooksPath` is
 unset and an edit made on github.com skip the hook.
@@ -108,10 +110,14 @@ def resolve(rev: str) -> str:
     return done.stdout.strip()
 
 
-def commits(heads: list[str], bases: list[str], merges: bool = True) -> list[tuple[str, str]]:
+def commits(heads: list[str], bases: list[str], merges: bool = True,
+            remotes: bool = False) -> list[tuple[str, str]]:
     """Each commit from `heads` and from none of `bases`, as (sha, message);
-    with no base, from none of the remote-tracking branches."""
-    exclude = [f"^{resolve(b)}" for b in bases] or ["--not", "--remotes"]
+    with no base, or with `remotes`, from none of the remote-tracking
+    branches either."""
+    exclude = [f"^{resolve(b)}" for b in bases]
+    if remotes or not exclude:
+        exclude += ["--not", "--remotes"]
     done = run_git("log", "-z", "--format=%H%n%B", *([] if merges else ["--no-merges"]),
                    *[resolve(h) for h in heads], *exclude)
     if done.returncode:
@@ -216,8 +222,8 @@ def main(argv: list[str]) -> int:
         print(f"refused: {FIX}", file=sys.stderr)
     silent = []
     if args.ticket:
-        silent = unnamed(commits(args.head or ["HEAD"], args.ticket_base, merges=False),
-                         args.ticket)
+        silent = unnamed(commits(args.head or ["HEAD"], args.ticket_base, merges=False,
+                                 remotes=True), args.ticket)
     for sha, subject in silent:
         print(f"names no #{args.ticket}, {sha[:8]} {subject!r}: a commit on the ticket's branch "
               "names its ticket")

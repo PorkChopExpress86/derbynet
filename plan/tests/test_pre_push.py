@@ -51,7 +51,8 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
          checked_out: str = 'head', ahead: str | None = None,
          ref: str = 'refs/heads/b', two_commits: bool = False,
-         pushed: str | None = None) -> subprocess.CompletedProcess:
+         pushed: str | None = None,
+         upstream: tuple[str, str] | None = None) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -75,7 +76,9 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
     message of a commit on b before the change, already on the remote: it is
     the remote sha git sends, with no remote-tracking branch at it, as in a
     clone that never fetched it; with `remote` 'new', a new branch stacked
-    on it, it is origin/pushed instead."""
+    on it, it is origin/pushed instead. `upstream` is (message, 'merge' or
+    'rebase'): a commit on master atop the base, which becomes origin/master
+    and which b then merges, or is rebased onto, as a force push sends it."""
     # A hook runs with GIT_DIR and the like set; the scratch repository
     # needs its own.
     env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
@@ -142,6 +145,17 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             git('rm', '-q', name)
         git('add', '.')
         git('commit', '-q', '-m', message)
+        if upstream is not None:
+            git('checkout', '-q', 'master')
+            (repo / 'upstream.txt').write_text('upstream\n')
+            git('add', '.')
+            git('commit', '-q', '-m', upstream[0])
+            git('update-ref', 'refs/remotes/origin/master', 'HEAD')
+            git('checkout', '-q', 'b')
+            if upstream[1] == 'merge':
+                git('merge', '-q', '--no-edit', 'master')
+            else:
+                git('rebase', '-q', 'master')
         head = git('rev-parse', 'HEAD')
         if pushed_before:
             git('update-ref', 'refs/remotes/origin/b', head)
@@ -744,6 +758,31 @@ class CommitClosingKeyword(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertRegex(result.stdout, rf"names no #{n}, \w{{8}} 'new unnamed'")
                 self.assertNotIn('old unnamed', result.stdout)
+
+    def test_a_master_commit_brought_in_is_not_the_branchs_own(self):
+        """A merge of origin/master into a pushed issue branch, as the loop's
+        fix round does, and a rebase onto it sent by a force push: the master
+        commit names no ticket and is not read for it (#504 review round 2)."""
+        for how in ('merge', 'rebase'):
+            with self.subTest(how=how):
+                result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
+                              pushed='old (#7)', message='new (#7)',
+                              upstream=('master commit no ticket', how))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
+                              pushed='old (#7)', message='new unnamed',
+                              upstream=('master commit no ticket', how))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("'new unnamed'", result.stdout)
+                self.assertNotIn('master commit no ticket', result.stdout)
+
+    def test_a_local_master_commit_atop_a_stale_origin_master_is_not_read(self):
+        """After a pull that leaves origin/master behind local master, the
+        branch cut from local master carries master's commit, which names no
+        ticket (#504 review round 2)."""
+        result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
+                      ahead='master commit no ticket', message='new (#7)')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_the_closing_check_still_reads_a_pushed_commit(self):
         """Its base stays origin/master (#439): a keyword reaches master with

@@ -164,10 +164,16 @@ for push in ${pushes[@]+"${pushes[@]}"}; do
   if [[ $ref =~ ^refs/heads/issue-([1-9][0-9]*)- ]]; then
     args+=(--closes "${BASH_REMATCH[1]}" --ticket "${BASH_REMATCH[1]}")
     # Only the commits this push sends: one the remote ref already has can
-    # be mended only by a force push. A new branch, or an old sha this clone
-    # lacks, leaves out what any remote-tracking branch has (#504 review).
+    # be mended only by a force push (#504 review). Master's commits that a
+    # merge or a rebase brings in are not the branch's own: the tool leaves
+    # out what any remote-tracking branch has, origin/master among them, and
+    # local master is a base when the closing check reads it as one, for a
+    # stale origin/master (#504 review round 2).
     if git cat-file -e "$old^{commit}" 2>/dev/null; then
       args+=(--ticket-base "$old")
+    fi
+    if [[ " ${args[*]} " == *" --base refs/heads/master "* ]]; then
+      args+=(--ticket-base refs/heads/master)
     fi
   fi
   echo "pre-push: plan/bin/commit-closes $sha ($ref)" >&2
