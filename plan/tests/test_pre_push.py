@@ -214,8 +214,8 @@ class PrePush(unittest.TestCase):
 
     def test_a_push_of_the_decisions_alone_runs_the_source_checks_that_read_them(self):
         """affected-tests finds them, so a check that reads the file joins
-        without a list to edit; the full script took about 10 min for #346's
-        retro's decisions-only push (session retro 2026-11-24)."""
+        without a list to edit, and test_php_claims.py, which does not read
+        it, stays out (session retro 2026-11-24)."""
         result = push('plan/owner-decisions.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('pre-push: the source checks that read plan/owner-decisions.md: '

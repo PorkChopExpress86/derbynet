@@ -320,7 +320,7 @@ fi
 
 # A push of plan/owner-decisions.md alone runs plan/tests and the source
 # checks that read it, which affected-tests finds as it maps a file to its
-# tests, not the whole of source-checks.sh, about 10 min, so the hook says
+# tests, not the whole of source-checks.sh, so the hook says
 # no `pre-push: tools/source-checks.sh` and the hand-off runs that (D129,
 # session retro 2026-11-24). A tool that fails or finds none runs it all.
 if [ -n "$decisions" ] && readers="$(python3 -I "$ROOT/plan/bin/affected-tests" \
