@@ -149,19 +149,21 @@ def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
     )
 
 
-def test_a_role_no_install_seeds_is_never_named(login):
+def test_a_hash_written_without_set_password_leaves_the_named_roles_as_before(login):
     """A role whose hash is written without `set_password` keeps whatever
     flag it had, so the banner names only the roles seeded with a password,
-    as before #441: not a new role, and not Timer, seeded with none."""
+    as before #441: not a new role, not Timer, seeded with none, and not a
+    seeded role left with no password."""
     Role.objects.create(
         name="Judge", password_hash=make_password("x"), permissions=258, position=9
     )
     Role.objects.filter(name="Timer").update(
         password_hash=make_password("tick"), keeps_seeded_password=True
     )
+    Role.objects.filter(name="Photo").update(password_hash="")
 
     page = login("RaceCrew").get("/").content.decode()
 
-    assert "<span>Photo, RaceCrew, RaceCoordinator still use their default" in page
+    assert "<span>RaceCrew, RaceCoordinator still use their default" in page
     assert "Judge" not in page
     assert "Timer" not in page
