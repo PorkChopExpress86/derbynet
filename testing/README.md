@@ -43,7 +43,9 @@ Run from a regular checkout, not a `git worktree`: the containers can't see the
 repository's git directory, and the build needs it.
 
 To see what PHP does with one script, from a regular checkout or a worktree,
-build the images once with `run-suite.sh harness assets server` and then run
+build the images once with `run-suite.sh harness assets server` from the regular
+checkout (a missing image makes the script print that command, with the
+checkout's path and the prefix), and then run
 
     testing/docker/php-scratch.sh test-points-racing.sh
 
