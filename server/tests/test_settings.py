@@ -293,7 +293,21 @@ def test_max_upload_size_defaults_to_100m(load_settings):
     assert load_settings()["DATA_UPLOAD_MAX_MEMORY_SIZE"] == 100 * 1024**2
 
 
-@pytest.mark.parametrize("value", ["16MB", "16T", "M", "-1M", "0", "1.5M", "sixteen"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "16MB",
+        "16T",
+        "\u00b2M",
+        "16\u00b2",
+        "\u0661\u0666M",
+        "M",
+        "-1M",
+        "0",
+        "1.5M",
+        "sixteen",
+    ],
+)
 def test_max_upload_size_refuses_what_nginx_would_not_read(load_settings, value):
     with pytest.raises(ImproperlyConfigured, match="MAX_UPLOAD_SIZE"):
         load_settings(MAX_UPLOAD_SIZE=value)

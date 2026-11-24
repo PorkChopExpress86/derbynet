@@ -17,7 +17,9 @@
 #              17 MiB one answers 413, and the about page's upload check is
 #              trouble and names nginx's 16M; at the default (100M) the photo
 #              stand's 30 MB photo succeeds and the check is ok and names
-#              100M (#48, D134)
+#              100M; the photo stand's own request for a 30000000-byte
+#              photo answers 413 at MAX_UPLOAD_SIZE=30000000, where the check
+#              is trouble, and 200 at 30001024, where it is ok (#48, D134)
 #   bind-mount with no DERBYNET_UID, derbynet takes a bind mount's non-root
 #              owner (D106); with the host user's DERBYNET_UID and
 #              DERBYNET_GID, a photo the server writes is the host user's
@@ -309,6 +311,33 @@ check_upload() {
     echo "$reply" | grep -q 'HTTP 200' || fail "the 30 MB upload did not answer 200"
     echo "$reply" | grep -q '"code": "success"' || fail "the 30 MB upload did not succeed"
     upload_check "$url" ok 100M
+    stop up2
+
+    upload_boundary 30000000 413 trouble
+    upload_boundary 30001024 200 ok
+}
+
+# upload_boundary <MAX_UPLOAD_SIZE> <HTTP code> <check status>: the photo
+# stand's request (extras/scripts/lib/photo-functions.sh:254-259) for a
+# 30000000-byte photo of car 999999 answers <HTTP code>, and the about page's
+# upload check is <check status>.  A 200 says only that nginx passed the
+# request on: the event has no car 999999, so Django refuses the barcode.
+upload_boundary() {
+    local work="$RUNNER_TEMP_DIR/upload" jar="$RUNNER_TEMP_DIR/upload/cookies" url code
+    say "the photo stand's request for a 30000000-byte photo at MAX_UPLOAD_SIZE=$1"
+    start "up-$1" "$PREFIX-upload" -e MAX_UPLOAD_SIZE="$1" -p 127.0.0.1::80
+    url="http://$(docker port "$PREFIX-up-$1" 80/tcp)"
+    rm -f "$jar"
+    login "$url" "$jar" Photo
+    cp "$work/30mb.jpg" "$work/Car999999.jpg"
+    code="$(curl -m 120 -s -o /dev/null -b "$jar" -c "$jar" -w '%{http_code}' \
+        -F action=photo.upload -F MAX_FILE_SIZE=30000000 -F repo=head \
+        -F barcode=PWD999999 -F autocrop=0 \
+        -F "photo=@$work/Car999999.jpg;type=image/jpeg" "$url/action.php")"
+    echo "HTTP $code"
+    [ "$code" = "$2" ] || fail "the photo stand's request answered $code, not $2"
+    upload_check "$url" "$3" "$1"
+    stop "up-$1"
 }
 
 # upload_check <url> <status> <size>: the about page, as RaceCoordinator,

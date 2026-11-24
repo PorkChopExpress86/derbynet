@@ -24,6 +24,14 @@ from derbynet.nginx_size import nginx_bytes
 # The photo stand posts MAX_FILE_SIZE=30000000 (`photo-stand` in `extras/`,
 # and `PHOTO_UPLOAD_MAX_BYTES` in `derbynet/settings.py`).
 PHOTO_STAND_BYTES = 30_000_000
+# What the photo stand's request carries beside the file: its multipart
+# fields and boundaries (`extras/scripts/lib/photo-functions.sh:254-259`).
+# Measured with curl 8.5 at 744 bytes (repo car, barcode PWD101) to 751
+# (repo head, PWD999999); 1024 leaves headroom for a longer car number or
+# file name, or another curl's boundary. nginx refuses a request whose body
+# is over client_max_body_size, so its cap must hold the file and these
+# (D134). `tests/test_photo_stand_request.py` measures it.
+PHOTO_STAND_FORM_BYTES = 1024
 
 
 class Status:
@@ -168,7 +176,9 @@ def upload_limit() -> Check:
     D134; PHP warns under 8000 KB of `upload_max_filesize` alone,
     `details-for-setup-page.inc:152-156`):
     Django's photo cap, and in the image (#58) nginx's
-    `client_max_body_size`, which `MAX_UPLOAD_SIZE` sets. Outside the image
+    `client_max_body_size`, which `MAX_UPLOAD_SIZE` sets and which must
+    also hold the request's form fields (`PHOTO_STAND_FORM_BYTES`). A conf
+    that can't be read, or that has no directive, is trouble. Outside the image
     the server cannot see the proxy in front of it, so the page says to
     check it; in the image a proxy can still sit in front of nginx
     (docs/install-docker.md), so the page says that too.
@@ -199,7 +209,7 @@ def upload_limit() -> Check:
             detail += " nginx in the image takes requests of any size."
         else:
             written, size = nginx
-            ok = ok and size >= PHOTO_STAND_BYTES
+            ok = ok and size >= PHOTO_STAND_BYTES + PHOTO_STAND_FORM_BYTES
             detail += (
                 f" nginx in the image (MAX_UPLOAD_SIZE) takes requests up to"
                 f" {written} ({_megabytes(size)})."

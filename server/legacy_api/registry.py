@@ -643,9 +643,10 @@ ROUTE_DIVERGENCES: dict[str, tuple[str, ...]] = {
         "D80: the wizard's steps and the health checks replace setup.php's"
         " status list (setup.php:85-86 opens it): the database takes writes,"
         " the configuration folders, each photo folder, and the upload caps.",
-        "D134: the upload check is trouble when Django's photo cap, or in the"
-        " image nginx's client_max_body_size, is under the photo stand's"
-        " 30000000 bytes; PHP warns under 8000 KB of upload_max_filesize, only"
+        "D134: the upload check is trouble when Django's photo cap is under"
+        " the photo stand's 30000000 bytes, or in the image when nginx's"
+        " client_max_body_size is under that plus 1024 bytes of form fields or"
+        " can't be read; PHP warns under 8000 KB of upload_max_filesize, only"
         " when settings aren't locked, and keeps the icon"
         " (details-for-setup-page.inc:152-156).",
     ),
