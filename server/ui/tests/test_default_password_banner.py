@@ -1,10 +1,14 @@
 """D16: every manager page warns while a role keeps its seeded password."""
 
-from unittest import mock
+from importlib import import_module
+from io import StringIO
+from pathlib import Path
 
 import pytest
+from django.apps import apps
+from django.core.management import call_command
+from django.test import Client
 
-from accounts import services
 from accounts.models import Role
 from accounts.services import roles_with_default_password
 
@@ -69,14 +73,71 @@ def test_the_seed_migration_reads_the_same_list():
     assert seed.DEFAULT_ROLES is defaults.DEFAULT_ROLES
 
 
-def test_each_hash_is_checked_once(event):
-    services._checked.clear()
-    real = services.check_password
-    with mock.patch.object(services, "check_password", side_effect=real) as check:
-        roles_with_default_password()
-        roles_with_default_password()
-        assert check.call_count == 3
+def test_a_change_on_the_roles_page_takes_its_role_off(login):
+    """`accounts.services.change_password`, which the roles page calls."""
+    client = login("RaceCoordinator")
 
-        change_password("RaceCrew", "new-crew")
-        assert roles_with_default_password() == ["Photo", "RaceCoordinator"]
-        assert check.call_count == 4
+    client.post("/settings/roles/Photo/password/", {"password": "zoom"})
+
+    page = client.get("/").content.decode()
+    assert "RaceCrew, RaceCoordinator still use their default passwords." in page
+
+
+def test_a_password_changed_back_to_the_seeded_one_is_named_again(login):
+    client = login("RaceCoordinator")
+    client.post("/settings/roles/Photo/password/", {"password": "zoom"})
+
+    client.post("/settings/roles/Photo/password/", {"password": "flashbulb"})
+
+    page = client.get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )
+
+
+def test_a_flush_and_re_seed_names_every_seeded_role_again(login):
+    """As the browser conftest re-seeds after each test's flush."""
+    for name in ("Photo", "RaceCrew", "RaceCoordinator"):
+        change_password(name, f"new-{name}")
+    Role.objects.all().delete()
+
+    seed = import_module("accounts.migrations.0002_seed_default_roles").seed
+    seed(apps, None)
+
+    page = login("RaceCrew").get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )
+
+
+ROLE_FILES = Path(__file__).parents[2] / "accounts" / "tests" / "data"
+
+
+def import_roles(name):
+    call_command("import_roles", str(ROLE_FILES / name), stdout=StringIO())
+
+
+def test_an_import_with_new_passwords_takes_the_banner_away(event):
+    """`config-roles-hand-edited.json` gives RaceCrew "10" and the
+    coordinator "n3w-pass", and has no Photo."""
+    import_roles("config-roles-hand-edited.inc")
+    client = Client()
+    response = client.post(
+        "/login/", {"name": "RaceCoordinator", "password": "n3w-pass"}
+    )
+    assert response.status_code == 302, response.content
+
+    assert BANNER not in client.get("/").content.decode()
+
+
+def test_an_import_of_the_seeded_passwords_keeps_the_banner(login):
+    """`config-roles-default.json` holds the passwords a new install seeds."""
+    for name in ("Photo", "RaceCrew", "RaceCoordinator"):
+        change_password(name, f"new-{name}")
+
+    import_roles("config-roles-default.inc")
+
+    page = login("RaceCrew").get("/").content.decode()
+    assert "Photo, RaceCrew, RaceCoordinator still use their default passwords." in (
+        page
+    )

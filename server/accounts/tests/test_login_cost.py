@@ -1,11 +1,10 @@
 """What a login costs in password hashes after the roles are seeded again,
 as each browser test seeds them (#430).
 
-The re-seed gives every role a new salt, so the hashes the process already
-checked are no help: each browser test paid them again, not only each
-process's first page, and under load the login's Enter timed out (#383).
-The test settings hash with MD5 (`conftest.py`); the production case keeps
-the real login on PBKDF2.
+The D16 banner reads whether each role keeps its seeded password from the
+database, so a fresh process's first logged-in page hashes nothing, where it
+used to check the three seeded hashes (#441). The test settings hash with
+MD5 (`conftest.py`); the production case keeps the real login on PBKDF2.
 """
 
 import time
@@ -75,7 +74,7 @@ def test_the_test_settings_run_no_pbkdf2(monkeypatch, event):
     assert hash_counts(monkeypatch) == dict.fromkeys(STEPS, 0)
 
 
-def test_the_production_hasher_pays_one_hash_per_login_and_three_per_first_page(
+def test_the_production_hasher_pays_one_hash_per_login_and_none_per_page(
     monkeypatch, settings, event
 ):
     settings.PASSWORD_HASHERS = global_settings.PASSWORD_HASHERS
@@ -84,6 +83,6 @@ def test_the_production_hasher_pays_one_hash_per_login_and_three_per_first_page(
         "seed": 3,
         "visitor's /": 0,
         "login": 1,
-        "first /": 3,
+        "first /": 0,
         "second /": 0,
     }
