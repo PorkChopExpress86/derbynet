@@ -53,7 +53,6 @@ KNOWN = {
     ("server/tools/load-lock-line.sh", "${last%%.*}"): (
         "line_scan lists only names ENTRY_NAME matches, ten digits before the dot"
     ),
-    ("server/tools/load-lock-line.sh", "last"): "set from that ticket",
     ("server/tools/pytest-under-load.sh", "pid"): "$PPID, then `ps -o ppid=`",
     ("server/tools/source-checks.sh", "pid"): "$PPID, then `ps -o ppid=`",
     ("server/docker/ci/checks.sh", "size"): "padded_jpeg's callers pass digits",
