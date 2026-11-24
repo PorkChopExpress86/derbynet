@@ -151,11 +151,11 @@ BROWSER = "import pytest\n\npytestmark = pytest.mark.browser\n"
 
 
 def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
-    out, tmp_path = tmp_path / "out", tmp_path / "repo"
     """The report, run in a stand-in with the repository's affected-tests,
     names each pair mapped or UNMAPPED, a listing as a listing, and counts
     the unmapped file pairs; a top-level read reaches a browser test that
     imports its module."""
+    out, root = tmp_path / "out", tmp_path / "repo"
     repo = Path(__file__).resolve().parents[2]
     files = {
         "plan/bin/affected-tests": (repo / "plan/bin/affected-tests").read_text(),
@@ -168,17 +168,17 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
         "server/ui/tests/browser/test_quiet.py": BROWSER + "import helpers.rows\n",
     }
     for rel, text in files.items():
-        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path / rel).write_text(text)
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
     for argv in (
         ["init", "-q"],
         ["add", "-A"],
         ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "t"],
     ):
-        subprocess.run(["git", *argv], cwd=tmp_path, check=True)
+        subprocess.run(["git", *argv], cwd=root, check=True)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=tmp_path,
+        cwd=root,
         check=True,
         capture_output=True,
         text=True,
@@ -213,7 +213,7 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
         argv = [
             sys.executable,
             "-I",
-            str(tmp_path / "server/tools/opens_oracle.py"),
+            str(root / "server/tools/opens_oracle.py"),
             str(out),
         ]
         return subprocess.run(
@@ -221,7 +221,7 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
         ).stdout.splitlines()
 
     assert report() == [
-        f"worktree {tmp_path} head {head}; uncommitted: no",
+        f"worktree {root} head {head}; uncommitted: no",
         "pairs 4; testing/ paths 3",
         f"listing\tlist\ttesting/data\t{quiet}",
         f"UNMAPPED\topen\ttesting/data/other.csv\t{cites}",
@@ -229,5 +229,5 @@ def test_the_report_marks_each_pair_affected_tests_maps(tmp_path):
         f"UNMAPPED\timport-time\ttesting/data/roster.csv\t{quiet}",
         "unmapped file pairs 2",
     ]
-    (tmp_path / "stray").write_text("")
-    assert report()[0] == f"worktree {tmp_path} head {head}; uncommitted: yes"
+    (root / "stray").write_text("")
+    assert report()[0] == f"worktree {root} head {head}; uncommitted: yes"

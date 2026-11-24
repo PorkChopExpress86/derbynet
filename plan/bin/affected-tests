@@ -823,9 +823,15 @@ def runners(tree, citing):
     sample-names files through transfer/tests/import_golden.py (#470).
     Neither an import through another module nor one of a browser test
     counts: the kiosk tests import open_kiosk from test_kiosk_pages.py,
-    where a test copies a headshot, and through test_race_day.py they would
-    map the shell scripts test_round_scenarios.py names, which no kiosk
-    test reads (#470's oracle sweep, the lead's choice)."""
+    where a test copies a headshot, and through test_race_day.py seven
+    kiosk files and test_dashboard.py would map each testing/ file
+    test_round_scenarios.py names. #470's oracle saw them read two of
+    those: outlaw-class.csv, which maps for the two that import
+    test_race_day.py themselves, and import-roster.sh, at
+    test_round_scenarios.py's top level.
+    test_kiosk_names.py maps import-roster.sh through its own cite.
+    TestingReaders.test_a_module_that_names_a_file_maps_the_plain_tests_that_import_it
+    holds both cases (#470)."""
     found = set()
     for rel in citing:
         module = module_name(rel)
