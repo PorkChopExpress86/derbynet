@@ -4,7 +4,6 @@ A delegate reads `CLAUDE.md` on its own. A brief names the ticket and what is sp
 
 ## Rules for every agent
 
-- Never use the fable model, and never spawn a subagent on it. Use opus for the hardest work.
 - Before building, list what `origin/master` already has for the ticket: its commits (`git log origin/master --grep '#N\b'`), its endpoints in `server/legacy_api/registry.py`, and the handlers and services that exist. Build what the list lacks, and put the list in the final report.
 - Work in its own git worktree, on a branch named `issue-<n>-<slug>`. Check `git branch --show-current` before any pull or merge in the main clone, because other sessions use it.
 - Commit with `git -c user.name=PorkChopExpress86 -c user.email="$(git -C <main clone> config user.email)" commit`, which reads the owner's address from the main clone's `.git/config` instead of typing it: #307's implementer saw a command with the address typed out refused as a privacy leak. The same line works in a fresh clone with no config of its own, such as the screenshots clone. End each message with the `Co-Authored-By` line the session gives. A message holds no closing keyword for an issue the PR leaves open (`Closes #N`, `fixes #N`): GitHub closes it when the squash commit reaches master, and the pre-push hook refuses one (`plan/bin/commit-closes`; reword it, or `DERBYNET_PUSH_CLOSES="N"` for an issue the PR closes on purpose, #439; a branch named `issue-<n>-` may close its ticket). Push the branch, and leave the PR and the merge to the lead.
