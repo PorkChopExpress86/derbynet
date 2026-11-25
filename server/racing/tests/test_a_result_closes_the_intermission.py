@@ -153,6 +153,18 @@ def test_a_final_that_has_a_result_does_not_wait_again(waiting_final):
     assert raced_heats(final) == [1]
 
 
+def test_next_from_the_ended_round_does_not_make_a_raced_final_wait(waiting_final):
+    """Next on round 1's last heat finds the round complete and ends it
+    again with no result written."""
+    event, round1, final, entry, finalists_for = waiting_final
+    race_first_final_heat(event, final, finalists_for)
+    assert select_heat(event, round_id=round1.id, heat=last_heat(round1)) is None
+    advance(event, "next", report=False, finalists_for=finalists_for)
+    assert_no_intermission(event)
+    now = state_of_event(event)
+    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 2, False)
+
+
 def test_a_final_that_has_a_result_goes_on_racing_when_the_step_continues():
     """A step that does not wait starts with racing on when the step before
     it says `continue_racing`, and so does a final that has a result."""
