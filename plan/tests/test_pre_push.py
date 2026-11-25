@@ -499,6 +499,19 @@ class TreeChanged(unittest.TestCase):
                 self.assertNotIn(self.CHANGED, result.stderr)
 
 
+class TwoCommitLock(unittest.TestCase):
+    """The lock .githooks/pre-commit reads covers a push of two commits,
+    whose checks read the working tree, too (#500 retro)."""
+
+    edit = TreeChanged.edit
+
+    def test_a_push_of_two_commits_locks_both_refs_while_its_checks_run(self):
+        line = ("assert [p.read_text() for p in (REPO / '.git').glob('pre-push-*.lock')]"
+                " == ['refs/heads/b\\nrefs/heads/m\\n'], 'the lock'")
+        result = push('notes/x.md', two_commits=True, plan_test=self.edit(line))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
 class TreeCopy(unittest.TestCase):
     """A push of one commit runs its checks in a detached copy of it, so the
     working tree is free while they run: #400's implementer edited it during
@@ -606,20 +619,21 @@ class CopySignals(unittest.TestCase):
         return subprocess.run(['git', *argv], cwd=self.repo, env=self.env, check=True,
                               capture_output=True, text=True).stdout.strip()
 
-    def start(self, **environ):
+    def start(self, local='refs/heads/master', **environ):
         hook = subprocess.Popen(
             ['bash', str(self.repo / '.githooks' / 'pre-push'), 'origin', 'url'],
             cwd=self.repo, env={**self.env, **environ}, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             start_new_session=True)
-        hook.stdin.write(f'refs/heads/master {self.head} refs/heads/b {self.base}\n')
+        hook.stdin.write(f'{local} {self.head} refs/heads/b {self.base}\n')
         hook.stdin.close()
         return hook
 
-    def hanging(self, **environ):
+    def hanging(self, local='refs/heads/master', **environ):
         """The hook, once its plan test hangs in the copy, and that test's pid."""
         pid_file = self.tmp / 'hang.pid'
-        hook = self.start(HANG_PID=str(pid_file), **environ)
+        pid_file.unlink(missing_ok=True)
+        hook = self.start(local, HANG_PID=str(pid_file), **environ)
         for _ in range(600):
             if pid_file.exists() and pid_file.read_text():
                 break
@@ -660,6 +674,8 @@ class CopySignals(unittest.TestCase):
         _, err = hook.communicate(timeout=60)
         self.assertEqual(hook.returncode, 1, err)
         self.assertIn("PRE_PUSH_KILL_WAIT takes a whole number of seconds, not '2s'", err)
+        # It stops before any trap is set, so it writes no lock to leave behind.
+        self.assertEqual(list((self.repo / '.git').glob('pre-push-*.lock')), [])
 
     def test_a_term_stops_the_checks_and_removes_the_copy(self):
         hook, pid = self.hanging()
@@ -678,6 +694,50 @@ class CopySignals(unittest.TestCase):
         self.assertEqual(hook.returncode, 143, err)
         self.assertFalse(self.running(pid), 'the check outlived the hook')
         self.assert_no_copy()
+
+    def test_a_commit_on_the_pushed_branch_is_refused_while_the_checks_run(self):
+        """#500's implementer committed 7e50d6bd while the hook checked
+        106ef5b6, and the hook refused the push once its checks ended (#500
+        retro). The
+        hook's lock makes .githooks/pre-commit refuse the commit at once,
+        and the lock is gone once the hook ends. `git push origin HEAD`
+        sends the hook HEAD as its local ref, which the lock names as the
+        branch."""
+        shutil.copy(HOOK.parent / 'pre-commit', self.repo / '.githooks' / 'pre-commit')
+        self.git('config', 'core.hooksPath', '.githooks')
+        for local in ('refs/heads/master', 'HEAD'):
+            with self.subTest(local=local):
+                hook, _ = self.hanging(local)
+                locks = list((self.repo / '.git').glob('pre-push-*.lock'))
+                self.assertEqual([p.name for p in locks], [f'pre-push-{hook.pid}.lock'])
+                self.assertEqual(locks[0].read_text(), 'refs/heads/master\n')
+                done = subprocess.run(
+                    ['git', 'commit', '-q', '--allow-empty', '-m', 'during'],
+                    cwd=self.repo, env=self.env, capture_output=True, text=True)
+                self.assertEqual(done.returncode, 1, done.stderr)
+                self.assertIn(f'pre-push {hook.pid} is checking refs/heads/master',
+                              done.stderr)
+                hook.send_signal(signal.SIGTERM)
+                hook.communicate(timeout=60)
+                self.assertEqual(list((self.repo / '.git').glob('pre-push-*.lock')), [])
+                self.assertEqual(self.git('rev-parse', 'HEAD'), self.head)
+
+    def test_the_next_push_removes_a_lock_whose_pid_is_gone(self):
+        """A SIGKILL runs no trap, so its lock stays, and a process that later
+        takes its pid would block a commit (PR #517's review). A live pid's
+        lock stays."""
+        sleeper = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(sleeper.wait)
+        self.addCleanup(sleeper.kill)
+        gone = self.repo / '.git' / 'pre-push-999999999.lock'
+        live = self.repo / '.git' / f'pre-push-{sleeper.pid}.lock'
+        for lock in (gone, live):
+            lock.write_text('refs/heads/master\n')
+        hook = self.start()
+        _, err = hook.communicate(timeout=120)
+        self.assertEqual(hook.returncode, 0, err)
+        self.assertFalse(gone.exists())
+        self.assertTrue(live.exists())
 
     def test_the_next_push_removes_a_killed_hooks_copy_and_its_checks(self):
         hook, pid = self.hanging()

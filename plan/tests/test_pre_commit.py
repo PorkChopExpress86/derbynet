@@ -90,6 +90,44 @@ class PreCommit(unittest.TestCase):
         done = self.git('commit', '-q', '-m', 'x')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
+    def test_a_push_checking_the_branch_refuses_a_commit_on_it(self):
+        """#500's implementer committed 7e50d6bd and 0e4252ca while the
+        pre-push hook checked 106ef5b6, which refused the push once its
+        checks ended (#500 retro). A lock whose pid is gone, or that names another
+        branch, refuses nothing."""
+        common = Path(self.root, '.git')
+        sleeper = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(sleeper.wait)
+        self.addCleanup(sleeper.kill)
+        lock = common / f'pre-push-{sleeper.pid}.lock'
+        lock.write_text('refs/heads/other\nrefs/heads/master\n')
+        done = self.commit('notes.md', 'x\n')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn(f'pre-push {sleeper.pid} is checking refs/heads/master', done.stderr)
+        lock.write_text('refs/heads/other\nrefs/heads/master-2\n')
+        done = self.git('commit', '-q', '-m', 'x')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lock.write_text('refs/heads/master\n')
+        sleeper.kill()
+        sleeper.wait()
+        done = self.commit('notes.md', 'y\n')
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_worktree_s_commit_sees_the_lock_of_a_push_from_the_main_checkout(self):
+        self.commit('notes.md', 'x\n')
+        tree = self.root / 'wt'
+        self.git('worktree', 'add', '-q', '-b', 'side', str(tree))
+        sleeper = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(sleeper.wait)
+        self.addCleanup(sleeper.kill)
+        (self.root / '.git' / f'pre-push-{sleeper.pid}.lock').write_text('refs/heads/side\n')
+        (tree / 'side.md').write_text('x\n')
+        subprocess.run(['git', 'add', '.'], cwd=tree, env=self.env, check=True)
+        done = subprocess.run(['git', 'commit', '-q', '-m', 'x'], cwd=tree, env=self.env,
+                              capture_output=True, text=True)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn('is checking refs/heads/side', done.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

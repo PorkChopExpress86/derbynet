@@ -147,9 +147,11 @@ def unbounded(source):
 
 
 def stand_in_modules():
-    # This module's own examples are left out.
+    # This module's own examples are left out, and so are test_waiter_hook.py's
+    # waiters, commands the hook reads and never runs (#500 retro).
+    examples = {Path(__file__).resolve(), Path(__file__).resolve().with_name('test_waiter_hook.py')}
     yield from (p for p in sorted((REPO / 'plan' / 'tests').glob('*.py'))
-                if p != Path(__file__).resolve())
+                if p not in examples)
     for path in sorted((REPO / 'server').rglob('*.py')):
         parts = path.relative_to(REPO / 'server').parts
         if parts[0] != '.venv' and 'tests' in parts[:-1]:
@@ -199,6 +201,12 @@ class StubLoops(unittest.TestCase):
         self.assertEqual(len(unbounded('X = "while " + ":; do sleep 1; done"\n')), 1)
         self.assertEqual(len(unbounded('X = "\\n".join(["while :", "do sleep 1", "done"])\n')), 1)
         self.assertEqual(unbounded('"""Loops `while :; do sleep 1; done`."""\n'), [])
+
+    def test_the_plan_tests_are_read_but_the_examples_are_not(self):
+        names = {path.name for path in stand_in_modules()}
+        self.assertIn('test_pre_push.py', names)
+        self.assertNotIn('test_stub_loops.py', names)
+        self.assertNotIn('test_waiter_hook.py', names)
 
     def test_every_stand_in_loop_has_a_bound(self):
         found = [f'{path.relative_to(REPO)}:{line}: {loop}'

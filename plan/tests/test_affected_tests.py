@@ -1611,6 +1611,65 @@ def moved(sheet=MOVED_SHEET, helpers=MOVED_HELPERS, base=BASE_SHEET, commit=True
             cwd=root, env=env, capture_output=True, text=True, check=True).stdout
 
 
+class PhpCites(unittest.TestCase):
+    """#500's README, comment and test name said what `playlist.inc:85`
+    does, and no PHP run showed it until review sent it back (#500 retro)."""
+
+    @staticmethod
+    def output(change, uncommitted=None):
+        """The tool's output for a branch that commits `change` on TREE, with a
+        README that cites `kiosks.inc:27-31` and a PHP file, and leaves
+        `uncommitted` in the working tree."""
+        env = git_env()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def git(*argv):
+                subprocess.run(['git', *argv], cwd=root, env=env, check=True,
+                               capture_output=True)
+
+            def write(files):
+                for rel, text in files.items():
+                    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (root / rel).write_text(text)
+
+            write({**TREE, 'server/README.md': 'Old: as `kiosks.inc:27-31` shows.\n',
+                   'website/inc/playlist.inc': '<?php\n'})
+            git('init', '-q', '-b', 'master')
+            git('add', '.')
+            git('commit', '-q', '-m', 'base')
+            write(change)
+            git('add', '.')
+            git('commit', '-q', '-m', 'change')
+            write(uncommitted or {})
+            return subprocess.run(
+                [sys.executable, '-I', str(AFFECTED), 'HEAD~1'],
+                cwd=root, env=env, capture_output=True, text=True, check=True).stdout
+
+    def test_each_php_line_an_added_line_cites_is_listed_before_the_hand_off(self):
+        out = self.output(
+            {'server/README.md': 'Kept, as PHP does (`website/inc/playlist.inc:85`).\n'
+                                 'Old: as `kiosks.inc:27-31` shows.\n',
+             'website/inc/playlist.inc': '<?php // playlist.inc:85\n'},
+            # An uncommitted edit counts too, at its line in the working tree.
+            {'server/racing/models.py': 'X = 1\n# as roster.inc:12 does\n'})
+        lines = [ln for ln in before_hand_off(out).splitlines() if ln.startswith('    ')]
+        self.assertEqual(lines, ['    website/inc/playlist.inc:85  at server/README.md:1',
+                                 '    roster.inc:12  at server/racing/models.py:2'])
+        self.assertIn('testing/docker/php-scratch.sh', before_hand_off(out))
+
+    def test_a_doc_s_cite_alone_opens_the_list(self):
+        out = self.output({'server/README.md': 'As `website/inc/playlist.inc:85` keeps it.\n'})
+        self.assertIn('    website/inc/playlist.inc:85  at server/README.md:1\n',
+                      before_hand_off(out))
+
+    def test_a_diff_with_no_php_cite_prints_no_probe_line(self):
+        out = self.output({'server/ui/tests/test_dashboard.py': 'def test_x():\n    pass\n'})
+        self.assertIn('docstring_claims.py', before_hand_off(out))
+        self.assertNotIn('php-scratch', out)
+        self.assertNotIn('php-scratch', run('server/README.md'))
+
+
 class MasterMoved(unittest.TestCase):
     """The tool names each commit on BASE past the merge base that touches a
     file the branch changes or a test it prints, or an area of pr-merge's

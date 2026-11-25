@@ -1,7 +1,8 @@
 #! /bin/bash
 #
 # Before a commit: refuses one while tools/mutate.py holds a lock in this
-# worktree's git directory, and runs ruff on the staged Python under server/.
+# worktree's git directory, or while the pre-push hook checks the branch,
+# and runs ruff on the staged Python under server/.
 #
 # A mutate.py run rewrites its file in place for each mutant, and restores
 # the working tree, not the index: the #463 retro staged `if True else []`
@@ -34,6 +35,27 @@ if [ -e "${locks[0]}" ]; then
   done
   exit 1
 fi
+
+# A commit on a ref the pre-push hook is checking fails that push when its
+# checks end, since git may send a commit they never read: #500's two
+# commits during the checks of 106ef5b6 cost the 637 s push (#500 retro).
+# The hook's lock names its pid and holds one ref per line; a lock whose pid
+# is gone, left by a SIGKILL, refuses nothing. `git rebase` runs no
+# pre-commit, so the hook's own check of its refs at exit stays.
+branch=$(git symbolic-ref -q HEAD || true)
+common="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
+for lock in "$common"/pre-push-*.lock; do
+  [ -e "$lock" ] || continue
+  pid=${lock##*/pre-push-}
+  pid=${pid%.lock}
+  kill -0 "$pid" 2>/dev/null || continue
+  if [ -n "$branch" ] && grep -qxF -e "$branch" "$lock"; then
+    echo "pre-commit: pre-push $pid is checking $branch, and a commit on it now" \
+         "fails that push once its checks end. Commit once the push ends," \
+         "or stop the push first (#500 retro)." >&2
+    exit 1
+  fi
+done
 
 mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -- 'server/*.py' |
                       sed 's,^server/,,')
