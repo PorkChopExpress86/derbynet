@@ -9,10 +9,10 @@ from datetime import datetime
 import pytest
 from playwright.sync_api import expect
 
-from ui.tests.browser.helpers import pause_clock_at
+from ui.tests.browser.helpers import pause_clock_at, post_message
 from ui.tests.race import race_round, race_setup, scheduled
 
-# The page records the message the test posts, `replay-started`, with
+# The page records the one message the test posts, `replay-started`, with
 # the list's glide offset at that moment, and the time of each fetch.
 RECORD = """window.__fetches = [];
 window.addEventListener('message', () => {
@@ -37,10 +37,6 @@ GLIDED = """() => {
   return document.querySelector('[data-rounds]').style.transform !== started.transform;
 }"""
 
-# After the message a poll goes out at most one poll's wait (1 s,
-# kiosk-results.js) after the reply of one still out, and the glide steps
-# every 40 ms: slack 4000 ms less that reply for POLLED, and 4960 ms for
-# GLIDED.
 RESULTS_WAIT_MS = 5000
 
 PAUSED_AT = datetime(2026, 11, 9, 12, 0, 0)
@@ -60,7 +56,12 @@ def raced(event):
 def test_the_results_kiosk_polls_and_glides_through_a_replay(page, event, raced):
     """After `replay-started`, results-by-racer still polls (results/rounds/
     and the intermission, both every second) and its list still glides
-    (D140). Each wait is `RESULTS_WAIT_MS`, with its slack beside it."""
+    (D140). Each wait is `RESULTS_WAIT_MS` (5000 ms) from the message's
+    delivery. A poll goes out at most one poll's wait (1 s,
+    kiosk-results.js) after the reply of one still out, so POLLED's slack
+    is 5000 - 1000 - that reply = 4000 ms less the reply; the glide steps
+    every 40 ms, so GLIDED's is 5000 - 40 = 4960 ms. Should pass: kiosk.js
+    `queue()` 3800 ms late; should fail: 4500 ms late."""
     page.add_init_script(RECORD)
     page.goto("/kiosk.php?page=kiosks/results-by-racer.kiosk")
     expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
@@ -70,19 +71,9 @@ def test_the_results_kiosk_polls_and_glides_through_a_replay(page, event, raced)
         "(() => { const r = document.querySelector('[data-results]');"
         " return r.querySelector('[data-rounds]').scrollHeight > r.clientHeight; })()"
     ), "the results fit the screen; the test checks no glide"
-    # The evaluate resolves once the page has recorded the message.
-    page.evaluate(
-        """() => new Promise((done) => {
-          window.addEventListener('message', () => done());
-          window.postMessage('replay-started', '*');
-        })"""
-    )
+    post_message(page, "replay-started")
     page.wait_for_function(POLLED, timeout=RESULTS_WAIT_MS)
     page.wait_for_function(GLIDED, timeout=RESULTS_WAIT_MS)
-
-
-def first_row(page):
-    return page.locator("[data-rows] > [data-racer]").first
 
 
 @pytest.mark.sizes("desktop", reason="the kiosk is a TV")
@@ -91,7 +82,8 @@ def test_the_standings_kiosk_scrolls_through_a_replay(page, event, raced):
     (kiosk-standings.js, D140). The page is a preview, with no kiosk poll
     whose request the clock could give up, and loads on a paused clock,
     which runs the 5 s before the first list starts, 1.5 s per row until
-    every row shows, then 2 s once the message is in."""
+    every row shows, then 2 s once the page has handled the message
+    (`post_message`)."""
     pause_clock_at(page, PAUSED_AT)
     page.goto("/kiosk.php?page=kiosks/standings.kiosk")
     rows = page.locator("[data-rows] > [data-racer]")
@@ -105,7 +97,8 @@ def test_the_standings_kiosk_scrolls_through_a_replay(page, event, raced):
         "(() => { const l = document.querySelector('[data-rows]');"
         " return l.scrollHeight > l.clientHeight + 2; })()"
     ), "the standings fit the screen; the test checks no scroll"
-    before = first_row(page).inner_text()
-    page.evaluate("() => window.postMessage('replay-started', '*')")
+    first = rows.first
+    before = first.inner_text()
+    post_message(page, "replay-started")
     page.clock.run_for(2000)
-    expect(first_row(page)).not_to_have_text(before)
+    expect(first).not_to_have_text(before)
