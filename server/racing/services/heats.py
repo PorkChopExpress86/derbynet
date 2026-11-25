@@ -351,15 +351,18 @@ def rebuild_waiting_final(
     ended round as the intermission named it before the change. Runs in
     the caller's transaction.
 
-    D136: a change that leaves a result on the waiting final closes the
-    intermission instead."""
+    D141: any other change rebuilds a waiting final its round feeds, with
+    the intermission closed. D136: a change that leaves a result on the
+    waiting final closes the intermission instead."""
     # The playlist moves the current heat through `transition`.
     from racing.services import playlist, rounds
 
     playlist.close_intermission_on_result(event)
-    if ended_before is None or (changed is not None and ended_before not in changed):
-        return
-    playlist.rebuild_waiting_round(event, finalists_for or rounds.playlist_finalists())
+    finalists_for = finalists_for or rounds.playlist_finalists()
+    if ended_before is not None and (changed is None or ended_before in changed):
+        playlist.rebuild_waiting_round(event, finalists_for)
+    else:
+        playlist.rebuild_fed_finals(event, changed, finalists_for)
 
 
 def results_locked(round_id: int) -> bool:
@@ -447,15 +450,13 @@ def maybe_cancel_running_round(state: RaceState, round_id: int) -> None:
 
 
 def rerun(
-    event: Event,
-    which: str = "current",
-    *,
-    control_race: bool = True,
-    finalists_for: FinalistsFor | None = None,
+    event: Event, which: str = "current", *, control_race: bool = True
 ) -> hs.Failure | None:
     """`heat.rerun`: race the current heat, or the last heat with a result,
     again. Its results are saved for a reinstate and then cleared, so only
-    the new results stand."""
+    the new results stand. The rerun closes the intermission (D136) and
+    rebuilds no waiting final: the new result does, by the round ending
+    again (D135) or as a change to its round (D141)."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if which == "current":
@@ -470,11 +471,8 @@ def rerun(
             locked = locked_failure(target[0], control_race)
             if locked is not None:
                 return locked
-        ended = state.ended_round_id
         inputs = Inputs()
         decision = transition(state, hs.Rerun(target), inputs)
-        if decision.failure is None:
-            rebuild_waiting_final(event, [target[0]], ended, finalists_for)
     if decision.failure is None:
         audit.write(event.id, [*inputs.records, audit.discarded(target)])
     return decision.failure

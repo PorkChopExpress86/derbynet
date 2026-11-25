@@ -14,7 +14,7 @@ PHP does (playlist.inc:135-163).
 the standings (#26), so each call takes a `FinalistsFor`.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -365,8 +365,8 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
     racers from the ended round, none of its heats has a result, and the cut
     now picks other racers. Returns whether it rebuilt them. A current heat
     outside the waiting round stays current. `round_ended` does the same
-    when the ended round ends again (D135), so a change made while the
-    intermission was closed is not lost."""
+    when the ended round ends again (D135), and `rebuild_fed_finals` on a
+    change made while the intermission is closed (D141)."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None or state.ended_round_id is None:
@@ -385,6 +385,48 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
         _activate(state, entry, finalists_for, select)
         state.save()
         return True
+
+
+def _waiting_final(round: Round) -> tuple[PlaylistEntry, Round] | None:
+    """The step `_after_round` would take after `round` ends, and its
+    round, when the step waits for the operator, draws its racers from
+    `round` and has a round made already."""
+    entry = PlaylistEntry.objects.filter(
+        event_id=round.event_id, group_id=round.group_id, round_number=round.number
+    ).first()
+    after = None if entry is None else _next_entry(entry)
+    while after is not None and _is_raced(after):
+        after = _next_entry(after)
+    if after is None or not after.waits_for_operator or not _feeds(round, after):
+        return None
+    final = _round_of(after)
+    return None if final is None else (after, final)
+
+
+def rebuild_fed_finals(
+    event, changed: Sequence[int] | None, finalists_for: FinalistsFor
+) -> None:
+    """Owner decision D141: with the intermission closed, a change to the
+    results of a round makes the waiting final it feeds again, as
+    `rebuild_waiting_round` does with it open, when none of the final's
+    heats has a result and the cut now picks other racers. `changed` holds
+    the round ids whose results changed, or None for every round. A final
+    not made yet stays unmade, and a current heat outside the final stays
+    current. PHP keeps the roster (playlist.inc:85)."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        rounds = Round.objects.filter(event=event).order_by("id")
+        if changed is not None:
+            rounds = rounds.filter(pk__in=changed)
+        for fed in rounds:
+            found = _waiting_final(fed)
+            if found is None:
+                continue
+            entry, final = found
+            select = state.current_round_id in (None, final.id)
+            if _clear_changed_final(state, final, entry, finalists_for):
+                _activate(state, entry, finalists_for, select)
+                state.save()
 
 
 # ----- editing the playlist (#34) ----------------------------------------------

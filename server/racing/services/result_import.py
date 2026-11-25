@@ -18,7 +18,7 @@ from django.utils import timezone
 from core.models import Event
 from core.services import lock_race_state
 from racing.models import HeatLane, RosterEntry, Round
-from racing.services import playlist
+from racing.services import heats
 from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import groups
 
@@ -96,7 +96,7 @@ def import_result(event: Event, fields: dict) -> ImportFailure | None:
         )
         completed = _completed(fields.get("completed"))
         with transaction.atomic():
-            lock_race_state(event.id)
+            ended = lock_race_state(event.id).ended_round_id
             group = _group(event, name)
             subgroup = _subgroup(group)
             partition = _partition(event, subgroup, name)
@@ -131,7 +131,7 @@ def import_result(event: Event, fields: dict) -> ImportFailure | None:
                 completed=completed,
             )
             RosterEntry.objects.get_or_create(event=event, round=round, racer=racer)
-            playlist.close_intermission_on_result(event)
+            heats.rebuild_waiting_final(event, [round.id], ended, None)
     except ImportFailure as failure:
         return failure
     except IntegrityError, DatabaseError, groups.GroupFailure:
