@@ -1,7 +1,8 @@
-"""D27 through the result services: a rerun, a reinstate, a manual result,
-a result delete, or the new timer result after a rerun, on the round that
-just ended, rebuilds the waiting final from the standings in the same
-transaction, until a heat of the final has a result (#20, "Race-day flow").
+"""D27 through the result services: a reinstate, a manual result or a
+result delete on the round that just ended rebuilds the waiting final from
+the standings in the same transaction, until a heat of the final has a
+result (#20, "Race-day flow"). A rerun closes the intermission (D136), so
+the final is rebuilt when the rerun's timer result ends the round again.
 
 D135: the round ending again rebuilds it too, so a rerun made while the
 intermission was closed does not leave the old finalists waiting (#500)."""
@@ -68,10 +69,12 @@ def test_a_rerun_and_its_new_timer_result_rebuild_the_final(intermission):
     now.last_heat = {"round_id": round1.id, "heat": heat, "results": None}
     now.save()
     assert rerun(event, "last") is None
-    assert roster(final) == standings_say(final, entry, finalists_for)
     after_rerun = state_of_event(event)
-    assert (after_rerun.current_round_id, after_rerun.current_heat) == (round1.id, heat)
-    assert after_rerun.racing, "the rebuild leaves the rerun heat racing"
+    assert after_rerun.waiting_entry_id is None
+    assert roster(final) == before
+    assert after_rerun.current_round_id == round1.id
+    assert after_rerun.current_heat == heat
+    assert after_rerun.racing
 
     record_timer_result(event, fast(round1, heat))
     assert roster(final) == standings_say(final, entry, finalists_for)
