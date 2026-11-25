@@ -238,6 +238,7 @@ def timed(waits):
     replay, finalists_for = two_step_playlist(waits=waits, continue_racing=False)
     event = replay.event
     round1 = start_playlist(event, finalists_for)
+    assert (round1.group.name, round1.number) == ("Scouts", 1)
     race_by_timer(event, round1, finalists_for)
     final = Round.objects.get(group=round1.group, number=2)
     now = state_of_event(event)
