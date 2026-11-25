@@ -112,8 +112,7 @@ def problem(cite: re.Match, files: dict[str, list[Path]], line: str = "") -> str
         cited = [x for x in lines[first - 1 : last] if not NO_CODE.fullmatch(x)]
         if not 0 < first <= last <= len(lines) or not cited:
             continue
-        comment = COMMENT.get(path.suffix)
-        if comment and all(comment.match(x) for x in cited):
+        if all(COMMENT[path.suffix].match(x) for x in cited):
             if NAMES_A_COMMENT.search(line):
                 return None
             why = "a comment, not code (cite the code, or say comment)"
@@ -144,6 +143,7 @@ def test_a_cite_to_a_blank_line_a_brace_or_no_file_is_found():
     assert check("website/inc/voterid.inc:34") == "no code on that line"
     assert check("vote.php:146") == "no code on that line"
     assert check("vote.php:99999") == "no code on that line"
+    assert check("vote.php:0") == "no code on that line"
     assert check("no-such-page.php:3") == "no such file"
     assert check("`website/vote.php:67`") is None
     assert check("kiosks.inc:27-31") is None

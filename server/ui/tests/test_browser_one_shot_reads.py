@@ -129,11 +129,11 @@ def _marked(lines: list[str], statement: ast.stmt) -> bool:
     span = range(statement.lineno - 1, statement.end_lineno)
     if any(MARK in lines[i] for i in span):
         return True
-    i = statement.lineno - 2
-    while i >= 0 and lines[i].lstrip().startswith("#"):
-        if MARK in lines[i]:
+    for line in reversed(lines[: statement.lineno - 1]):
+        if not line.lstrip().startswith("#"):
+            return False
+        if MARK in line:
             return True
-        i -= 1
     return False
 
 
