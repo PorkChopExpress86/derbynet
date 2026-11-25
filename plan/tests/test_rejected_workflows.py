@@ -88,7 +88,7 @@ class RejectedWorkflows(unittest.TestCase):
         return subprocess.run(['bash', str(REJECTED), head], env=self.gh(runs, head),
                               capture_output=True, text=True, timeout=60, cwd=self.tmp)
 
-    def test_ff00bbc6s_rejected_pi_images_run_is_named(self):
+    def test_ff00bbc6s_rejected_run_is_named(self):
         done = self.rejected(FF00_RUNS)
         self.assertEqual((done.returncode, done.stdout), (0, REJECTED_LINE + '\n'),
                          done.stderr)

@@ -654,19 +654,44 @@ def test_the_checks_sh_check_a_reason_names_is_found():
     assert CHECKS_SH_CHECK.findall("runs `checks.sh upload`") == [("", "upload")]
 
 
-def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
+def checks_missing(registry: str, root: Path = ROOT) -> list[str]:
+    """Each `checks.sh <check>` a reason of `registry` names that the
+    checks.sh it names has no arm for."""
     named = [
         (where or "server/docker/ci/", check)
-        for e in gc.parse_registry(gc.REGISTRY.read_text())
+        for e in gc.parse_registry(registry)
         if e.kind == "reason"
         for where, check in CHECKS_SH_CHECK.findall(e.detail)
     ]
-    for where, check in named:
-        assert re.search(
+    return [
+        f"{where}checks.sh has no check {check}"
+        for where, check in named
+        if not re.search(
             rf"^ +{re.escape(check)}\) check_\w+ ;;$",
-            (ROOT / where / "checks.sh").read_text(),
+            (root / where / "checks.sh").read_text(),
             re.M,
-        ), f"{where}checks.sh has no check {check}"
+        )
+    ]
+
+
+def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
+    assert checks_missing(gc.REGISTRY.read_text()) == []
+
+
+@pytest.mark.parametrize(
+    "named, missing",
+    [
+        ("`server/docker/ci/checks.sh upload`", []),
+        ("`checks.sh upload`", []),
+        ("`checks.sh uploads`", ["server/docker/ci/checks.sh has no check uploads"]),
+    ],
+)
+def test_a_reason_s_checks_sh_check_is_looked_up_in_the_script(named, missing):
+    """No reason of the registry names a checks.sh check since D139, so
+    these entries hold the lookup into the real server/docker/ci/checks.sh,
+    whose `upload) check_upload ;;` arm the first two find."""
+    registry = f"g.md\tStart\t1\tls\treason in its place image.yml runs {named}\n"
+    assert checks_missing(registry) == missing
 
 
 def test_the_script_starts_the_registry_the_workflows_pin():

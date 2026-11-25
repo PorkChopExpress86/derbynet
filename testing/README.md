@@ -252,7 +252,7 @@ Each takes the base URL first.
   race day's whole load, with every kiosk, the timer, the coordinator, replay
   and the kiosk dashboard at their real rates, use `server/tools/load_test.py`.
   `server/README.md` ("Race-day load test") has its usage, and the one command
-  for the Raspberry Pi run.
+  for the race-day run on the desktop server (D63).
 
 CI runs the ones that end on their own against Django, in
 `.github/workflows/server.yml`.  `server/legacy_api/tests/test_testing_scripts.py`

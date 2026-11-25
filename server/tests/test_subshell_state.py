@@ -334,7 +334,7 @@ check_timer_compose() {
 check_photostand_compose() {
     STAND="$(compose_up "$folder" stand.yaml "$PREFIX-photostand-compose")"
 }
-"""  # noqa: E501 (the lines as they were)
+"""  # noqa: E501 (the lines as they were, but for the stand-in names)
 
 
 def test_round_1_checks_sh_is_found():

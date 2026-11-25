@@ -49,7 +49,3 @@ On each racer's card, "Unassign" puts the photo back with the unassigned ones, a
 ## Photos from another program
 
 The pages list each photo folder when they open. A photo file copied into the folder by another program, such as a Wi-Fi camera card's app, shows under "Unassigned photos". Press "Refresh" to list the folder again, for photos taken while the page was open. In the Docker image, the folders are on the data volume, so the program needs to write there.
-
-## A photo stand
-
-A photo stand takes car photos by itself as each car is scanned, and sends them to the server. Existing Raspberry Pi photo stands keep working.
