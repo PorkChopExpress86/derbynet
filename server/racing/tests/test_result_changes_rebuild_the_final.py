@@ -564,14 +564,17 @@ def test_a_change_to_another_round_after_a_rerun_keeps_the_final(
 
 def test_a_change_to_the_final_keeps_the_next_groups_round(closed_intermission):
     """The step after the final is Outlaw round 1, which takes no racer
-    from the final."""
+    from the final, so the racer taken off its roster by hand stays off."""
     event, round1, final, entry, finalists_for = closed_intermission
     outlaw = Round.objects.get(group__name="Outlaw", number=1)
+    RosterEntry.objects.filter(round=outlaw).order_by("id").first().delete()
+    kept = roster(outlaw)
     after = PlaylistEntry.objects.filter(seq__gt=entry.seq).order_by("seq").first()
     assert after.group_id == outlaw.group_id
     assert after.round_number == 1
     chart = chart_ids(outlaw)
     assert delete_results(event, final, finalists_for=finalists_for) is None
+    assert roster(outlaw) == kept
     assert chart_ids(outlaw) == chart
 
 
