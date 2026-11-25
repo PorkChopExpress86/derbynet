@@ -83,8 +83,9 @@ def test_a_manual_result_on_the_waiting_final_closes_the_intermission(waiting_fi
 
 
 def test_a_timer_result_on_the_waiting_final_closes_the_intermission(waiting_final):
-    """No service turns racing on with the intermission open, so the state
-    is set here. The final races on at its next heat."""
+    """A rerun, the usual way to race a heat again, closes the intermission
+    itself, so racing is set on here with the intermission open. The final
+    races on at its next heat."""
     event, round1, final, entry, finalists_for = waiting_final
     now = state_of_event(event)
     now.racing = True
@@ -152,7 +153,8 @@ def test_a_rerun_closes_the_intermission(waiting_final, which, in_final):
     now = state_of_event(event)
     assert now.waiting_entry_id is None
     assert now.ended_round_id is None
-    assert (now.current_round_id, now.current_heat) == target
+    assert now.current_round_id == target[0]
+    assert now.current_heat == target[1]
     assert now.racing
 
 
