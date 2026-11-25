@@ -6,7 +6,7 @@ be stored fails with `unable`; the rest of the file's lines are separate
 calls, each in its own transaction.
 
 D143: a result the line writes on the waiting final closes the
-intermission, as D136 has a result from the timer or by hand do.
+intermission, as D136 does for a result from the timer or by hand.
 """
 
 from dataclasses import dataclass
