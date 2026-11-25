@@ -1,6 +1,7 @@
-"""No `RacingOn` leaves the intermission open (#514). When the playlist
-turns racing on for a step that does not wait, the intermission closes, and
-the final races on as a normal round (D136). The timer test is #515.
+"""Every `RacingOn` that turns racing on closes the intermission (#514).
+When the playlist turns racing on for a step that does not wait, the
+intermission closes, and the final races on as a normal round (D136). The
+timer test still turns racing on with it open (#515).
 
 No page reaches the state these tests build. The dashboard's Next and
 `heat.select` go through `select_heat`, whose `Select` row closes the
@@ -13,12 +14,14 @@ from racing.models import HeatLane, PlaylistEntry, Round
 from racing.services.heats import advance, select_heat
 from racing.services.playlist import set_step_waits, start_playlist
 from racing.services.results import record_manual_result
+from racing.services.timer import set_test_mode
 from racing.tests.test_race_day import one_finalist, two_step_playlist
 from racing.tests.test_result_changes_rebuild_the_final import (
     fast,
     last_heat,
     race_by_timer,
     state_of_event,
+    timed,
 )
 
 pytestmark = pytest.mark.django_db
@@ -35,7 +38,8 @@ def switched_off_during_the_intermission():
     event = replay.event
     short = one_finalist(replay)
     round1 = start_playlist(event, short)
-    assert (round1.group.name, round1.number) == ("Scouts", 1)
+    assert round1.group.name == "Scouts"
+    assert round1.number == 1
     race_by_timer(event, round1, short)
     entry = PlaylistEntry.objects.get(group=round1.group, round_number=2)
     final = Round.objects.get(group=round1.group, number=2)
@@ -73,7 +77,7 @@ def test_the_playlist_turning_racing_on_closes_the_intermission(
     assert now.ended_round_id is None
 
 
-def test_next_from_a_page_closes_the_intermission_before_the_playlist_runs(
+def test_next_from_a_page_leaves_no_intermission_open(
     switched_off_during_the_intermission,
 ):
     """What the dashboard's Next and `heat.select` do from the same state."""
@@ -85,3 +89,17 @@ def test_next_from_a_page_closes_the_intermission_before_the_playlist_runs(
     assert now.current_heat == 1
     assert now.waiting_entry_id is None
     assert now.ended_round_id is None
+
+
+def test_a_timer_test_during_the_intermission_turns_racing_on_with_it_open():
+    """What the port does today, which #515 decides and will change: the
+    timer test's start is no `RacingOn`, so it turns racing on and leaves the
+    intermission open."""
+    event, round1, final, entry, finalists_for = timed(waits=True)
+    assert state_of_event(event).waiting_entry_id == entry.id
+    set_test_mode(event, True)
+    now = state_of_event(event)
+    assert now.timer_test
+    assert now.racing
+    assert now.waiting_entry_id == entry.id
+    assert now.ended_round_id == round1.id
