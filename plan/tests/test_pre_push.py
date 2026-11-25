@@ -44,15 +44,63 @@ class Plan(unittest.TestCase):
 '''
 
 
+READER = 'server/legacy_api/tests/test_registry.py'
+
+
+def scratch_env(tmp: Path, environ: dict | None = None) -> dict:
+    """The environment for a scratch repository in `tmp`: a hook runs with
+    GIT_DIR and the like set, and the scratch repository needs its own. The
+    stand-in for uv is first on PATH, and the stand-ins note what ran in
+    `tmp`/ran."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
+               GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
+               GIT_CONFIG_NOSYSTEM='1')
+    stubs = tmp / 'stubs'
+    stubs.mkdir()
+    (stubs / 'uv').write_text(UV)
+    (stubs / 'uv').chmod(0o755)
+    env.update({'PATH': f'{stubs}:{os.environ["PATH"]}', 'STUB_LOG': str(tmp / 'ran'),
+                'XDG_CACHE_HOME': str(tmp / 'cache'), **(environ or {})})
+    return env
+
+
+def lay_out(repo: Path, clone: Path, plan_test: str):
+    """Writes the hook and its tools into `clone`, and into `repo` the files
+    its checks read: the real source-checks.sh and affected-tests, the
+    stand-in check-paths.sh, one plan test, and two of source-checks.sh's
+    tests, test_registry.py, which names owner-decisions.md, and
+    test_php_claims.py, which does not."""
+    (clone / '.githooks').mkdir(exist_ok=True)
+    shutil.copy(HOOK, clone / '.githooks' / 'pre-push')
+    (clone / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
+    for tool in ('commit-closes', 'pr-evidence'):
+        shutil.copy(PLAN_BIN / tool, clone / 'plan' / 'bin' / tool)
+    (repo / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
+    shutil.copy(PLAN_BIN / 'affected-tests', repo / 'plan' / 'bin' / 'affected-tests')
+    (repo / 'server' / 'tools').mkdir(parents=True)
+    shutil.copy(SOURCE_CHECKS, repo / 'server' / 'tools' / 'source-checks.sh')
+    for rel, text in ((READER, 'DECISIONS = "owner-decisions.md"\n'),
+                      ('server/tests/test_php_claims.py', '')):
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text)
+    (repo / 'server' / 'docs' / 'adr').mkdir(parents=True)
+    (repo / 'server' / 'docs' / 'adr' / 'check-paths.sh').write_text(CHECK_PATHS)
+    (repo / 'plan' / 'tests').mkdir(parents=True)
+    (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
+    # The stand-ins' log and the plan test's bytecode, which the hook
+    # would count as a change of the tree, as the clone's own
+    # .gitignore files keep its bytecode out.
+    (repo / '.gitignore').write_text('/ran\n/cache/\n/stubs/\n__pycache__/\n')
+
+
 def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
          remote: str = 'base', base_files: dict | None = None, delete: tuple = (),
          local: str = 'head', git_dir: bool = False, message: str = 'change',
          environ: dict | None = None, base_message: str = 'base',
          origin: bool = False, other_clone: bool = False, pushed_before: bool = False,
          checked_out: str = 'head', ahead: str | None = None,
-         ref: str = 'refs/heads/b', two_commits: bool = False,
-         pushed: str | None = None,
-         upstream: tuple[str, str] | None = None) -> subprocess.CompletedProcess:
+         ref: str = 'refs/heads/b', two_commits: bool = False) -> subprocess.CompletedProcess:
     """Runs the hook for a push of one commit that changes only `changed`, a
     path or a tuple of paths, each written `text`, from a `bash -c` script
     that runs `shell` first when it is given. `remote` is the remote sha git
@@ -72,21 +120,11 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
     which b is cut from. `ref` is the ref pushed to. `two_commits` also
     pushes the base commit to refs/heads/m, so the checks read the working
     tree, not a copy of the pushed commit. The copy goes under the
-    XDG_CACHE_HOME `environ` names, or a scratch folder. `pushed` is the
-    message of a commit on b before the change, already on the remote: it is
-    the remote sha git sends, with no remote-tracking branch at it, as in a
-    clone that never fetched it; with `remote` 'new', a new branch stacked
-    on it, it is origin/pushed instead. `upstream` is (message, 'merge' or
-    'rebase'): a commit on master atop the base, which becomes origin/master
-    and which b then merges, or is rebased onto, as a force push sends it."""
-    # A hook runs with GIT_DIR and the like set; the scratch repository
-    # needs its own.
-    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-    env.update(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t',
-               GIT_COMMITTER_EMAIL='t@t', GIT_CONFIG_GLOBAL=os.devnull,
-               GIT_CONFIG_NOSYSTEM='1')
+    XDG_CACHE_HOME `environ` names, or a scratch folder. A history git
+    pushes for real is OrdinaryPushes'."""
     with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as main:
         repo = Path(tmp)
+        env = scratch_env(repo, environ)
 
         def git(*argv):
             return subprocess.run(['git', *argv], cwd=repo, env=env, check=True,
@@ -94,28 +132,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
 
         git('init', '-q', '-b', 'master')
         clone = Path(main) if other_clone else repo
-        (clone / '.githooks').mkdir(exist_ok=True)
-        shutil.copy(HOOK, clone / '.githooks' / 'pre-push')
-        (clone / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
-        for tool in ('commit-closes', 'pr-evidence'):
-            shutil.copy(PLAN_BIN / tool, clone / 'plan' / 'bin' / tool)
-        (repo / 'plan' / 'bin').mkdir(parents=True, exist_ok=True)
-        (repo / 'server' / 'tools').mkdir(parents=True)
-        shutil.copy(SOURCE_CHECKS, repo / 'server' / 'tools' / 'source-checks.sh')
-        (repo / 'server' / 'docs' / 'adr').mkdir(parents=True)
-        (repo / 'server' / 'docs' / 'adr' / 'check-paths.sh').write_text(CHECK_PATHS)
-        stubs = Path(tmp, 'stubs')
-        stubs.mkdir()
-        (stubs / 'uv').write_text(UV)
-        (stubs / 'uv').chmod(0o755)
-        env.update({'PATH': f'{stubs}:{os.environ["PATH"]}', 'STUB_LOG': str(Path(tmp, 'ran')),
-                    'XDG_CACHE_HOME': str(Path(tmp, 'cache')), **(environ or {})})
-        (repo / 'plan' / 'tests').mkdir(parents=True)
-        (repo / 'plan' / 'tests' / 'test_plan.py').write_text(plan_test)
-        # The stand-ins' log and the plan test's bytecode, which the hook
-        # would count as a change of the tree, as the clone's own
-        # .gitignore files keep its bytecode out.
-        (repo / '.gitignore').write_text('/ran\n/cache/\n__pycache__/\n')
+        lay_out(repo, clone, plan_test)
         for name, body in (base_files or {}).items():
             (repo / name).parent.mkdir(parents=True, exist_ok=True)
             (repo / name).write_text(body)
@@ -129,14 +146,6 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             git('add', '.')
             git('commit', '-q', '-m', ahead)
         git('checkout', '-q', *(('--orphan',) if remote == 'orphan' else ('-b',)), 'b')
-        pushed_sha = None
-        if pushed is not None:
-            (repo / 'pushed.txt').write_text('pushed\n')
-            git('add', '.')
-            git('commit', '-q', '-m', pushed)
-            pushed_sha = git('rev-parse', 'HEAD')
-            if remote == 'new':
-                git('update-ref', 'refs/remotes/origin/pushed', pushed_sha)
         for name in (changed,) if isinstance(changed, str) else changed:
             path = repo / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,17 +154,6 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
             git('rm', '-q', name)
         git('add', '.')
         git('commit', '-q', '-m', message)
-        if upstream is not None:
-            git('checkout', '-q', 'master')
-            (repo / 'upstream.txt').write_text('upstream\n')
-            git('add', '.')
-            git('commit', '-q', '-m', upstream[0])
-            git('update-ref', 'refs/remotes/origin/master', 'HEAD')
-            git('checkout', '-q', 'b')
-            if upstream[1] == 'merge':
-                git('merge', '-q', '--no-edit', 'master')
-            else:
-                git('rebase', '-q', 'master')
         head = git('rev-parse', 'HEAD')
         if pushed_before:
             git('update-ref', 'refs/remotes/origin/b', head)
@@ -171,7 +169,7 @@ def push(changed, plan_test: str, shell: str = '', text: str = 'changed\n',
         result = subprocess.run(
             hook, cwd=repo, env=hook_env,
             input=f'refs/heads/b {head if local == "head" else "0" * 40} {ref} '
-                  f'{pushed_sha if pushed_sha and remote == "base" else REMOTES.get(remote, base)}\n'
+                  f'{REMOTES.get(remote, base)}\n'
                   + (f'refs/heads/m {base} refs/heads/m {"0" * 40}\n' if two_commits else ''),
             capture_output=True, text=True)
         ran = Path(tmp, 'ran')
@@ -206,13 +204,45 @@ class PrePush(unittest.TestCase):
         test_listing_order.py plan/'s Python, test_docker_checks.py every
         tracked .md, and test_pipefail_pipes.py plan/bin's bash; #346's push
         ran none of them (#346 retro, D129)."""
-        for path in ('plan/owner-decisions.md', 'plan/php_cites.py',
-                     'plan/bin/ci-failures', 'plan/README.md'):
-            with self.subTest(path=path):
-                result = push(path, PASSING)
+        for path, gone in (('plan/php_cites.py', ()), ('plan/bin/ci-failures', ()),
+                           ('plan/README.md', ()), (('plan/owner-decisions.md', 'plan/README.md'), ()),
+                           # A deleted file whose name sorts after the decisions.
+                           ('plan/owner-decisions.md', ('plan/zz.md',))):
+            with self.subTest(path=path, gone=gone):
+                result = push(path, PASSING, delete=gone,
+                              base_files={name: 'x\n' for name in gone})
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
                 self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
+
+    def test_a_push_of_the_decisions_alone_runs_the_source_checks_that_read_them(self):
+        """affected-tests finds them, so a check that reads the file joins
+        without a list to edit, and test_php_claims.py, which does not read
+        it, stays out (session retro 2026-11-24)."""
+        result = push('plan/owner-decisions.md', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('pre-push: the source checks that read plan/owner-decisions.md: '
+                      'legacy_api/tests/test_registry.py\n', result.stderr)
+        self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n'
+                         'uv run --locked pytest -q -p no:cacheprovider '
+                         'legacy_api/tests/test_registry.py\n')
+        # D129: the hand-off then runs the whole script itself.
+        self.assertNotIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_a_decisions_push_with_no_reader_found_runs_every_source_check(self):
+        """No test names the file, or affected-tests fails, as on a branch
+        cut before its --source-checks."""
+        for files in ({READER: ''}, {'plan/bin/affected-tests': 'raise SystemExit(2)\n'}):
+            with self.subTest(files=files):
+                result = push('plan/owner-decisions.md', PASSING, base_files=files)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_a_failing_plan_test_stops_a_decisions_push(self):
+        result = push('plan/owner-decisions.md', FAILING)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('the plan test failed', result.stderr)
+        self.assertNotIn('pytest', result.ran)
 
     def test_a_failing_plan_test_stops_a_push_outside_server(self):
         result = push('notes/x.md', FAILING)
@@ -268,7 +298,7 @@ class GuideCommands(unittest.TestCase):
 
 
 PASSING = FAILING.replace("self.fail('the plan test failed')", 'pass')
-REMOTES = {'orphan': '0' * 40, 'new': '0' * 40, 'missing': '1' * 40}
+REMOTES = {'orphan': '0' * 40, 'missing': '1' * 40}
 
 
 class Guides(unittest.TestCase):
@@ -329,6 +359,15 @@ class Guides(unittest.TestCase):
         result = push('docs/install-docker.md', PASSING, remote='missing')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
+
+    def test_a_tip_without_plan_tests_on_a_base_the_clone_lacks_runs_the_checks(self):
+        """Nothing shows that base held no code, so only a base this clone
+        has, and that lacks plan/tests, lets a push skip them (PR #505's
+        review)."""
+        result = push('docs/install-docker.md', PASSING, remote='missing',
+                      delete=('plan/tests/test_plan.py',))
+        self.assertNotIn('no check reads it', result.stderr)
+        self.assertIn('check-paths.sh --docs docs\n', result.ran)
 
     def test_every_branch_push_runs_the_guides_check(self):
         for changed in ('plan/README.md', 'server/tools/parity_gate.py', 'server/docs/adr/README.md'):
@@ -659,6 +698,281 @@ class CopySignals(unittest.TestCase):
         self.assert_no_copy()
 
 
+class Origin:
+    """A clone of a bare origin, its hook turned on as each clone turns it on
+    (`git config core.hooksPath .githooks`), whose `push()` is a real `git
+    push`: git, not the test, names the remote sha and the refs the hook
+    reads. Master holds two commits pushed before any rule, `Closes #316.`
+    among them, as upstream's history does. `sent()` commits a commit the
+    history's last push sends, with `bad` in place of its message when
+    `bad` is given."""
+
+    def __init__(self, tmp: Path, changed: str, bad: str | None = None):
+        self.tmp, self.changed, self.bad, self.count = tmp, changed, bad, 0
+        self.env = scratch_env(tmp)
+        self.origin = tmp / 'origin.git'
+        self.repo = tmp / 'clone'
+        self.run('git', 'init', '-q', '--bare', '-b', 'master', str(self.origin), cwd=tmp)
+        self.run('git', 'init', '-q', '-b', 'master', str(self.repo), cwd=tmp)
+        lay_out(self.repo, self.repo, PASSING)
+        self.git('remote', 'add', 'origin', str(self.origin))
+        self.git('config', 'core.hooksPath', '.githooks')
+        self.commit('Upstream fix\n\nCloses #316.', 'notes/upstream.md', every=True)
+        self.commit('Another ticket (#5)', 'notes/other.md')
+        self.push('origin', 'master', verify=False)
+
+    def run(self, *argv, cwd=None, check=True):
+        return subprocess.run(argv, cwd=cwd or self.repo, env=self.env, check=check,
+                              capture_output=True, text=True)
+
+    def git(self, *argv) -> str:
+        return self.run('git', *argv).stdout.strip()
+
+    def commit(self, message: str, path: str | None = None, every: bool = False):
+        """Commits `message` with a new line in `path`, the change by default;
+        `every` adds every file of the tree."""
+        self.count += 1
+        target = self.repo / (path or self.changed)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open('a') as f:
+            f.write(f'{self.count}\n')
+        self.git('add', '.' if every else str(target))
+        self.git('commit', '-q', '-m', message)
+
+    def sent(self, message: str, path: str | None = None):
+        self.commit(self.bad or message, path)
+
+    def push(self, *argv, verify: bool = True):
+        """`git push` with the hook, or with `verify` false, as a push from
+        before the rule or one the history only sets up."""
+        flags = () if verify else ('--no-verify',)
+        return self.run('git', 'push', '-q', *flags, *argv, check=False)
+
+    def on_master(self, message: str):
+        """A commit on master that origin/master then has, as another PR's
+        merge leaves it, with this clone's branch left checked out."""
+        branch = self.git('branch', '--show-current')
+        self.git('checkout', '-q', 'master')
+        self.commit(message, f'notes/master-{self.count}.md')
+        self.push('origin', 'master', verify=False)
+        self.git('checkout', '-q', branch)
+
+
+def first_push(o):
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.sent('A change (#7)')
+    return o.push('-u', 'origin', 'issue-7-x')
+
+
+def re_push(o, pushed='A change from before the rule'):
+    """#504's first round read the commit already on the remote again, here
+    one pushed before the rule, which names no ticket."""
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.commit(pushed)
+    o.push('-u', 'origin', 'issue-7-x', verify=False)
+    o.sent('A second change (#7)')
+    return o.push('origin', 'issue-7-x')
+
+
+def merge_master(o):
+    """The loop's fix round merges origin/master into the pushed branch, and
+    commits its fix; #504's second round read master's commit as the
+    branch's."""
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.commit('A change (#7)')
+    o.push('-u', 'origin', 'issue-7-x', verify=False)
+    o.on_master('A third ticket (#6)')
+    o.git('merge', '-q', '--no-edit', 'origin/master')
+    o.sent('A fix (#7)')
+    return o.push('origin', 'issue-7-x')
+
+
+def rebase_force_push(o):
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.sent('A change (#7)')
+    o.push('-u', 'origin', 'issue-7-x', verify=False)
+    o.on_master('A third ticket (#6)')
+    o.git('rebase', '-q', 'origin/master')
+    return o.push('--force', 'origin', 'issue-7-x')
+
+
+def stacked(o):
+    """A ticket branch cut from another ticket's pushed branch."""
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.commit('A change (#7)')
+    o.push('-u', 'origin', 'issue-7-x', verify=False)
+    o.git('checkout', '-q', '-b', 'issue-8-y')
+    o.sent('A change on top (#8)')
+    return o.push('-u', 'origin', 'issue-8-y')
+
+
+def stale_origin_master(o):
+    """A pull by URL moves local master and leaves origin/master behind it,
+    and the branch is cut from local master, whose new commit closed its
+    issue when it merged (4f7e0dff on the fork, #439 review)."""
+    o.git('checkout', '-q', '-b', 'elsewhere')
+    o.on_master('Upstream again (#9)\n\nCloses #316.')
+    o.git('update-ref', 'refs/remotes/origin/master', 'master~1')
+    o.git('checkout', '-q', 'master')
+    o.git('pull', '-q', '--ff-only', str(o.origin), 'master')
+    o.git('checkout', '-q', '-b', 'issue-7-x')
+    o.sent('A change (#7)')
+    return o.push('-u', 'origin', 'issue-7-x')
+
+
+def screenshots(o):
+    """The orphan branch of D75's screenshots, one folder per ticket, which
+    shares no history with master and holds no code."""
+    o.git('checkout', '-q', '--orphan', 'screenshots')
+    o.git('rm', '-rq', '--cached', '.')
+    o.commit('Screenshots for #7', '7/page.png')
+    o.push('-u', 'origin', 'screenshots', verify=False)
+    o.sent('Screenshots for #8', '8/page.png')
+    return o.push('origin', 'screenshots')
+
+
+# Each ends on the push it checks; the last is no ticket branch.
+HISTORIES = (first_push, re_push, merge_master, rebase_force_push, stacked,
+             stale_origin_master, screenshots)
+
+
+class OrdinaryPushes(unittest.TestCase):
+    """Every rule of the hook passes each ordinary push history, with every
+    commit the push sends well formed: each names its ticket and closes
+    none. What is already on the remote is as history left it: master's
+    commits name other tickets and two close #316, and a branch commit
+    pushed before a rule existed breaks it. #504's ticket rule shipped twice
+    with a regression its own tests missed, since they fed the hook stdin
+    by hand: it read the remote's commits again (3cf4e29e), then master's
+    commits after a merge or a rebase (957e8736); only review's real `git
+    push` caught them (session retro 2026-11-24). Each history pushes
+    through git and the whole hook, so a rule added to the hook runs in
+    every case without being listed here, once for a change on each of the
+    hook's check paths, which CHECK_PATHS_SEEN holds."""
+
+    CHANGES = ('notes/x.md', 'server/x.py', 'plan/owner-decisions.md')
+
+    def pushed(self, history, changed, bad=None):
+        """`history` pushed for a change of `changed`, with the result, the
+        pushed ref, and whether origin has the pushed commit at it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            o = Origin(Path(tmp), changed, bad)
+            result = history(o)
+            ref = o.git('branch', '--show-current')
+            sha = o.git('rev-parse', 'HEAD')
+            self.assertIn(f'pre-push: plan/bin/commit-closes {sha} (refs/heads/{ref})',
+                          result.stderr, 'the hook ran')
+            at = o.run('git', 'rev-parse', '-q', '--verify', ref, cwd=o.origin, check=False)
+            return result, ref, at.stdout.strip() == sha
+
+    def test_each_history_passes(self):
+        paths = set()
+        for history in HISTORIES:
+            for changed in self.CHANGES:
+                with self.subTest(history=history.__name__, changed=changed):
+                    result, _ref, landed = self.pushed(history, changed)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertTrue(landed, 'origin has the pushed commit')
+                    paths.update(seen for seen in CHECK_PATHS_SEEN
+                                 for line in result.stderr.splitlines()
+                                 if line.startswith(seen))
+        self.assertEqual(paths, set(CHECK_PATHS_SEEN))
+
+    def test_a_bad_commit_the_push_sends_is_refused_alone(self):
+        """The same histories, with the commit the push sends naming no
+        ticket, or closing #2, are refused for that commit alone, so each
+        rule above read them."""
+        for history in HISTORIES[:-1]:
+            with self.subTest(history=history.__name__, bad='names no ticket'):
+                result, ref, landed = self.pushed(history, 'notes/x.md', 'Says nothing')
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse(landed)
+                ticket = ref.split('-')[1]
+                self.assertEqual(result.stdout.count('names no #'), 1, result.stdout)
+                self.assertRegex(result.stdout, rf"names no #{ticket}, \w{{8}} 'Says nothing'")
+        for history in HISTORIES:
+            with self.subTest(history=history.__name__, bad='closes #2'):
+                result, _ref, landed = self.pushed(history, 'notes/x.md', 'Fixes #2 (#7) (#8)')
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse(landed)
+                self.assertEqual(result.stdout.count('closes another issue'), 1, result.stdout)
+                self.assertIn('Fixes #2', result.stdout)
+
+    def test_a_branch_that_deletes_plan_tests_runs_every_check(self):
+        """PR #505's review: the tip `git rm -r plan/tests` beside an
+        unformatted server file skipped every check. Only a ref whose base
+        lacks plan/tests too, as the screenshots branch does, skips them; here
+        source-checks.sh runs and fails on the missing plan/tests."""
+        with tempfile.TemporaryDirectory() as tmp:
+            o = Origin(Path(tmp), 'server/core/zz_bad.py')
+            o.git('checkout', '-q', '-b', 'issue-7-x')
+            o.git('rm', '-rq', 'plan/tests')
+            o.sent('Removes the plan tests (#7)')
+            result = o.push('-u', 'origin', 'issue-7-x')
+        self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+        self.assertNotIn('no check reads it', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+
+    def two_refs(self, first, second):
+        """A push of two refs at once, each made by a function of the Origin
+        that leaves it checked out, with the result: pushed `first` then
+        `second` and again with the names swapped, so a rule that reads only
+        the first or only the last ref fails one of the two."""
+        results = []
+        for a, b in ((first, second), (second, first)):
+            with tempfile.TemporaryDirectory() as tmp:
+                o = Origin(Path(tmp), 'notes/x.md')
+                a(o, 'issue-7-a')
+                o.git('checkout', '-q', '-f', 'master')
+                b(o, 'issue-7-b')
+                results.append(o.push('origin', 'issue-7-a', 'issue-7-b'))
+        return results
+
+    def test_a_ref_that_changes_more_than_the_decisions_runs_every_check(self):
+        def decisions(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Decisions (#7)', 'plan/owner-decisions.md')
+
+        def server(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Code (#7)', 'server/x.py')
+
+        for result in self.two_refs(decisions, server):
+            with self.subTest():
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_an_orphan_ref_beside_a_branch_runs_every_check(self):
+        def orphan(o, name):
+            o.git('checkout', '-q', '--orphan', name)
+            o.git('rm', '-rq', '--cached', '.')
+            o.commit('Screenshots (#7)', '7/page.png')
+
+        def branch(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Code (#7)', 'server/x.py')
+
+        for result in self.two_refs(orphan, branch):
+            with self.subTest():
+                self.assertNotIn('no check reads it', result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_the_closing_check_still_reads_a_commit_the_remote_has(self):
+        """Its base stays origin/master (#439): a keyword reaches master with
+        the squash whether or not the remote branch has it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            result = re_push(Origin(Path(tmp), 'notes/x.md'), pushed='Old: Fixes #2 (#7)')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('Fixes #2', result.stdout)
+        self.assertEqual(result.stdout.count('closes another issue'), 1, result.stdout)
+
+
+# How the line each of the hook's check paths prints starts.
+CHECK_PATHS_SEEN = ('pre-push: plan/tests',
+                    'pre-push: tools/source-checks.sh, plan/tests among them',
+                    'pre-push: the source checks that read plan/owner-decisions.md:')
+
+
 class CommitClosingKeyword(unittest.TestCase):
     """A closing keyword in a commit message closes its issue when the
     commit reaches master. #415's first commit, 73a1c975, quoted
@@ -698,19 +1012,6 @@ class CommitClosingKeyword(unittest.TestCase):
         self.assertIn('takes an issue number', result.stderr)
         self.assertEqual(result.ran, '')
 
-    def test_a_commit_on_origin_master_is_not_read(self):
-        """Master's own history has upstream's `Fixes #N` commits, which
-        closed upstream's issues long ago."""
-        result = push('notes/x.md', PASSING, base_message='Fixes #1', origin=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_a_commit_on_local_master_is_not_read_when_origin_master_is_stale(self):
-        """A pull that leaves origin/master behind local master: master's own
-        `Closes #316.` (4f7e0dff on the fork) came with the branch, and the
-        push of the branch passes (#439 review)."""
-        result = push('notes/x.md', PASSING, origin=True, ahead='Upstream\n\nCloses #316.')
-        self.assertEqual(result.returncode, 0, result.stderr)
-
     def test_a_keyword_on_the_branch_atop_a_stale_origin_master_is_refused(self):
         result = push('notes/x.md', PASSING, origin=True, ahead='Clean', message='Fixes #2')
         self.refused(result, 'Fixes #2')
@@ -737,59 +1038,11 @@ class CommitClosingKeyword(unittest.TestCase):
         self.assertRegex(result.stdout, r"names no #499, \w{8} 'Says nothing'")
         self.assertIn("refused: name the ticket in each commit's subject", result.stderr)
         self.assertEqual(result.ran, '', 'a refusal comes before every other check')
-        for ref, message in ((ref, 'Says it (#499)'), ('refs/heads/b', 'Says nothing'),
+        for ref, message in (('refs/heads/b', 'Says nothing'),
                              ('refs/heads/issue-499', 'Says nothing')):
             with self.subTest(ref=ref, message=message):
                 result = push('notes/x.md', PASSING, origin=True, message=message, ref=ref)
                 self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_a_commit_the_remote_already_has_is_not_read_for_the_ticket(self):
-        """Only the commits the push sends: one already pushed can be mended
-        only by a force push (#504 review). A new branch stacked on a pushed
-        one leaves out what any remote ref has."""
-        for ref, remote in (('refs/heads/issue-7-x', 'base'), ('refs/heads/issue-8-y', 'new')):
-            n = ref.split('-')[1]
-            with self.subTest(ref=ref):
-                result = push('notes/x.md', PASSING, origin=True, ref=ref, remote=remote,
-                              pushed='old unnamed', message=f'new (#{n})')
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                result = push('notes/x.md', PASSING, origin=True, ref=ref, remote=remote,
-                              pushed='old unnamed', message='new unnamed')
-                self.assertEqual(result.returncode, 1, result.stderr)
-                self.assertRegex(result.stdout, rf"names no #{n}, \w{{8}} 'new unnamed'")
-                self.assertNotIn('old unnamed', result.stdout)
-
-    def test_a_master_commit_brought_in_is_not_the_branchs_own(self):
-        """A merge of origin/master into a pushed issue branch, as the loop's
-        fix round does, and a rebase onto it sent by a force push: the master
-        commit names no ticket and is not read for it (#504 review round 2)."""
-        for how in ('merge', 'rebase'):
-            with self.subTest(how=how):
-                result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
-                              pushed='old (#7)', message='new (#7)',
-                              upstream=('master commit no ticket', how))
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
-                              pushed='old (#7)', message='new unnamed',
-                              upstream=('master commit no ticket', how))
-                self.assertEqual(result.returncode, 1, result.stderr)
-                self.assertIn("'new unnamed'", result.stdout)
-                self.assertNotIn('master commit no ticket', result.stdout)
-
-    def test_a_local_master_commit_atop_a_stale_origin_master_is_not_read(self):
-        """After a pull that leaves origin/master behind local master, the
-        branch cut from local master carries master's commit, which names no
-        ticket (#504 review round 2)."""
-        result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
-                      ahead='master commit no ticket', message='new (#7)')
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_the_closing_check_still_reads_a_pushed_commit(self):
-        """Its base stays origin/master (#439): a keyword reaches master with
-        the squash whether or not the remote branch has it."""
-        result = push('notes/x.md', PASSING, origin=True, ref='refs/heads/issue-7-x',
-                      pushed='old: Fixes #2 (#7)', message='new (#7)')
-        self.refused(result, 'Fixes #2')
 
     def test_a_ref_that_names_no_ticket_closes_none(self):
         for ref, words in (('refs/heads/issue-439', 'Closes #439'),
