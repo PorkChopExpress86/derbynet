@@ -549,6 +549,42 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
     assert 7 not in {m.line for m in found}, "line 7's condition is on no added line"
 
 
+def test_an_assert_s_and_operand_is_made_false_only(tmp_path):
+    """In a passing test each operand of an assert's `and` is true, so made
+    True it changes nothing: #500's `assert raced.exists() and
+    unraced.exists()` and `assert racers and heats` listed four such
+    mutants, which could not die (#500 retro). An `or` inside the `and`, an
+    assert's own `or`, and an `and` in an `if` keep both."""
+    text = (
+        "def test_x(a, b, c):\n"
+        "    assert a and (b or c)\n"
+        "    if a and b:\n"
+        "        pass\n"
+        "    assert a or c\n"
+    )
+    (tmp_path / "t.py").write_text(text)
+    diff = "+++ b/t.py\n@@ -0,0 +1,5 @@\n"
+    diff += "".join(f"+{x}\n" for x in text.splitlines())
+    found = om.mutants(diff, tmp_path)
+    found = {(m.line, m.old, m.new) for m in found if m.kind == "operand"}
+    assert found == {
+        (2, "a", "False"),
+        (2, "b or c", "False"),
+        (2, "b", "True"),
+        (2, "b", "False"),
+        (2, "c", "True"),
+        (2, "c", "False"),
+        (3, "a", "True"),
+        (3, "a", "False"),
+        (3, "b", "True"),
+        (3, "b", "False"),
+        (5, "a", "True"),
+        (5, "a", "False"),
+        (5, "c", "True"),
+        (5, "c", "False"),
+    }
+
+
 def test_a_line_mutant_on_disk_has_its_span_where_its_text_is_once(tmp_path):
     """--listed replaces a line mutant at its span: none when its text is
     on its line twice, or when the diff names a line past the file's end,

@@ -606,20 +606,21 @@ class CopySignals(unittest.TestCase):
         return subprocess.run(['git', *argv], cwd=self.repo, env=self.env, check=True,
                               capture_output=True, text=True).stdout.strip()
 
-    def start(self, **environ):
+    def start(self, local='refs/heads/master', **environ):
         hook = subprocess.Popen(
             ['bash', str(self.repo / '.githooks' / 'pre-push'), 'origin', 'url'],
             cwd=self.repo, env={**self.env, **environ}, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             start_new_session=True)
-        hook.stdin.write(f'refs/heads/master {self.head} refs/heads/b {self.base}\n')
+        hook.stdin.write(f'{local} {self.head} refs/heads/b {self.base}\n')
         hook.stdin.close()
         return hook
 
-    def hanging(self, **environ):
+    def hanging(self, local='refs/heads/master', **environ):
         """The hook, once its plan test hangs in the copy, and that test's pid."""
         pid_file = self.tmp / 'hang.pid'
-        hook = self.start(HANG_PID=str(pid_file), **environ)
+        pid_file.unlink(missing_ok=True)
+        hook = self.start(local, HANG_PID=str(pid_file), **environ)
         for _ in range(600):
             if pid_file.exists() and pid_file.read_text():
                 break
@@ -678,6 +679,32 @@ class CopySignals(unittest.TestCase):
         self.assertEqual(hook.returncode, 143, err)
         self.assertFalse(self.running(pid), 'the check outlived the hook')
         self.assert_no_copy()
+
+    def test_a_commit_on_the_pushed_branch_is_refused_while_the_checks_run(self):
+        """#500's implementer committed twice while the hook checked
+        106ef5b6, and the hook refused the push 637 s in (#500 retro). The
+        hook's lock makes .githooks/pre-commit refuse the commit at once,
+        and the lock is gone once the hook ends. `git push origin HEAD`
+        sends the hook HEAD as its local ref, which the lock names as the
+        branch."""
+        shutil.copy(HOOK.parent / 'pre-commit', self.repo / '.githooks' / 'pre-commit')
+        self.git('config', 'core.hooksPath', '.githooks')
+        for local in ('refs/heads/master', 'HEAD'):
+            with self.subTest(local=local):
+                hook, _ = self.hanging(local)
+                locks = list((self.repo / '.git').glob('pre-push-*.lock'))
+                self.assertEqual([p.name for p in locks], [f'pre-push-{hook.pid}.lock'])
+                self.assertEqual(locks[0].read_text(), 'refs/heads/master\n')
+                done = subprocess.run(
+                    ['git', 'commit', '-q', '--allow-empty', '-m', 'during'],
+                    cwd=self.repo, env=self.env, capture_output=True, text=True)
+                self.assertEqual(done.returncode, 1, done.stderr)
+                self.assertIn(f'pre-push {hook.pid} is checking refs/heads/master',
+                              done.stderr)
+                hook.send_signal(signal.SIGTERM)
+                hook.communicate(timeout=60)
+                self.assertEqual(list((self.repo / '.git').glob('pre-push-*.lock')), [])
+                self.assertEqual(self.git('rev-parse', 'HEAD'), self.head)
 
     def test_the_next_push_removes_a_killed_hooks_copy_and_its_checks(self):
         hook, pid = self.hanging()

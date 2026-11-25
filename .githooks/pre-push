@@ -221,6 +221,17 @@ if [ -n "$pushed" ] && [ -z "$code" ]; then
 fi
 COPY=
 checks_pid=
+# The refs this push checks, for .githooks/pre-commit, which refuses a
+# commit on one of them while this hook runs: #500's implementer made two
+# commits during the checks of 106ef5b6, and the hook refused the push 637 s
+# in (#500 retro). The lock sits in the common git dir, so a commit from any
+# worktree sees it, and a lock whose pid is gone refuses nothing.
+LOCK="$(cd "$(git rev-parse --git-common-dir)" && pwd)/pre-push-$$.lock"
+for pair in ${locals[@]+"${locals[@]}"}; do
+  ref=${pair#* }
+  [ "$ref" != HEAD ] || ref=$(git symbolic-ref -q HEAD || echo HEAD)
+  echo "$ref"
+done >"$LOCK"
 # Seconds the trap waits for a check that ignores TERM before it kills it.
 KILL_WAIT=${PRE_PUSH_KILL_WAIT:-10}
 case "$KILL_WAIT" in
@@ -248,6 +259,7 @@ if [ ${#shas[@]} -eq 1 ]; then
   remove_copy() {
     local status=$? pair now
     trap '' INT HUP TERM
+    rm -f "$LOCK"
     if [ -n "$checks_pid" ]; then
       kill -TERM -- "-$checks_pid" 2>/dev/null || true
       for _ in $(seq $((KILL_WAIT * 5))); do
@@ -290,6 +302,7 @@ else
   START_TREE="$(tree_state)"
   check_tree() {
     local status=$?
+    rm -f "$LOCK"
     if [ "$(tree_state)" != "$START_TREE" ]; then
       echo "pre-push: the working tree changed while the checks ran, so their" \
            "results are for no commit. Leave the tree alone until the push" \
