@@ -16,6 +16,10 @@
 # thread dump (SIGQUIT) in derby-timer.log, and a failure takes two more.
 # Both logs are printed after a failure, and after a pass that took a dump
 # (#399).  testing/race-with-derby-timer-cases.sh checks each bound.
+#
+# JAVA, a command (default java), runs the jar in place of java.
+# extras/docker/ci/checks.sh's timer check sets it to
+# extras/docker/ci/timer-java, which runs the jar in the timer image (#518).
 
 BASE_URL=$1
 TESTING=`dirname $0`
@@ -60,6 +64,7 @@ STAGING=3
 RUNNING=4
 
 TIMER_LOG="$TESTING/derby-timer.log"
+JAVA=${JAVA:-java}
 
 user_login_coordinator
 $TESTING/reset-database.sh "$BASE_URL"
@@ -96,8 +101,8 @@ stamp() {
 
 rm -f "$TESTING"/timer-*.log
 : > "$TIMER_LOG"
-{ echo "$(stamp) uptime: $(uptime)"; java -version 2>&1; } >&2
-java -jar "$JAR" -x -t -th -r -logdir "$TESTING" -simulate-timer -lanes 4 -pace 1 \
+{ echo "$(stamp) uptime: $(uptime)"; "$JAVA" -version 2>&1; } >&2
+"$JAVA" -jar "$JAR" -x -t -th -r -logdir "$TESTING" -simulate-timer -lanes 4 -pace 1 \
      "$BASE_URL" >> "$TIMER_LOG" 2>&1 &
 JAR_PID=$!
 START=$SECONDS
@@ -112,11 +117,14 @@ trap 'jar_alive && kill $JAR_PID 2>/dev/null || true' EXIT
 
 # SIGQUIT makes the JVM print every thread's stack to its stdout, the jar's
 # log, ending with a "JNI global refs" line.  Sent only to this script's own
-# child, and only once it runs java: the running executable, not comm, which
-# a script named java shares.
+# child, and only once it runs java, or docker, whose `docker run` in
+# timer-java passes the signal on to the container's java: the running
+# executable, not comm, which a script named java shares.
 DUMPS=0
 thread_dump() {
-    if jar_alive && [ "$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")" = java ]; then
+    local exe
+    exe=$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")
+    if jar_alive && { [ "$exe" = java ] || [ "$exe" = docker ]; }; then
         echo "===== $(stamp) thread dump: $1" >> "$TIMER_LOG"
         local before
         before=$(grep -c '^JNI global refs' "$TIMER_LOG" || true)

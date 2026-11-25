@@ -196,17 +196,17 @@ wait_for_round() {
     grep -E 'Successful login|Starting derby-timer' "$LOGS/timer-$name.log" || true
 }
 
-# testing/race-with-derby-timer.sh's race, with the jar in the timer image in
-# place of a jar on the host.
+# testing/race-with-derby-timer.sh's race, bounds and thread dumps, with the
+# image's jar run in the timer image by timer-java (#518).  The jar's logs
+# go to LOGS as well.
 check_timer() {
     : "${TIMER_IMAGE:?set TIMER_IMAGE}"
     start_server
-    schedule_round
-    docker run -d --name "$PREFIX-timer" --network "$NET" \
-        -e DERBYNET_SERVER="http://$SERVER" \
-        -e TIMER_ARGS="-t -r -simulate-timer -lanes 4 -pace 1" \
-        "$TIMER_IMAGE" >/dev/null
-    wait_for_round "$PREFIX-timer"
+    local status=0
+    PREFIX="$PREFIX" TIMER_IMAGE="$TIMER_IMAGE" JAVA="$ROOT/extras/docker/ci/timer-java" \
+        bash "$ROOT/testing/race-with-derby-timer.sh" "$BASE" /usr/bin/derby-timer.jar || status=$?
+    cp "$ROOT"/testing/derby-timer.log "$ROOT"/testing/timer-*.log "$LOGS/" 2>/dev/null || true
+    [ "$status" = 0 ] || fail "testing/race-with-derby-timer.sh failed with the jar in $TIMER_IMAGE"
 }
 
 # With no -simulate-timer the jar opens the timer's port through jssc's

@@ -38,6 +38,8 @@ on:
       - testing/reset-database.sh
       - testing/import-roster.sh
       - testing/common.sh
+      # checks.sh timer races the round with this script (#518).
+      - testing/race-with-derby-timer.sh
       - server/tests/test_pi_images.py
       - docs/pi-setup.md
       - server/docs/guide-commands.tsv
@@ -67,6 +69,8 @@ on:
       - testing/reset-database.sh
       - testing/import-roster.sh
       - testing/common.sh
+      # checks.sh timer races the round with this script (#518).
+      - testing/race-with-derby-timer.sh
       - server/tests/test_pi_images.py
       - docs/pi-setup.md
       - server/docs/guide-commands.tsv
