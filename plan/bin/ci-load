@@ -22,9 +22,9 @@ it skipped. A load command is a line whose words are an optional
 counts summing to N, each shard keeping the command's other arguments and
 its font. Any other line that runs `tools/pytest-under-load.sh` or
 `tools/hold-load-lock.sh`, such as D133's DejaVu Sans run once with no load,
-is no load command, and neither is one whose arguments include
-`--no-load`, a hand-off's browser step (D138): the plan lists it as skipped,
-with the reason.
+is no load command, and neither is one that gives `--no-load` among the
+script's own options, read before its first pytest argument, a hand-off's
+browser step (D138): the plan lists it as skipped, with the reason.
 `--flake-ticket` adds the script's `--flake-ticket` (D122) to each shard.
 `--count N` replaces each command's count, and `--workers N` the N after
 each `-n`, for a trial run of the workflow: its run is named a trial, which
@@ -94,6 +94,21 @@ def parse_line(line):
     return font, words[1:]
 
 
+def own_options(args):
+    """pytest-under-load.sh's own options at the head of args, which it
+    reads up to its first pytest argument."""
+    options = []
+    words = iter(args)
+    for word in words:
+        if word == '--loops':
+            options += [word, next(words, '')]
+        elif word in ('--postgres', '--flake-ticket', '--no-load'):
+            options.append(word)
+        else:
+            break
+    return options
+
+
 def count_at(args):
     """The index of the N after `--count`, the form affected-tests prints,
     or None."""
@@ -132,7 +147,7 @@ def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
                                 'tools/hold-load-lock.sh)'})
             continue
         font, args = parsed
-        if '--no-load' in args:
+        if '--no-load' in own_options(args):
             skipped.append({'line': line, 'why': "no load command: --no-load runs a "
                             "hand-off's browser step once, with no load (D138)"})
             continue

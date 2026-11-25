@@ -114,8 +114,9 @@ TREE = {
 }
 
 
-def run(*files, tree=None, root=None):
-    """Runs the tool on `files` with --stdin over the stand-in, or `root`."""
+def run(*files, tree=None, root=None, options=()):
+    """Runs the tool on `files` with --stdin over the stand-in, or `root`,
+    and `options` of its own."""
     with tempfile.TemporaryDirectory() as tmp:
         if root is None:
             root = Path(tmp)
@@ -124,7 +125,8 @@ def run(*files, tree=None, root=None):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text)
         result = subprocess.run(
-            [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', str(root)],
+            [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', str(root),
+             *options],
             input=''.join(f'{f}\n' for f in files), capture_output=True, text=True)
     if result.returncode:
         raise AssertionError(result.stderr)
@@ -907,6 +909,24 @@ class TestFile(unittest.TestCase):
         self.assertIn('  uv run pytest -n auto tests ui/tests/test_mixed.py\n', out)
         self.assertIn('  tools/pytest-postgres.sh -n auto tests ui/tests/test_mixed.py\n', out)
         self.assertNotIn('pytest -n auto -m browser', out)
+
+    def test_flake_ticket_prints_the_flag_on_every_load_script_line(self):
+        """D122/D138: a flake ticket's load repeats and hand-off browser lines
+        keep pytest's status after a clean rerun, so `--flake-ticket` prints
+        the script's flag on each of them (#506 review); other lines stay."""
+        files = ['server/derbynet/settings.py', 'server/ui/tests/test_mixed.py',
+                 'server/ui/tests/browser/test_kiosk_ondeck_labels.py']
+        plain = run(*files)
+        out = run(*files, options=('--flake-ticket',))
+        script = [ln.strip() for ln in out.splitlines()
+                  if 'tools/pytest-under-load.sh' in ln and 'D133' not in ln]
+        self.assertGreaterEqual(len(script), 4, out)
+        for line in script:
+            self.assertRegex(line, r'^(DERBYNET_BROWSER_FONT="DejaVu Sans" )?'
+                             r'tools/pytest-under-load\.sh --flake-ticket ')
+        self.assertEqual(out.replace('tools/pytest-under-load.sh --flake-ticket ',
+                                     'tools/pytest-under-load.sh '), plain)
+        self.assertNotIn('--flake-ticket', plain)
 
     def test_a_test_file_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
         tree = {**TREE, 'server/conftest.py': 'from ui.tests.test_mixed import x\n',

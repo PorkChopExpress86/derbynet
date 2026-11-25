@@ -591,6 +591,51 @@ def test_a_hand_off_step_with_no_load_keeps_d122_s_conditions(
     assert nc.outcome(status, veth, rerun, flake, no_load=True)[0] == expected
 
 
+@pytest.mark.parametrize("no_load", [False, True], ids=["load-run", "no-load"])
+@pytest.mark.parametrize("status", [0, 2, 3, 4, 5])
+def test_only_a_first_run_whose_tests_ran_and_failed_is_passed(status, no_load):
+    """pytest exits 1 only when tests ran and some failed; 2 (interrupted),
+    3 (internal error), 4 (usage) and 5 (no tests) keep their status
+    whatever the rerun does (#506 review)."""
+    code, line = nc.outcome(status, 3, 0, False, no_load=no_load)
+    assert code == status
+    assert line == (
+        f"The first run exited {status}, with 3 veth lines in its window; the"
+        f" rerun passed, but only a first run that exited 1 (tests ran, some"
+        f" failed) is passed: the status stays pytest's {status}."
+    )
+
+
+@pytest.mark.parametrize(
+    "run_args",
+    [
+        ["-x"],
+        ["--exitfirst"],
+        ["-xv"],
+        ["-vx"],
+        ["--maxfail", "1"],
+        ["--maxfail=2"],
+        ["-m", "browser", "-n", "4", "-x"],
+    ],
+)
+def test_a_run_that_stops_early_starts_no_rerun(run_args):
+    """-x or --maxfail stops the run before every test ran, so a rerun of
+    the files that failed cannot pass it (#506 review: `-x` stopped at a
+    flake, and a test that always fails never ran)."""
+    args, reason = nc.rerun_args(junit(failure(message=PAGE_LOAD)), SUMMARY, run_args)
+    assert args is None
+    assert reason == (
+        "The run stops at its first failures (-x or --maxfail), so tests it"
+        " never ran could fail: no rerun, and the status stays pytest's."
+    )
+
+
+@pytest.mark.parametrize("run_args", [["-k", "x"], ["-v"], ["-p", "xdist"], ["-rx"]])
+def test_an_option_that_only_looks_like_x_still_reruns(run_args):
+    args, _ = nc.rerun_args(junit(failure(message=PAGE_LOAD)), SUMMARY, run_args)
+    assert args is not None
+
+
 def test_a_hand_off_step_s_pass_names_d138_not_d101_s_repeats():
     assert nc.outcome(1, 3, 0, False, no_load=True)[1] == (
         "The first run exited 1, with 3 veth lines in its window; the rerun"

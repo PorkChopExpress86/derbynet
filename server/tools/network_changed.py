@@ -9,12 +9,16 @@ changing as another project's container joins or leaves a Docker bridge
   pytest arguments that rerun each failed file alone, with no xdist: the
   run's own `-m`, `-k` and `-p` options, then `-n 0` and the files the
   summary names. Otherwise `None` and the reason: a count line, then one
-  line for each failure that is not one, by its test.
+  line for each failure that is not one, by its test. A run given `-x` or
+  `--maxfail` gets none, since it stopped before every test ran (#506
+  review).
 - `outcome(status, veth, rerun_status, flake_ticket, no_load)`: the
   script's exit status and the line that says why. A clean rerun with veth
   lines in the run's window passes the run for D101's repeats only, or,
-  with `no_load`, the hand-off step (D138); a flake ticket's run, a veth
-  count of 0 or one not read, and a failed rerun keep pytest's status.
+  with `no_load`, the hand-off step (D138), when the first run exited 1,
+  pytest's status for tests that ran and failed; any other status, a flake
+  ticket's run, a veth count of 0 or one not read, and a failed rerun keep
+  pytest's status.
 
 Usage, from the script:
 
@@ -204,6 +208,14 @@ def carried_options(args: list[str]) -> list[str]:
 
 NO_FILE = "No failed file is named in the summary: rerun the run's own command."
 
+# The options that stop pytest before every test ran: -x alone or among
+# other flags that take no value (`-xv`), --exitfirst and --maxfail.
+STOPS_EARLY = re.compile(r"-[vqsl]*x[vqsl]*|--exitfirst|--maxfail(?:=.*)?")
+STOPPED_EARLY = (
+    "The run stops at its first failures (-x or --maxfail), so tests it"
+    " never ran could fail: no rerun, and the status stays pytest's."
+)
+
 
 def rerun_args(
     junit: str | None, log: str, args: list[str]
@@ -212,6 +224,8 @@ def rerun_args(
     `junit` carries the error and the summary in `log` names a file, else
     (None, the reason: several lines when a failure is not a changed
     network, see `refusal`)."""
+    if any(STOPS_EARLY.fullmatch(arg) for arg in args):
+        return None, STOPPED_EARLY
     if junit is None:
         return None, "no junit.xml to read: no rerun."
     try:
@@ -256,6 +270,11 @@ def outcome(
     if rerun_status != 0:
         return status, f"{first} the rerun failed too (exit {rerun_status})."
     rerun = f"{first} the rerun passed"
+    if status != 1:
+        return status, (
+            f"{rerun}, but only a first run that exited 1 (tests ran, some"
+            f" failed) is passed: the status stays pytest's {status}."
+        )
     if flake_ticket:
         return status, (
             f"{rerun}, and --flake-ticket keeps pytest's status {status}:"

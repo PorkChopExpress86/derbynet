@@ -105,6 +105,18 @@ class Plan(unittest.TestCase):
         for skip in no_load:
             self.assertIn('D138', skip['why'])
 
+    def test_a_no_load_after_the_first_pytest_argument_is_pytest_s(self):
+        """The script reads --no-load only among its own options, before the
+        first pytest argument, so a later one leaves a load command."""
+        plan = TOOL.plan('  tools/pytest-under-load.sh --postgres -m browser '
+                         '--count 5 x.py --no-load\n'
+                         '  tools/pytest-under-load.sh --loops 4 --no-load x.py\n'
+                         '  tools/pytest-under-load.sh --flake-ticket --postgres --no-load x.py\n')
+        self.assertEqual([c['count'] for c in plan['commands']], [5])
+        self.assertEqual([s['line'].split(' x.py')[0] for s in plan['skipped']],
+                         ['tools/pytest-under-load.sh --loops 4 --no-load',
+                          'tools/pytest-under-load.sh --flake-ticket --postgres --no-load'])
+
     def test_shard_counts_sum_to_the_command_count(self):
         for total, per, counts in ((25, 5, [5] * 5), (5, 5, [5]), (7, 5, [4, 3]),
                                    (2, 1, [1, 1]), (1, 5, [1])):

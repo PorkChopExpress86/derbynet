@@ -2585,6 +2585,20 @@ def test_a_flake_ticket_s_no_load_step_keeps_pytest_s_status(tmp_path):
     assert "script exits" not in out
 
 
+@pytest.mark.parametrize("options", ["", "--no-load"], ids=["load-run", "no-load"])
+def test_a_run_stopped_by_x_at_a_network_change_starts_no_rerun(tmp_path, options):
+    """#506 review: `-x` stopped at test_loads, which failed once on a
+    changed network, so test_other, which always fails, never ran; the
+    rerun of test_net.py passed, and the run was excused. Both modes."""
+    (tmp_path / "test_other.py").write_text("def test_other():\n    assert False\n")
+    code, out, _ = load_run_of(tmp_path, once(PAGE_LOAD_ERROR), "-x", options=options)
+    assert code == 1, out
+    assert "test_other" not in (tmp_path / "run" / "pytest.log").read_text()
+    assert "The run stops at its first failures (-x or --maxfail)" in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
+    assert "script exits" not in out
+
+
 def test_a_no_load_step_waits_in_the_line_as_a_hand_off(tmp_path):
     """A hand-off's step goes ahead of the load runs, as hold-load-lock.sh's
     commands do (#419)."""
