@@ -18,6 +18,8 @@ from racing.services.results import (
     record_manual_result,
     record_timer_result,
 )
+from racing.services.rounds import delete_round_roster
+from racing.services.schedule import unschedule
 from racing.services.tests.race import fields
 from racing.tests.test_race_day import race, state, two_step_playlist
 
@@ -120,6 +122,21 @@ def test_a_manual_result_on_the_ended_round_rebuilds_the_final(intermission):
     now.save()
     record_manual_result(event, fast(round1, heat))
     assert roster(final) == standings_say(final, entry, finalists_for) != before
+
+
+def test_a_change_makes_a_final_deleted_during_the_intermission_again(intermission):
+    event, round1, final, entry, finalists_for = intermission
+    unschedule(final)
+    delete_round_roster(final)
+    assert not Round.objects.filter(group=entry.group, number=2).exists()
+    heat = last_heat(round1)
+    now = state_of_event(event)
+    now.current_round_id, now.current_heat = round1.id, heat
+    now.save()
+    record_manual_result(event, fast(round1, heat))
+    remade = Round.objects.get(group=entry.group, number=2)
+    assert roster(remade) == standings_say(remade, entry, finalists_for) != []
+    assert HeatLane.objects.filter(round=remade).exists()
 
 
 def test_a_change_after_the_final_has_raced_keeps_its_roster(intermission):
