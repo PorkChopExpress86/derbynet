@@ -765,8 +765,8 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     # The refusal names the next step (#367 retro).
     assert "Mutate each step the changed tests take by hand" in run.stderr
     assert run.stdout == (
-        "SKIPPED   notes.md: 2 listed, in no source file\n"
-        "SKIPPED   test_mod.py: 2 listed, in a test file"
+        "SKIPPED   notes.md: 2 not run, in no source file\n"
+        "SKIPPED   test_mod.py: 2 not run, in a test file"
         " (name it with --file to mutate its helpers)\n"
     )
 
@@ -823,7 +823,9 @@ def test_listed_mutates_a_guard_in_a_test_file_named_by_file(project):
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  True',
         'KILLED    test_mod.py:39  condition  lines[end].endswith("\\\\")  ->  False',
     ], run.stdout
-    assert "SKIPPED   test_mod.py: 8 listed, in a test function" in rows(run)
+    assert "SKIPPED   test_mod.py: 8 not run, in a test function" in rows(run)
+    # The tally names them too: #494's report read the two counts as one.
+    assert "; 8 skipped, not run" in run.stdout, run.stdout
     assert run.returncode == 0, run.stdout + run.stderr
     assert (project / "test_mod.py").read_text() == TESTS + GUARD_TESTS
 
@@ -832,7 +834,7 @@ def test_listed_skips_a_test_file_it_is_not_named(project):
     commit(project, MODULE + PICK, PICK_TESTS + GUARD_TESTS)
     run = listed(project, "test_mod.py::test_pick")
     assert (
-        "SKIPPED   test_mod.py: 10 listed, in a test file"
+        "SKIPPED   test_mod.py: 10 not run, in a test file"
         " (name it with --file to mutate its helpers)" in run.stdout
     ), run.stdout
     # No row names a mutant in it; a KILLED row's pytest line names its test.

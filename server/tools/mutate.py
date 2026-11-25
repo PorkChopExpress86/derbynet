@@ -654,7 +654,7 @@ def listed(args) -> int:
             why = "in no source file"
         skipped[m.path, why] = skipped.get((m.path, why), 0) + 1
     for (path, why), n in skipped.items():
-        print(f"SKIPPED   {path}: {n} listed, {why}", flush=True)
+        print(f"SKIPPED   {path}: {n} not run, {why}", flush=True)
     if not found:
         # #367's diff (PR #392) changed only tests/test_mutate.py, so it
         # listed no mutant, and its dropped marker write died only by a clock
@@ -712,7 +712,14 @@ def listed(args) -> int:
         w: sum(1 for word, _ in rows if word == w)
         for w in ("KILLED", "SURVIVED", "REFUSED", "ERROR")
     }
-    print(f"{len(rows)} listed: " + ", ".join(f"{n} {w}" for w, n in tally.items()))
+    # #494's report read "61 of 73 killed" off a SKIPPED row's "45 listed"
+    # and this line's "37 listed", so the tally names the skipped count too.
+    left = sum(skipped.values())
+    print(
+        f"{len(rows)} listed: "
+        + ", ".join(f"{n} {w}" for w, n in tally.items())
+        + (f"; {left} skipped, not run" if left else "")
+    )
     for word, m in rows:
         if word != "KILLED":
             print(f"  {word:<8}  {m}")

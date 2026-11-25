@@ -22,6 +22,12 @@ timer's sources under timer/ are read as cite targets too
 (`timer/derbynet-timer/src/js/host_poller.js:216`, #307 retro). A `.py` cite
 needs a folder (`accounts/defaults.py:15`), since tests print made-up ones
 (`test_late.py:3`).
+
+A cite whose lines are all comments names the comment above the code, not
+the code: #494 cited `now-racing.js:11`, the comment over the linger call on
+line 12, and review found it. A comment is cited on purpose with the word
+"comment" or "TODO" on the citing line (`action.photo.rotate.inc:5`, its
+header comment).
 """
 
 import re
@@ -57,6 +63,19 @@ CITE = re.compile(
 )
 # A line with no letter, digit or quote on it: blank, or a lone brace.
 NO_CODE = re.compile(r"[^\w'\"$]*")
+# A comment line, by the cited file's suffix (#494 retro). In CSS only `/*`,
+# since `*`, `#id` and `--var:` start rules.
+COMMENT = {
+    ".php": re.compile(r"\s*(//|#|/\*|\*)"),
+    ".inc": re.compile(r"\s*(//|#|/\*|\*)"),
+    ".js": re.compile(r"\s*(//|/\*|\*)"),
+    ".py": re.compile(r"\s*#"),
+    ".css": re.compile(r"\s*/\*"),
+    ".html": re.compile(r"\s*<!--"),
+    ".kiosk": re.compile(r"\s*(//|#|/\*|\*|<!--)"),
+}
+# The citing line says it cites a comment.
+NAMES_A_COMMENT = re.compile(r"comment|TODO", re.IGNORECASE)
 
 
 def php_files() -> dict[str, list[Path]]:
@@ -72,8 +91,8 @@ def php_files() -> dict[str, list[Path]]:
     return found
 
 
-def problem(cite: re.Match, files: dict[str, list[Path]]) -> str | None:
-    """Why the cite points nowhere, or None."""
+def problem(cite: re.Match, files: dict[str, list[Path]], line: str = "") -> str | None:
+    """Why the cite points nowhere, or None. `line` is the citing line."""
     rel = (
         cite["file"]
         .removeprefix("website/")
@@ -87,13 +106,20 @@ def problem(cite: re.Match, files: dict[str, list[Path]]) -> str | None:
         return "no such file"
     first = int(cite["first"])
     last = int(cite["last"] or first)
+    why = "no code on that line"
     for path in matches:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        if 0 < first <= last <= len(lines) and any(
-            not NO_CODE.fullmatch(line) for line in lines[first - 1 : last]
-        ):
-            return None
-    return "no code on that line"
+        cited = [x for x in lines[first - 1 : last] if not NO_CODE.fullmatch(x)]
+        if not 0 < first <= last <= len(lines) or not cited:
+            continue
+        comment = COMMENT.get(path.suffix)
+        if comment and all(comment.match(x) for x in cited):
+            if NAMES_A_COMMENT.search(line):
+                return None
+            why = "a comment, not code (cite the code, or say comment)"
+            continue
+        return None
+    return why
 
 
 def sources():
@@ -130,10 +156,22 @@ def test_a_cite_to_a_blank_line_a_brace_or_no_file_is_found():
     # The port's own files, and the prose form (#250 retro).
     assert check("`server/accounts/defaults.py:15`") is None
     assert check("accounts/no_such_module.py:1") == "no such file"
-    assert check("`kiosk.css` line 1") is None
+    assert check("`kiosk.css` line 7") is None
     assert check("kiosk.css, lines 6") == "no code on that line"
-    assert check("`kiosk.css` lines 1-3") is None
+    assert check("`kiosk.css` lines 6-8") is None
+    assert (
+        check("`kiosk.css` line 1")
+        == "a comment, not code (cite the code, or say comment)"
+    )
     assert check("ui/static/ui/kiosk.css:6") == "no code on that line"
+    # A comment line, unless the citing line says so (#494 retro).
+    comment = "a comment, not code (cite the code, or say comment)"
+    assert check("website/js/now-racing.js:11") == comment
+    assert check("website/js/now-racing.js:11-12") is None
+    assert check("website/js/now-racing.js:6-7") == comment
+    assert (
+        problem(CITE.search("its TODO, now-racing.js:6-7"), files, "its TODO") is None
+    )
     # A test's made-up output names no folder, and is no cite.
     assert CITE.search("test_late.py:3 gallery") is None
 
@@ -152,6 +190,6 @@ def test_every_php_cite_names_a_line_of_code():
         for path in sources()
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
         for cite in CITE.finditer(line)
-        if (why := problem(cite, files))
+        if (why := problem(cite, files, line))
     ]
     assert wrong == []

@@ -592,7 +592,8 @@ RED_CORNER = """() => {
 def test_the_crop_sheet_turns_the_photo_left_and_right(login, event, folders):
     """Turn left turns the stored photo a quarter counterclockwise and Turn
     right a quarter clockwise (PHP's `photo.rotate` takes its angle
-    counterclockwise, `action.photo.rotate.inc:5`), and the sheet redraws the
+    counterclockwise, its header comment says, `action.photo.rotate.inc:5`),
+    and the sheet redraws the
     turned photo in a cropper that can crop it. A red top-left corner shows
     which way each turn went."""
     racer = add_racers(event, "Scouts", 1, 101)[0]
