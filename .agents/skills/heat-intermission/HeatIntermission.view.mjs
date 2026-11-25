@@ -14,6 +14,7 @@ export const step = (action, from, to) => {
     case "TimerFinishR2": return "timer finishes final";
     case "ManualWriteR1": return "manual result on R1";
     case "ManualWriteR2": return "manual result on final";
+    case "ImportR2": return "imported result on final";
     case "SelectHeat": return `select ${to.curRound} H${to.curHeat}`;
     case "SetRacingOn": return "turn racing on";
     case "SetRacingOff": return "turn racing off";
