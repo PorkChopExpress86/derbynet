@@ -1,7 +1,7 @@
 """D136: a result on any heat of the waiting final, from the timer or by
 hand, closes the intermission, and the final then races on as a normal
 round. A rerun closes it too. Skip never passes a final that has a result
-(#501)."""
+(#501). D143: a result `result.import` writes closes it too (#519)."""
 
 import pytest
 from django.utils import timezone
@@ -17,6 +17,7 @@ from racing.services.playlist import (
     start_playlist,
     start_waiting_step,
 )
+from racing.services.result_import import import_result
 from racing.services.results import (
     discard_heat,
     record_manual_result,
@@ -303,3 +304,63 @@ def test_skip_does_not_stop_at_a_next_step_that_has_a_result():
     assert now.current_round_id == outlaws.id
     assert now.current_heat == 2
     assert now.racing
+
+
+def import_line(event, round, heat, lane, finishtime="3.1", finishplace="1"):
+    """A `result.import` line for a racer of the round's group. A lane the
+    chart already holds refuses the line (`heatlane_one_car_per_lane`), so
+    the line names a free one."""
+    racer = HeatLane.objects.filter(round=round).first().racer
+    assert not HeatLane.objects.filter(round=round, heat=heat, lane=lane).exists()
+    fields = {
+        "class": round.group.name,
+        "round": str(round.number),
+        "heat": str(heat),
+        "lane": str(lane),
+        "carnumber": str(racer.car_number),
+        "firstname": racer.first_name,
+        "lastname": racer.last_name,
+        "finishtime": finishtime,
+        "finishplace": finishplace,
+    }
+    assert import_result(event, fields) is None
+
+
+@pytest.mark.parametrize("heat, lane", [(1, 5), (9, 1)])
+def test_an_imported_result_on_the_waiting_final_closes_the_intermission(
+    waiting_final, heat, lane
+):
+    """D143: D136 covers a result `result.import` writes, on the final's
+    first heat or on a heat its chart lacks. The current heat and racing
+    stay as they are, and Skip then has no intermission to end."""
+    event, round1, final, entry, finalists_for = waiting_final
+    import_line(event, final, heat, lane)
+    assert raced_heats(final) == [heat]
+    now = state_of_event(event)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == final.id
+    assert now.current_heat == 1
+    assert not now.racing
+    assert_skip_refused(event, finalists_for)
+
+
+def test_an_imported_line_with_no_result_keeps_the_intermission_open(waiting_final):
+    """A line with no time and no place writes no result (`HAS_RESULT`)."""
+    event, round1, final, entry, finalists_for = waiting_final
+    import_line(event, final, 1, 5, finishtime="", finishplace="")
+    assert raced_heats(final) == []
+    now = state_of_event(event)
+    assert now.waiting_entry_id == entry.id
+    assert now.ended_round_id == round1.id
+
+
+def test_an_imported_result_on_the_ended_round_keeps_the_intermission_open(
+    waiting_final,
+):
+    """A result on the round that ended is no result on the final."""
+    event, round1, final, entry, finalists_for = waiting_final
+    import_line(event, round1, last_heat(round1) + 1, 1)
+    now = state_of_event(event)
+    assert now.waiting_entry_id == entry.id
+    assert now.ended_round_id == round1.id

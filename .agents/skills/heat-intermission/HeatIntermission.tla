@@ -3,7 +3,8 @@ EXTENDS Naturals, Sequences
 
 (*
  * Formal model of DerbyNet's current-heat state machine, result services,
- * and playlist operator-gate intermission (owner decisions D27, D28, D32, D135, D136).
+ * and playlist operator-gate intermission (owner decisions D27, D28, D32, D135, D136,
+ * D143).
  *
  * Scope and bounds:
  *   - One group with a 2-step playlist:
@@ -22,6 +23,7 @@ EXTENDS Naturals, Sequences
  *   - server/racing/services/heats.py
  *   - server/racing/services/results.py
  *   - server/racing/services/playlist.py
+ *   - server/racing/services/result_import.py
  *)
 
 VARIABLES
@@ -228,6 +230,22 @@ ManualWriteR2 ==
     /\ UNCHANGED <<curRound, curHeat, r1, finalBuilt, finalShort, finalRoster,
                    stepWaits, cutShort, discardRound, discardNum, discardVal, nonCoordBreak>>
 
+(* import_result onto the final: result_import.py writes a result on a lane
+   the final's chart leaves free (a lane it holds refuses the line), then
+   closes the intermission (D143). The current heat and racing stay. With
+   racing on the final the intermission is closed already
+   (NoRacingDuringIntermission), so that case is left out: the import
+   would score the heat the timer is racing. *)
+ImportR2 ==
+    /\ finalBuilt
+    /\ r2 = "none"
+    /\ ~(racing /\ curRound = "R2")
+    /\ r2' = "done"
+    /\ waiting' = FALSE  \* close_intermission_on_result (D143)
+    /\ UNCHANGED <<curRound, curHeat, racing, r1, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort, lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak>>
+
 (* select_heat: heats.py, the "select heat" row of TABLE *)
 SelectHeat(rnd, h) ==
     /\ HeatExists(rnd, h)
@@ -427,6 +445,7 @@ Next ==
     \/ \E val \in {"v1", "v2"}, isCoord \in BOOLEAN, cont \in BOOLEAN :
           ManualWriteR1(val, isCoord, cont)
     \/ ManualWriteR2
+    \/ ImportR2
     \/ \E h \in {1, 2} : SelectHeat("R1", h)
     \/ SelectHeat("R2", 1)
     \/ SetRacingOn
