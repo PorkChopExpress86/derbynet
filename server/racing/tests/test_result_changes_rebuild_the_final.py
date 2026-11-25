@@ -297,7 +297,8 @@ def test_a_round_that_ends_again_keeps_a_final_that_has_a_result(timed_intermiss
     record_timer_result(event, slow(final, 1), finalists_for=finalists_for)
     raced = HeatLane.objects.filter(round=final).filter(HAS_RESULT)
     unraced = HeatLane.objects.filter(round=final).exclude(HAS_RESULT)
-    assert raced.exists() and unraced.exists()
+    assert raced.exists()
+    assert unraced.exists()
     results = sorted(raced.values_list("id", "finish_time"))
 
     heat = last_heat(round1)

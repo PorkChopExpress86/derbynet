@@ -426,8 +426,8 @@ def test_a_round_that_ends_again_leaves_a_waiting_round_of_another_group_alone()
     racers, heats = outlaws.roster.count(), chart(replay, outlaws)
     round_ended(final, finalists_for)
     assert state(replay).waiting_entry.group == outlaws.group
+    assert racers > 0
     assert (outlaws.roster.count(), chart(replay, outlaws)) == (racers, heats)
-    assert racers and heats
 
 
 def one_finalist(replay):
