@@ -30,6 +30,7 @@ from racing.services.rounds import delete_round_roster
 from racing.services.schedule import unschedule
 from racing.services.tests.race import fields
 from racing.tests.test_race_day import race, state, two_step_playlist
+from roster.models import Racer
 
 pytestmark = pytest.mark.django_db
 
@@ -459,6 +460,7 @@ def test_undoing_a_discard_with_the_intermission_closed_rebuilds_the_final(
     assert set(
         HeatLane.objects.filter(round=final).values_list("racer_id", flat=True)
     ) == set(before)
+    assert_current(event, final.id, 1, racing=False)
 
 
 def test_a_manual_result_with_the_intermission_closed_rebuilds_the_final(
@@ -524,6 +526,72 @@ def test_a_change_with_the_intermission_closed_keeps_a_final_that_has_a_result(
     select_round_1_heat(event, round1, heat)
     record_manual_result(event, fast(round1, heat), finalists_for=finalists_for)
     assert standings_say(final, entry, finalists_for) != before
+    assert roster(final) == before
+    assert chart_ids(final) == chart
+
+
+def test_a_delete_of_every_result_rebuilds_the_final(closed_intermission):
+    """`result.delete` with no round clears every round, the final's too."""
+    event, round1, final, entry, finalists_for = closed_intermission
+    before = roster(final)
+    assert delete_results(event, finalists_for=finalists_for) is None
+    assert_rebuilt(event, final, entry, finalists_for, before, None, None)
+
+
+def test_a_delete_of_every_result_rebuilds_the_final_while_it_waits(intermission):
+    event, round1, final, entry, finalists_for = intermission
+    before = roster(final)
+    assert delete_results(event, finalists_for=finalists_for) is None
+    assert roster(final) == standings_say(final, entry, finalists_for) != before
+    assert state_of_event(event).waiting_entry_id == entry.id
+
+
+def test_a_change_to_another_round_after_a_rerun_keeps_the_final(
+    closed_intermission,
+):
+    """A rerun rebuilds nothing, and a change to the final's own results
+    rebuilds no final from Round 1's standings."""
+    event, round1, final, entry, finalists_for = closed_intermission
+    before, chart = roster(final), chart_ids(final)
+    select_round_1_heat(event, round1, last_heat(round1))
+    assert rerun(event, "current") is None
+    assert roster(final) == before
+    assert delete_results(event, final, finalists_for=finalists_for) is None
+    assert standings_say(final, entry, finalists_for) != before
+    assert roster(final) == before
+    assert chart_ids(final) == chart
+
+
+def test_a_change_to_the_final_keeps_the_next_groups_round(closed_intermission):
+    """The step after the final is Outlaw round 1, which takes no racer
+    from the final."""
+    event, round1, final, entry, finalists_for = closed_intermission
+    outlaw = Round.objects.get(group__name="Outlaw", number=1)
+    after = PlaylistEntry.objects.filter(seq__gt=entry.seq).order_by("seq").first()
+    assert after.group_id == outlaw.group_id
+    assert after.round_number == 1
+    chart = chart_ids(outlaw)
+    assert delete_results(event, final, finalists_for=finalists_for) is None
+    assert chart_ids(outlaw) == chart
+
+
+@pytest.mark.parametrize("number", [2, 3])
+def test_an_imported_line_on_a_round_no_step_feeds_from_keeps_the_final(
+    closed_intermission, number
+):
+    """Outlaw round 2 is the playlist's last step, and Outlaw round 3 has
+    no step. The import makes the round."""
+    event, round1, final, entry, finalists_for = closed_intermission
+    before, chart = roster(final), chart_ids(final)
+    racer = Racer.objects.filter(group__name="Outlaw").first()
+    line = {
+        **faster_line(round1, racer),
+        "class": "Outlaw",
+        "round": str(number),
+        "heat": "1",
+    }
+    assert import_result(event, line) is None
+    assert Round.objects.filter(group__name="Outlaw", number=number).exists()
     assert roster(final) == before
     assert chart_ids(final) == chart
 

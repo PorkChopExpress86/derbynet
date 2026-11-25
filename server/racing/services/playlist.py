@@ -388,15 +388,13 @@ def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
 
 
 def _waiting_final(round: Round) -> tuple[PlaylistEntry, Round] | None:
-    """The step `_after_round` would take after `round` ends, and its
-    round, when the step waits for the operator, draws its racers from
-    `round` and has a round made already."""
+    """The step after `round`'s, and its round, when the step waits for
+    the operator, draws its racers from `round` and has a round made
+    already. A raced step's round has a result, which keeps it (D136)."""
     entry = PlaylistEntry.objects.filter(
         event_id=round.event_id, group_id=round.group_id, round_number=round.number
     ).first()
     after = None if entry is None else _next_entry(entry)
-    while after is not None and _is_raced(after):
-        after = _next_entry(after)
     if after is None or not after.waits_for_operator or not _feeds(round, after):
         return None
     final = _round_of(after)
