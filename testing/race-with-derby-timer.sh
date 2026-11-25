@@ -7,7 +7,7 @@
 # Usage: race-with-derby-timer.sh <base_url> [<derby-timer.jar>]
 #
 # Build the jar first with `ant -noinput -buildfile timer/build.xml`.  Needs
-# java on the path.  Starts from an empty database.
+# java on the path, or the JAVA below.  Starts from an empty database.
 #
 # The jar's output goes to testing/derby-timer.log, and its own log, with a
 # millisecond time on every line and every heartbeat traced (-th), to
@@ -16,6 +16,10 @@
 # thread dump (SIGQUIT) in derby-timer.log, and a failure takes two more.
 # Both logs are printed after a failure, and after a pass that took a dump
 # (#399).  testing/race-with-derby-timer-cases.sh checks each bound.
+#
+# JAVA, a command (default java), runs the jar in place of java.
+# extras/docker/ci/checks.sh's timer check sets it to
+# extras/docker/ci/timer-java, which runs the jar in the timer image (#518).
 
 BASE_URL=$1
 TESTING=`dirname $0`
@@ -60,6 +64,7 @@ STAGING=3
 RUNNING=4
 
 TIMER_LOG="$TESTING/derby-timer.log"
+JAVA=${JAVA:-java}
 
 user_login_coordinator
 $TESTING/reset-database.sh "$BASE_URL"
@@ -96,8 +101,8 @@ stamp() {
 
 rm -f "$TESTING"/timer-*.log
 : > "$TIMER_LOG"
-{ echo "$(stamp) uptime: $(uptime)"; java -version 2>&1; } >&2
-java -jar "$JAR" -x -t -th -r -logdir "$TESTING" -simulate-timer -lanes 4 -pace 1 \
+{ echo "$(stamp) uptime: $(uptime)"; "$JAVA" -version 2>&1; } >&2
+"$JAVA" -jar "$JAR" -x -t -th -r -logdir "$TESTING" -simulate-timer -lanes 4 -pace 1 \
      "$BASE_URL" >> "$TIMER_LOG" 2>&1 &
 JAR_PID=$!
 START=$SECONDS
@@ -108,15 +113,33 @@ jar_alive() {
     [ "$(awk '/^PPid:/ { print $2 }' /proc/$JAR_PID/status 2>/dev/null)" = "$$" ] \
         && ! grep -q '^State:.*zombie' /proc/$JAR_PID/status 2>/dev/null
 }
-trap 'jar_alive && kill $JAR_PID 2>/dev/null || true' EXIT
+# On the way out the jar gets SIGTERM, and the script waits for it to end:
+# timer-java's `docker run` ends only once its container is gone, so the
+# caller's cleanup finds no container half removed (#518 review).  Up to
+# 10 s, 20 times the 0.5 s its container took to end and be removed after a
+# pass of checks.sh timer on amd64 (#518).
+stop_jar() {
+    jar_alive || return 0
+    echo "$(stamp) SIGTERM to pid $JAR_PID" >&2
+    kill $JAR_PID 2>/dev/null || true
+    for _ in $(seq 20); do
+        jar_alive || { echo "$(stamp) pid $JAR_PID ended" >&2; return 0; }
+        sleep 0.5  # 20 passes of 0.5 s make the 10 s above
+    done
+    echo "$(stamp) pid $JAR_PID still runs" >&2
+}
+trap stop_jar EXIT
 
 # SIGQUIT makes the JVM print every thread's stack to its stdout, the jar's
 # log, ending with a "JNI global refs" line.  Sent only to this script's own
-# child, and only once it runs java: the running executable, not comm, which
-# a script named java shares.
+# child, and only once it runs java, or docker, whose `docker run` in
+# timer-java passes the signal on to the container's java: the running
+# executable, not comm, which a script named java shares.
 DUMPS=0
 thread_dump() {
-    if jar_alive && [ "$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")" = java ]; then
+    local exe
+    exe=$(basename "$(readlink /proc/$JAR_PID/exe 2>/dev/null)")
+    if jar_alive && { [ "$exe" = java ] || [ "$exe" = docker ]; }; then
         echo "===== $(stamp) thread dump: $1" >> "$TIMER_LOG"
         local before
         before=$(grep -c '^JNI global refs' "$TIMER_LOG" || true)
@@ -128,7 +151,7 @@ thread_dump() {
             sleep 0.5
         done
     else
-        echo "$(stamp) no thread dump: pid $JAR_PID is not this script's java" >&2
+        echo "$(stamp) no thread dump: pid $JAR_PID is not this script's java or docker" >&2
     fi
 }
 
