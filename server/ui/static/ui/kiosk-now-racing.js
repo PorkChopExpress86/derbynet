@@ -6,19 +6,21 @@
 // lane by lane; once every car of the heat has a result the places land in
 // place order, the winner's lane glows, and the board holds the results for
 // `now-racing-linger-ms` before it takes the next lineup. Inside replay.php
-// the board holds while a replay shows and starts the linger when it ends.
+// the board takes no new poll while a replay shows, though a reply still out
+// is applied (D137). When it ends the rows page starts the linger and lands
+// the places again, as now-racing.js:9-15 does; the columnar pages go on as
+// before, as now-racing-columnar.js:5-12 does.
 (function () {
   'use strict';
 
   var board, columns, lingerMs;
   var shown = {roundid: 0, heat: 0, results: 0};
   var lingerUntil = 0;
-  var holding = false;
   var animate = true;
   var racers = 0;
 
   function okToChange() {
-    return !holding && Date.now() > lingerUntil;
+    return Date.now() > lingerUntil;
   }
 
   function lanes() {
@@ -222,6 +224,17 @@
     });
     if (!land) return Promise.resolve();
     animate = false;
+    // A landing again after a replay blanks the places that landed, as
+    // PHP hides them before its flyers fly again (now-racing.js:319-321).
+    found.forEach(function (hr) {
+      var el = lane(hr.lane);
+      var place = el && el.querySelector('[data-place].k-shown');
+      if (!place) return;
+      place.classList.remove('k-shown');
+      place.textContent = '';
+      el.classList.remove('k-p1', 'k-p2', 'k-p3');
+      void el.offsetWidth;
+    });
     var chain = Promise.resolve();
     byPlace.forEach(function (hr) {
       chain = chain.then(function () {
@@ -289,10 +302,17 @@
     lingerMs = Number(board.dataset.lingerMs) || 10000;
     fit();
     window.addEventListener('resize', fit);
-    Kiosk.onReplay = function (paused) {
-      holding = paused;
-      if (!paused) lingerUntil = Date.now() + lingerMs;
-    };
+    // The rows page re-arms the landing, as PHP's enable_flyers() does
+    // (now-racing.js:15), and the next poll of the heat lands the places
+    // again, then lingers (now-racing.js:333). The columnar pages do neither
+    // (now-racing-columnar.js:5-12).
+    if (!columns) {
+      Kiosk.onReplay = function (paused) {
+        if (paused) return;
+        lingerUntil = Date.now() + lingerMs;
+        animate = true;
+      };
+    }
     // 500 ms after each reply (now-racing-poller.js:33-43).
     Kiosk.poll(poll, 500, 'after');
     Kiosk.start();
