@@ -343,8 +343,8 @@ fi
 # why: #519's implementer started source-checks.sh by hand after an .agents/
 # push, then dropped it (#519 retro).
 if [ -z "$changed" ]; then
-  echo "pre-push: plan/tests alone, since the push changes no path" \
-       "tools/source-checks.sh reads" >&2
+  echo "pre-push: plan/tests alone: the push changes nothing under the" \
+       "paths that run tools/source-checks.sh here" >&2
   if ! out="$(python3 -I -m unittest discover -s "$ROOT/plan/tests" 2>&1 </dev/null)"; then
     printf '%s\n' "$out" >&2
     exit 1

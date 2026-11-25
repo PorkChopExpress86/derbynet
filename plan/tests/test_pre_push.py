@@ -205,8 +205,8 @@ class PrePush(unittest.TestCase):
         (#519 retro)."""
         result = push('.agents/skills/x/SKILL.md', PASSING)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('pre-push: plan/tests alone, since the push changes no path'
-                      ' tools/source-checks.sh reads\n', result.stderr)
+        self.assertIn('pre-push: plan/tests alone: the push changes nothing under the'
+                      ' paths that run tools/source-checks.sh here\n', result.stderr)
 
     def test_a_push_of_plan_runs_the_source_checks_that_read_it(self):
         """test_registry.py and test_deviations.py read owner-decisions.md,
