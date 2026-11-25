@@ -92,8 +92,8 @@ class PreCommit(unittest.TestCase):
 
     def test_a_push_checking_the_branch_refuses_a_commit_on_it(self):
         """#500's implementer committed 7e50d6bd and 0e4252ca while the
-        pre-push hook checked 106ef5b6, which refused the push 637 s in
-        (#500 retro). A lock whose pid is gone, or that names another
+        pre-push hook checked 106ef5b6, which refused the push once its
+        checks ended (#500 retro). A lock whose pid is gone, or that names another
         branch, refuses nothing."""
         common = Path(self.root, '.git')
         sleeper = subprocess.Popen(['sleep', '60'])

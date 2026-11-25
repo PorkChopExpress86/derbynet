@@ -14,8 +14,8 @@ A foreground loop that sleeps until a file says a run ended is a waiter
 too: the Bash tool moves it to the background after about 3 min, where it
 is one more waiter (plan/AGENT-BRIEF.md, Evidence). #409, #463, the #499
 retro and #500 each typed one on a run's log; #500's was TaskStopped
-(#500 retro). A loop inside a quoted string or a heredoc body is left
-alone, as a script being written, and so is a `for` loop.
+(#500 retro). A loop inside a quoted string, a heredoc body or a comment
+is left alone, as a script being written, and so is a `for` loop.
 """
 
 import json
@@ -23,17 +23,20 @@ import os
 import re
 import sys
 
+# The loop's header, its `do` after a `;` or a newline as in
+# plan/tests/test_stub_loops.py's HEAD, then a sleep before its `done`.
 FOREGROUND_WAIT = re.compile(
-    r"\b(?:until|while)\b.*?\bdo\b.*?\bsleep\b.*?\bdone\b", re.S
+    r"(?<![\w-])(?:until|while)\b[^\n;]*(?:;|\n)\s*do\b.*?\bsleep\b.*?\bdone\b", re.S
 )
 
 
 def code_of(command):
-    """`command` less its heredoc bodies and quoted strings, as
+    """`command` less its heredoc bodies, quoted strings and comments, as
     .githooks/pre-push reads a shell's script."""
     heredoc = r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n.*?\n\s*\2(?=\n|$)"
     command = re.sub(heredoc, r"\3", command, flags=re.S)
-    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", command)
+    command = re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", command)
+    return re.sub(r"(^|\s)#[^\n]*", r"\1", command)
 
 
 def deny(reason):

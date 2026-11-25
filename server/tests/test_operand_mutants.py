@@ -552,8 +552,8 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
 def test_an_assert_s_and_operand_is_made_false_only(tmp_path):
     """In a passing test each operand of an assert's `and` is true, so made
     True it changes nothing: #500's `assert raced.exists() and
-    unraced.exists()` and `assert racers and heats` listed four such
-    mutants, which could not die (#500 retro). An `or` inside the `and`, an
+    unraced.exists()` and `assert racers and heats` listed such mutants,
+    which could not die (#500 retro). An `or` inside the `and`, an
     assert's own `or`, and an `and` in an `if` keep both."""
     text = (
         "def test_x(a, b, c):\n"

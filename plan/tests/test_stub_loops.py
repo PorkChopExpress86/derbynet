@@ -202,6 +202,12 @@ class StubLoops(unittest.TestCase):
         self.assertEqual(len(unbounded('X = "\\n".join(["while :", "do sleep 1", "done"])\n')), 1)
         self.assertEqual(unbounded('"""Loops `while :; do sleep 1; done`."""\n'), [])
 
+    def test_the_plan_tests_are_read_but_the_examples_are_not(self):
+        names = {path.name for path in stand_in_modules()}
+        self.assertIn('test_pre_push.py', names)
+        self.assertNotIn('test_stub_loops.py', names)
+        self.assertNotIn('test_waiter_hook.py', names)
+
     def test_every_stand_in_loop_has_a_bound(self):
         found = [f'{path.relative_to(REPO)}:{line}: {loop}'
                  for path in stand_in_modules() for line, loop in unbounded(path.read_text())]

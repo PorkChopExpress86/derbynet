@@ -661,6 +661,8 @@ class CopySignals(unittest.TestCase):
         _, err = hook.communicate(timeout=60)
         self.assertEqual(hook.returncode, 1, err)
         self.assertIn("PRE_PUSH_KILL_WAIT takes a whole number of seconds, not '2s'", err)
+        # It stops before any trap is set, so it writes no lock to leave behind.
+        self.assertEqual(list((self.repo / '.git').glob('pre-push-*.lock')), [])
 
     def test_a_term_stops_the_checks_and_removes_the_copy(self):
         hook, pid = self.hanging()
@@ -681,8 +683,9 @@ class CopySignals(unittest.TestCase):
         self.assert_no_copy()
 
     def test_a_commit_on_the_pushed_branch_is_refused_while_the_checks_run(self):
-        """#500's implementer committed twice while the hook checked
-        106ef5b6, and the hook refused the push 637 s in (#500 retro). The
+        """#500's implementer committed 7e50d6bd while the hook checked
+        106ef5b6, and the hook refused the push once its checks ended (#500
+        retro). The
         hook's lock makes .githooks/pre-commit refuse the commit at once,
         and the lock is gone once the hook ends. `git push origin HEAD`
         sends the hook HEAD as its local ref, which the lock names as the
