@@ -23,6 +23,9 @@ export const step = (action, from, to) => {
     case "RestoreResults": return "undo discard (restore results)";
     case "StartWaitingStep": return "start waiting final";
     case "SkipWaitingStep": return "skip waiting final";
+    case "NextNoResult": return "next heat, no result written";
+    case "SetStepWaits": return to.stepWaits ? "final step waits" : "final step does not wait";
+    case "ChangeCut": return to.cutShort ? "cut picks one racer" : "cut picks 2 racers or more";
     default: return action;
   }
 };

@@ -12,9 +12,9 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 - **Last verified commit:** `7c3cd879a90246a83044ae86ece6206935892679`
 - **Covered files and functions:**
   - `server/racing/engine/heat_state.py`: `State`, `Chart.allowed`, `Chart.round_complete`, `TABLE`, `decide`, `_RACING_ON_EXTRAS`
-  - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `rebuild_waiting_final`, `results_locked`, `locked_failure`
+  - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `advance`, `rebuild_waiting_final`, `results_locked`, `locked_failure`
   - `server/racing/services/results.py`: `record_timer_result`, `timer_result_locked`, `record_manual_result`, `discard_heat`, `restore_results`
-  - `server/racing/services/playlist.py`: `start_playlist`, `round_ended`, `_after_round`, `_activate`, `start_waiting_step`, `skip_waiting_step`, `rebuild_waiting_round`, `_clear_changed_final`, `_waits`, `close_intermission_on_result`
+  - `server/racing/services/playlist.py`: `start_playlist`, `round_ended`, `_after_round`, `_activate`, `start_waiting_step`, `skip_waiting_step`, `rebuild_waiting_round`, `_clear_changed_final`, `_waits`, `close_intermission_on_result`, `set_step_waits`
 
 Before trusting a pass, check whether covered code changed since the sync commit:
 
@@ -32,12 +32,13 @@ Move the sync commit forward **only** after confirming that `.agents/skills/heat
 
 | Invariant | Promise | Harm if broken | Baseline at the last verified commit |
 | --- | --- | --- | --- |
-| `RacingHeatAllowed` | While racing mode is on, the current heat exists and has no results yet (`Chart.allowed`). | Timer stages or scores a heat that already has results, overwriting or corrupting scores. | **PASS** (29,935 distinct states checked; failed before #499, when `restore_results` left `racing=True` on a scored heat) |
-| `WaitingFinalMatchesStandings` | While an intermission is open and the final has not raced, the waiting final's roster matches Round 1's current standings (D27, D135). | The wrong kids race in the final after a Round 1 result change. | **PASS** (29,935 distinct states checked; failed before #501 on traces that wrote a result to the waiting final while the intermission was open, such as `ManualWriteR2` + `DiscardHeat` + `Rerun`. D136 closes the intermission on that result. The `select_heat` + `rerun` + `timer_result` trace is gone since #500, where `round_ended` rebuilds the unraced final (D135).) |
-| `NoIntermissionAfterFinalRaces` | Once any heat of the final has a result, the intermission for that final is closed (D136). | Intermission stays open after the final has started scoring; `skip_waiting_step` can skip an already-raced final. | **PASS** (29,935 distinct states checked; failed before #501, when `record_manual_result` on the paused waiting final left the intermission open. With the close taken out of `ManualWriteR2` or of `RestoreResults` it fails again.) |
-| `LockedFeederProtected` | Once any heat of the final has a result, no caller without `CONTROL_RACE` can alter Round 1's results (D32). | A volunteer without race-control permission alters qualifying heats after the final has begun. | **PASS** (29,935 distinct states checked) |
+| `RacingHeatAllowed` | While racing mode is on, the current heat exists and has no results yet (`Chart.allowed`). | Timer stages or scores a heat that already has results, overwriting or corrupting scores. | **PASS** (155,180 distinct states checked; failed before #499, when `restore_results` left `racing=True` on a scored heat) |
+| `WaitingFinalMatchesStandings` | While an intermission is open and the final has not raced, the waiting final's roster matches Round 1's current standings (D27, D135). | The wrong kids race in the final after a Round 1 result change. | **PASS** (155,180 distinct states checked; failed before #501 on traces that wrote a result to the waiting final while the intermission was open, such as `ManualWriteR2` + `DiscardHeat` + `Rerun`. D136 closes the intermission on that result. The `select_heat` + `rerun` + `timer_result` trace is gone since #500, where `round_ended` rebuilds the unraced final (D135).) |
+| `NoIntermissionAfterFinalRaces` | Once any heat of the final has a result, the intermission for that final is closed (D136). | Intermission stays open after the final has started scoring; `skip_waiting_step` can skip an already-raced final. | **PASS** (155,180 distinct states checked; failed before #501, when `record_manual_result` on the paused waiting final left the intermission open. With the close taken out of `ManualWriteR2` or of `RestoreResults` it fails again.) |
+| `LockedFeederProtected` | Once any heat of the final has a result, no caller without `CONTROL_RACE` can alter Round 1's results (D32). | A volunteer without race-control permission alters qualifying heats after the final has begun. | **PASS** (155,180 distinct states checked) |
+| `NoRacingDuringIntermission` | Racing never runs with the intermission open (#514), outside the timer test, which the model leaves out (#515). | The dashboard shows the intermission over a race in progress, and still offers Skip. | **PASS** (155,180 distinct states checked; failed before #514, when the playlist's racing-on for a step that does not wait left the intermission open. With the close taken out of `RoundOneEnded`'s racing-on branch it fails again, on a trace that ends in `NextNoResult` by `advance`. No page reaches that trace: the dashboard's Next and `heat.select` call `select_heat`, which closes the intermission first.) |
 
-TLC also checks `NoDeadlock` across all 29,935 states (**PASS**).
+TLC also checks `NoDeadlock` across all 155,180 states (**PASS**).
 
 ## How to run
 
@@ -66,7 +67,7 @@ Always inspect TLA+ results using the pstack `/statechart` skill against:
 
 When TLC reports a counterexample:
 
-1. Read the counterexample as a sequence of service calls (`record_timer_result`, `record_manual_result`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `discard_heat`, `restore_results`, `start_waiting_step`, `skip_waiting_step`).
+1. Read the counterexample as a sequence of service calls (`record_timer_result`, `record_manual_result`, `select_heat`, `advance`, `set_racing`, `rerun`, `reinstate`, `discard_heat`, `restore_results`, `start_waiting_step`, `skip_waiting_step`, `set_step_waits`).
 2. Replay that exact sequence against the real Django services in `server/` with `uv run pytest` (see `server/racing/tests/test_result_changes_rebuild_the_final.py` for the `two_step_playlist` fixture pattern).
 3. If the real Django services reproduce the violation, it is a **real bug** — do not weaken the invariant or the model.
 4. If the real Django services reject a step or behave differently from the model, the model has drifted — update `HeatIntermission.tla` to match the real code and re-run.
@@ -80,6 +81,6 @@ When TLC reports a counterexample:
 
 ## Scope & what is NOT covered
 
-- **Bounds:** One group with a 2-step playlist (Round 1 with 2 heats, waiting Round 2 Final with 1 heat) and abstract Round 1 results `{"none", "v1", "v2"}`.
+- **Bounds:** One group with a 2-step playlist (Round 1 with 2 heats, Round 2 Final with 1 heat, which waits until `set_step_waits` switches that off), abstract Round 1 results `{"none", "v1", "v2"}`, and a cut that picks 2 racers or more, or one (D28), and changes at any time. `continue_racing` on Round 1's step is either value each time the round ends.
 - **Assumptions:** Each service call executes atomically under `lock_race_state(event.id)` (as enforced by `transaction.atomic()` + `SELECT ... FOR UPDATE`).
-- **Not modeled:** A final of more than one heat, so a half-raced final that its round's second ending must not make wait again (`_waits`; `server/racing/tests/test_a_result_closes_the_intermission.py` covers it), `advance` to Next on a complete round, which opens the intermission without writing a result, `result_import`, master schedule interleaving, `EmptiedHeat` retention/release, `schedule.reschedule` / `close_lanes` snapshot retries, `timer-test` mode, `delete_results(round=None)` whole-event clears, and multi-group aggregate finals.
+- **Not modeled:** A final of more than one heat, so a half-raced final that its round's second ending must not make wait again (`_waits`; `server/racing/tests/test_a_result_closes_the_intermission.py` covers it), a step's `scene_at_finish`, a cut that picks no racer, whose empty roster `_activate` writes again where the model has a step that does not wait keep its roster, the timer test (#515), `result_import`, master schedule interleaving, `EmptiedHeat` retention/release, `schedule.reschedule` / `close_lanes` snapshot retries, `delete_results(round=None)` whole-event clears, and multi-group aggregate finals.

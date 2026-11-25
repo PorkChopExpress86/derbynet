@@ -760,7 +760,7 @@ _RACING_ON_EXTRAS: dict[By, tuple[Step, ...]] = {
     ),
     By.WAITING_STEP: (CloseIntermission(), Emit(ApplyRacingScene())),
     # A step's continue_racing keeps the scene the crew chose (playlist.inc).
-    By.PLAYLIST: (),
+    By.PLAYLIST: (CloseIntermission(),),
 }
 
 

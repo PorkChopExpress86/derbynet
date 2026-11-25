@@ -25,6 +25,7 @@ else
     WaitingFinalMatchesStandings
     NoIntermissionAfterFinalRaces
     LockedFeederProtected
+    NoRacingDuringIntermission
   )
 fi
 
