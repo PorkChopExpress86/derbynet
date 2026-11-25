@@ -3,7 +3,7 @@ racers who can win each, and the three orders of the racer grid.
 
 `vote.php` lists the racers who passed check-in and are eligible for awards
 (`passedinspection = 1 AND exclude = 0`, `website/vote.php:67`), with no
-names (`website/vote.php:152`), and every judged award
+names (their echo is commented out, `website/vote.php:152`), and every judged award
 (`all_awards(false)`, `website/vote.php:101`). Which of those awards are on
 the ballot, and their depth, come from `ballot.get` in the browser, as in
 `vote.js` (`get_ballot()`, `website/js/vote.js:172`). Each award's racers

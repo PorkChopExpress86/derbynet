@@ -839,7 +839,7 @@ def set_test_lane(event: Event, lane: int, occupied: bool) -> bool:
     the state the lane ends in, not a flip, so the same toggle sent twice is
     one change. False, with nothing written, for a lane the track does not
     have (one lane when the count is 0). Bits past the lane count, left when
-    the count went down, are cleared here; `timer-test.js:27` clears them
+    the count went down, are cleared here; `timer-test.js:28` clears them
     only in its page's field and never posts them.
 
     Every change stages a new test heat. PHP's `tt-mask`, which
