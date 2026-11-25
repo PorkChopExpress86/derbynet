@@ -712,8 +712,9 @@ def listed(args) -> int:
         w: sum(1 for word, _ in rows if word == w)
         for w in ("KILLED", "SURVIVED", "REFUSED", "ERROR")
     }
-    # #494's report read "61 of 73 killed" off a SKIPPED row's "45 listed"
-    # and this line's "37 listed", so the tally names the skipped count too.
+    # #494's report took the 73 mutants operand_mutants.py listed as the
+    # round's total and read "61 of 73 killed", where the round ran 37 and
+    # skipped the rest in test functions; the tally names both.
     left = sum(skipped.values())
     print(
         f"{len(rows)} listed: "

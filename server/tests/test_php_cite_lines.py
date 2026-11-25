@@ -144,6 +144,7 @@ def test_a_cite_to_a_blank_line_a_brace_or_no_file_is_found():
     assert check("vote.php:146") == "no code on that line"
     assert check("vote.php:99999") == "no code on that line"
     assert check("vote.php:0") == "no code on that line"
+    assert check("vote.php:67-99999") == "no code on that line"
     assert check("no-such-page.php:3") == "no such file"
     assert check("`website/vote.php:67`") is None
     assert check("kiosks.inc:27-31") is None

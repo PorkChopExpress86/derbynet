@@ -691,7 +691,7 @@ def test_listed_runs_each_mutant_and_names_each_survivor(project):
         "SURVIVED  mod.py:10  operand  b > 0  ->  True",
         "KILLED    mod.py:10  operand  b > 0  ->  False",
     ], run.stdout
-    assert "6 listed: 5 KILLED, 1 SURVIVED, 0 REFUSED, 0 ERROR" in run.stdout
+    assert "6 listed: 5 KILLED, 1 SURVIVED, 0 REFUSED, 0 ERROR\n" in run.stdout
     assert (
         run.stdout.splitlines()[-1] == "  SURVIVED  mod.py:10  operand  b > 0  ->  True"
     )
