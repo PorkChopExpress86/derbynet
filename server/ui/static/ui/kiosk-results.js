@@ -23,7 +23,6 @@
   }
 
   function scroll() {
-    if (Kiosk.paused) return;
     var room = root.clientHeight;
     var height = rounds.scrollHeight;
     if (height <= room) {
