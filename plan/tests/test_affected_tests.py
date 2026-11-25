@@ -114,9 +114,8 @@ TREE = {
 }
 
 
-def run(*files, tree=None, root=None, options=()):
-    """Runs the tool on `files` with --stdin over the stand-in, or `root`,
-    and `options` of its own."""
+def run(*files, tree=None, root=None):
+    """Runs the tool on `files` with --stdin over the stand-in, or `root`."""
     with tempfile.TemporaryDirectory() as tmp:
         if root is None:
             root = Path(tmp)
@@ -125,8 +124,7 @@ def run(*files, tree=None, root=None, options=()):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text)
         result = subprocess.run(
-            [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', str(root),
-             *options],
+            [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', str(root)],
             input=''.join(f'{f}\n' for f in files), capture_output=True, text=True)
     if result.returncode:
         raise AssertionError(result.stderr)
@@ -917,7 +915,15 @@ class TestFile(unittest.TestCase):
         files = ['server/derbynet/settings.py', 'server/ui/tests/test_mixed.py',
                  'server/ui/tests/browser/test_kiosk_ondeck_labels.py']
         plain = run(*files)
-        out = run(*files, options=('--flake-ticket',))
+        with tempfile.TemporaryDirectory() as tmp:
+            for rel, text in TREE.items():
+                (Path(tmp) / rel).parent.mkdir(parents=True, exist_ok=True)
+                (Path(tmp) / rel).write_text(text)
+            out = subprocess.run(
+                [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', tmp,
+                 '--flake-ticket'],
+                input=''.join(f'{f}\n' for f in files), capture_output=True,
+                text=True, check=True).stdout
         script = [ln.strip() for ln in out.splitlines()
                   if 'tools/pytest-under-load.sh' in ln and 'D133' not in ln]
         self.assertGreaterEqual(len(script), 4, out)

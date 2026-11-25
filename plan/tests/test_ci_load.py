@@ -107,7 +107,7 @@ class Plan(unittest.TestCase):
 
     def test_a_no_load_after_the_first_pytest_argument_is_pytest_s(self):
         """The script reads --no-load only among its own options, before the
-        first pytest argument, so a later one leaves a load command."""
+        first pytest argument: after it, the line stays a load command."""
         plan = TOOL.plan('  tools/pytest-under-load.sh --postgres -m browser '
                          '--count 5 x.py --no-load\n'
                          '  tools/pytest-under-load.sh --loops 4 --no-load x.py\n'
