@@ -9,7 +9,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 
 ## Coverage & sync commit
 
-- **Last verified commit:** `7c3cd879a90246a83044ae86ece6206935892679`
+- **Last verified commit:** `603cf1fa678ac7da614e1eb6f3c4c87ac5d68338`
 - **Covered files and functions:**
   - `server/racing/engine/heat_state.py`: `State`, `Chart.allowed`, `Chart.round_complete`, `TABLE`, `decide`, `_RACING_ON_EXTRAS`
   - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `advance`, `rebuild_waiting_final`, `results_locked`, `locked_failure`
@@ -19,7 +19,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 Before trusting a pass, check whether covered code changed since the sync commit:
 
 ```sh
-git diff --stat 7c3cd879a90246a83044ae86ece6206935892679 -- \
+git diff --stat 603cf1fa678ac7da614e1eb6f3c4c87ac5d68338 -- \
   server/racing/engine/heat_state.py \
   server/racing/services/heats.py \
   server/racing/services/results.py \
@@ -62,6 +62,15 @@ Always inspect TLA+ results using the pstack `/statechart` skill against:
 - View: `.agents/skills/heat-intermission/HeatIntermission.view.mjs`
 
 `/statechart` reports each invariant violation as its shortest step-by-step path in plain words and renders a Mermaid statechart of the transitions.
+
+`/statechart` installs TLC with mise, which this machine lacks (`spawn mise ENOENT`, hit by #500, #501 and #514). Run `check.sh` once, to cache the jar, then give `/statechart` that jar and Java, with `--out` a folder that does not exist yet:
+
+```sh
+TLA2TOOLS=$HOME/.local/share/tla2tools/tla2tools-1.7.4.jar JAVA=java \
+  <statechart skill dir>/scripts/statechart .agents/skills/heat-intermission/HeatIntermission.tla \
+  --config .agents/skills/heat-intermission/HeatIntermission.cfg \
+  --view .agents/skills/heat-intermission/HeatIntermission.view.mjs --out <new folder>
+```
 
 ## Telling a real bug from a modeling error
 

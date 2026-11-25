@@ -21,6 +21,12 @@ a `while read` loop is no waiter. A counter loop, whose condition is one
 comparison with a literal of at most 60 (`while [ $i -lt 5 ]`), runs as a
 `for _ in $(seq 5)` loop does; one joined with `||` or `&&` to a check,
 `until grep ... || [ $i -ge 30 ]`, is a waiter (PR #517's review).
+
+A hook matched on `Bash` alone also gets each Monitor command, named
+`Bash` and with only its command and description, so the loop rule
+refused the Monitor watch its own message names (#501 and #514 retro).
+The matcher names Monitor too, and Claude Code then sends a Monitor call
+under its own name, which this hook lets through.
 """
 
 import json
