@@ -105,9 +105,23 @@ class Overlaps(unittest.TestCase):
         self.assertEqual(TOOL.cites(body), {'server/x.py'})
 
     def test_only_scope_and_references_are_read(self):
-        body = ('## Why\n\n`server/a.py`\n\n## Scope\n\n`server/b.py`\n\n'
-                '## Risks\n\n`server/c.py`\n\n## References\n\n`server/d.py`\n')
-        self.assertEqual(TOOL.cites(body), {'server/b.py', 'server/d.py'})
+        """Every section plan/lint-issues.py names for a ticket or a spec
+        (TICKET, SPEC, STILL_OPEN, WAITING_ON), each citing its own file."""
+        sections = ['Goal', 'Current PHP behavior', 'Scope', 'Out of scope',
+                    'Acceptance criteria', 'Risks and notes', 'Dependencies', 'References',
+                    'Summary', 'Context', 'Proposal', 'Alternatives considered',
+                    'Open questions for the owner', 'Still open', 'Waiting on']
+        body = ''.join(f'## {name}\n\n`server/{n}.py`\n\n' for n, name in enumerate(sections))
+        self.assertEqual(TOOL.cites(body), {'server/2.py', 'server/7.py'})
+
+    def test_a_whole_top_level_folder_is_no_cite(self):
+        """#58 bind-mounts `server/`, which paired it with every server ticket."""
+        self.assertEqual(TOOL.cites('## Scope\n\nbind-mount `server/` and `testing/`, '
+                                    'edit `server/docker/`\n'), {'server/docker'})
+
+    def test_a_line_range_after_a_cite_is_dropped(self):
+        self.assertEqual(TOOL.cites('## Scope\n\n`server/x.py:27-31`, `server/y.py:3,9`\n'),
+                         {'server/x.py', 'server/y.py'})
 
 
 FAKE_GH = '''#!{python}
@@ -117,6 +131,8 @@ if {fail!r}:
 args = sys.argv[1:]
 bodies = {bodies!r}
 if args[:2] == ['issue', 'list']:
+    if args[args.index('--limit') + 1] != '200':
+        sys.exit('ticket-overlap listed fewer than 200 issues')
     print(json.dumps([{{'number': int(n), 'body': b}} for n, b in bodies.items()]))
 elif args[:2] == ['issue', 'view']:
     print(json.dumps({{'body': bodies[args[2]]}}))

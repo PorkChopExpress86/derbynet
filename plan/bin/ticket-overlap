@@ -10,8 +10,10 @@ Once a ticket's PR is open, `plan/bin/pr-overlap` names the files the PRs
 change; this reads only what the tickets cite before any code exists.
 
 A cite is a backticked path with a `/` in it whose first folder is one of
-the repository's, a `:line` after it dropped: `linux/arm64` is none. A
-cite of a folder shares every path under it. `website/` is left out, since
+the repository's, a `:line` after it dropped: `linux/arm64` is none, and
+neither is a whole top-level folder, such as #58's bind-mounted `server/`,
+which would pair it with every ticket. A cite of a deeper folder shares
+every path under it. `website/` is left out, since
 PHP is frozen (CLAUDE.md), and so is plan/owner-decisions.md, since no
 ticket's agent edits an owner decision (plan/AGENT-BRIEF.md): both are read,
 never changed.
@@ -45,7 +47,7 @@ def cites(body: str) -> set[str]:
             keep = line[3:].strip() in SECTIONS
         elif keep:
             found.update(m.rstrip('/') for m in CITE.findall(line))
-    return {c for c in found if not c.startswith(READ_ONLY)
+    return {c for c in found if not c.startswith(READ_ONLY) and '/' in c
             and os.path.isdir(os.path.join(ROOT, c.split('/')[0]))}
 
 

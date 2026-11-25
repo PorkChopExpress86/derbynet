@@ -204,10 +204,13 @@ class PrePush(unittest.TestCase):
         test_listing_order.py plan/'s Python, test_docker_checks.py every
         tracked .md, and test_pipefail_pipes.py plan/bin's bash; #346's push
         ran none of them (#346 retro, D129)."""
-        for path in ('plan/php_cites.py', 'plan/bin/ci-failures', 'plan/README.md',
-                     ('plan/owner-decisions.md', 'plan/README.md')):
-            with self.subTest(path=path):
-                result = push(path, PASSING)
+        for path, gone in (('plan/php_cites.py', ()), ('plan/bin/ci-failures', ()),
+                           ('plan/README.md', ()), (('plan/owner-decisions.md', 'plan/README.md'), ()),
+                           # A deleted file whose name sorts after the decisions.
+                           ('plan/owner-decisions.md', ('plan/zz.md',))):
+            with self.subTest(path=path, gone=gone):
+                result = push(path, PASSING, delete=gone,
+                              base_files={name: 'x\n' for name in gone})
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
                 self.assertEqual(result.ran.count('plan/tests'), 1, result.ran)
@@ -356,6 +359,15 @@ class Guides(unittest.TestCase):
         result = push('docs/install-docker.md', PASSING, remote='missing')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
+
+    def test_a_tip_without_plan_tests_on_a_base_the_clone_lacks_runs_the_checks(self):
+        """Nothing shows that base held no code, so only a base this clone
+        has, and that lacks plan/tests, lets a push skip them (PR #505's
+        review)."""
+        result = push('docs/install-docker.md', PASSING, remote='missing',
+                      delete=('plan/tests/test_plan.py',))
+        self.assertNotIn('no check reads it', result.stderr)
+        self.assertIn('check-paths.sh --docs docs\n', result.ran)
 
     def test_every_branch_push_runs_the_guides_check(self):
         for changed in ('plan/README.md', 'server/tools/parity_gate.py', 'server/docs/adr/README.md'):
@@ -885,6 +897,65 @@ class OrdinaryPushes(unittest.TestCase):
                 self.assertFalse(landed)
                 self.assertEqual(result.stdout.count('closes another issue'), 1, result.stdout)
                 self.assertIn('Fixes #2', result.stdout)
+
+    def test_a_branch_that_deletes_plan_tests_runs_every_check(self):
+        """PR #505's review: the tip `git rm -r plan/tests` beside an
+        unformatted server file skipped every check. Only a ref whose base
+        lacks plan/tests too, as the screenshots branch does, skips them; here
+        source-checks.sh runs and fails on the missing plan/tests."""
+        with tempfile.TemporaryDirectory() as tmp:
+            o = Origin(Path(tmp), 'server/core/zz_bad.py')
+            o.git('checkout', '-q', '-b', 'issue-7-x')
+            o.git('rm', '-rq', 'plan/tests')
+            o.sent('Removes the plan tests (#7)')
+            result = o.push('-u', 'origin', 'issue-7-x')
+        self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+        self.assertNotIn('no check reads it', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+
+    def two_refs(self, first, second):
+        """A push of two refs at once, each made by a function of the Origin
+        that leaves it checked out, with the result: pushed `first` then
+        `second` and again with the names swapped, so a rule that reads only
+        the first or only the last ref fails one of the two."""
+        results = []
+        for a, b in ((first, second), (second, first)):
+            with tempfile.TemporaryDirectory() as tmp:
+                o = Origin(Path(tmp), 'notes/x.md')
+                a(o, 'issue-7-a')
+                o.git('checkout', '-q', '-f', 'master')
+                b(o, 'issue-7-b')
+                results.append(o.push('origin', 'issue-7-a', 'issue-7-b'))
+        return results
+
+    def test_a_ref_that_changes_more_than_the_decisions_runs_every_check(self):
+        def decisions(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Decisions (#7)', 'plan/owner-decisions.md')
+
+        def server(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Code (#7)', 'server/x.py')
+
+        for result in self.two_refs(decisions, server):
+            with self.subTest():
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
+
+    def test_an_orphan_ref_beside_a_branch_runs_every_check(self):
+        def orphan(o, name):
+            o.git('checkout', '-q', '--orphan', name)
+            o.git('rm', '-rq', '--cached', '.')
+            o.commit('Screenshots (#7)', '7/page.png')
+
+        def branch(o, name):
+            o.git('checkout', '-q', '-b', name)
+            o.commit('Code (#7)', 'server/x.py')
+
+        for result in self.two_refs(orphan, branch):
+            with self.subTest():
+                self.assertNotIn('no check reads it', result.stderr)
+                self.assertIn('pre-push: tools/source-checks.sh', result.stderr)
 
     def test_the_closing_check_still_reads_a_commit_the_remote_has(self):
         """Its base stays origin/master (#439): a keyword reaches master with

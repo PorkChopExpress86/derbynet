@@ -95,6 +95,12 @@ changed=
 pushed=
 # Each pushed ref changes plan/owner-decisions.md and nothing else.
 decisions=1
+# Some pushed ref, or its base, holds plan/tests. The screenshots branch
+# (D75) holds PNGs and no code, so the checks find none of their scripts in
+# it and fail its push (session retro 2026-11-24); a branch that deletes
+# plan/tests still runs them (PR #505's review). A base this clone lacks
+# counts as code.
+code=
 pushes=()
 locals=()
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -107,6 +113,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
               || git merge-base "$local_sha" master 2>/dev/null || true)"
   else
     base="$remote_sha"
+  fi
+  if git cat-file -e "$local_sha:plan/tests" 2>/dev/null \
+      || { [ -n "$base" ] && ! git cat-file -e "$base:" 2>/dev/null; } \
+      || { [ -n "$base" ] && git cat-file -e "$base:plan/tests" 2>/dev/null; }; then
+    code=1
   fi
   # The whole list first: under pipefail, grep -q's early exit can fail the
   # pipe (server/tests/test_pipefail_pipes.py).  image.yml runs checks.sh,
@@ -204,16 +215,8 @@ done
 # (#390 review).
 mapfile -t shas < <(for push in ${pushes[@]+"${pushes[@]}"}; do echo "${push%% *}"; done |
                     sort -u)
-# The screenshots branch (D75) holds PNGs and no code, so the checks find
-# none of their scripts in it and fail its push (session retro 2026-11-24).
-# A push whose every commit lacks plan/tests runs no check past the commit
-# messages'.
-code=
-for sha in ${shas[@]+"${shas[@]}"}; do
-  if git cat-file -e "$sha:plan/tests" 2>/dev/null; then code=1; fi
-done
-if [ ${#shas[@]} -gt 0 ] && [ -z "$code" ]; then
-  echo "pre-push: no pushed commit holds plan/tests, so no check reads it" >&2
+if [ -n "$pushed" ] && [ -z "$code" ]; then
+  echo "pre-push: no pushed ref holds plan/tests, nor did its base, so no check reads it" >&2
   exit 0
 fi
 COPY=
