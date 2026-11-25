@@ -69,6 +69,12 @@ that `test-basic-checkins.sh` checks in. #251 lost two tries to
 `test-basic-checkins.sh` with no roster and to `--no-event` before
 `reset-database.sh` (#251 retro).
 
+Each fetch in `common.sh` (`curl_getj`, `curl_postj`, `curl_page` and the
+other `curl_` functions) overwrites `$DEBUG_CURL` with its own response, so a
+probe reads what it needs from that file before its next fetch. #500's second probe
+fetched the standings between a heat's fetch and the `jq` over its racers,
+and printed an empty roster (#500 retro).
+
 A server database can't be reused: setup (`ez-new=testdb`) fails with
 `already_exists` the second time, so each run needs a fresh data volume.  The
 script always makes one.

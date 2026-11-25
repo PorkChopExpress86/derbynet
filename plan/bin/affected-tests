@@ -71,7 +71,10 @@ targets, then:
   tools and tests among them, with `tools/mutate.py --listed`, which runs
   every mutant it lists (#336 retro),
   and `--listed --file` on each changed test file and conftest for its
-  helpers (#345 retro): run them before the first hand-off run,
+  helpers (#345 retro), and each PHP line a line the diff adds cites
+  outside website/ and templates/, to run against PHP with
+  testing/docker/php-scratch.sh (not under `--stdin`; #500 retro): run them
+  before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
 - the commands, from server/. Each `-m browser` line, the DejaVu Sans one
@@ -1449,6 +1452,29 @@ def diff_text(plan, path):
                      if ln[:1] in '+-' and not ln.startswith(('+++', '---')))
 
 
+# A PHP file and line, as `playlist.inc:85` or `website/inc/playlist.inc:85`.
+PHP_CITE = re.compile(r'(?<![\w/.-])((?:[\w-]+/)*[\w.-]+\.(?:php|inc)):(\d+(?:-\d+)?)')
+
+
+def added_php_cites(plan):
+    """(`file:line` cited, `path:line` citing) for each PHP line that a line
+    the branch or the working tree adds cites, outside the PHP's own files.
+    #500's README, comment and test name said what `playlist.inc:85` does,
+    and no PHP run showed it until review (#500 retro)."""
+    found = []
+    for rev in (f'{plan.base}...HEAD', 'HEAD'):
+        path = line = None
+        for text in git(plan.root, 'diff', '-U0', rev).splitlines():
+            if text.startswith('+++ '):
+                path = text[6:]  # `+++ /dev/null`, a deleted file's, adds no line
+            elif text.startswith('@@'):
+                line = int(re.search(r'\+(\d+)', text).group(1))
+            elif text.startswith('+') and not path.startswith(('website/', 'templates/')):
+                found += [(f'{m[1]}:{m[2]}', f'{path}:{line}') for m in PHP_CITE.finditer(text)]
+                line += 1
+    return list(dict.fromkeys(found))
+
+
 def base_text(plan, rel):
     """`server/rel` as it was where the branch left BASE (the diff is
     BASE...HEAD), or None when it is new on the branch."""
@@ -2673,9 +2699,16 @@ def report(plan, tree):
     # read, and never listed its operand mutants.
     claimed = plan.changed_tests + plan.changed_helpers
     base = f' --base {plan.base}' if plan.from_git else ''
-    if claimed or plan.changed_source:
+    cites = added_php_cites(plan) if plan.from_git else []
+    if claimed or plan.changed_source or cites:
         say('Before the first hand-off run, from server/: settle what these list, '
             'since an edit restarts the runs below (#312 retro):')
+        if cites:
+            say('  PHP lines the diff cites: run each claim against PHP with '
+                'testing/docker/php-scratch.sh, one probe step per claim '
+                '(plan/AGENT-BRIEF.md; #500 retro):')
+            for cited, where in cites:
+                say(f'    {cited}  at {where}')
         if claimed:
             say(f'  uv run python tools/docstring_claims.py {" ".join(claimed)}')
             # #341 checked two of its four changed test files, and a
