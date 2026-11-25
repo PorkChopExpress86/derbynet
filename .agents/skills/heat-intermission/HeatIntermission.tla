@@ -17,7 +17,7 @@ EXTENDS Naturals, Sequences
  *   - R1 heat results are abstracted to {"none", "v1", "v2"} so any result change
  *     that alters the finalist cut ("v1" <-> "v2" or "none") is observable.
  *
- * Covered source files (sync commit: 7c3cd879a90246a83044ae86ece6206935892679):
+ * Covered source files (sync commit: 603cf1fa678ac7da614e1eb6f3c4c87ac5d68338):
  *   - server/racing/engine/heat_state.py
  *   - server/racing/services/heats.py
  *   - server/racing/services/results.py

@@ -33,6 +33,8 @@ gh issue edit N --repo PorkChopExpress86/derbynet --body-file /tmp/bodyN.md
 
 A ticket's Goal states the symptom to make pass, and leaves the mechanism to the first Scope box. When Current PHP behavior or Scope marks an observation or a cause unverified ("not yet verified", "observed once", "not reproduced", "suspect"), the lint flags each Goal line that asserts a cause as fact ("can land", "because", "caused by", "due to"). #282's Goal said CI's run "can land it on one worker" while its Current PHP behavior called the failure "observed once" and its suspect "not yet verified", and the mechanism proved false.
 
+A ticket's repro, written from an agent's report too, starts at what a page sends (an `action.php` call or a view), and the lead runs that path once before filing it. #514's "Next is pressed" came from #501's report and reached the bug only through `heats.advance`, which only tests call: the dashboard's Next calls `select_heat`, which closed the intermission first (#514 retro).
+
 A body for an issue not created yet lints with `--file 0=PATH`, as a new open issue with the labels `--labels kind:ticket,ready-for-agent` names (default `kind:ticket`). `plan/tests/` tests the lint against a fake `gh`; CI runs it.
 
 The lint reads every other issue live, so a reference or dependency is checked against the whole plan. It needs `gh` on `PATH`, or `GH=/path/to/gh`. CI runs it in `.github/workflows/plan-checks.yml`.

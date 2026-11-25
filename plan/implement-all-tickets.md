@@ -71,6 +71,7 @@ Run `git worktree remove ../derbynet-wt-N`, `git branch -D issue-N-<slug>`, and 
 2. Spawn a general-purpose agent with `model: opus` and give it that list. It follows ~/.claude/plugins/cache/mattpocock/mattpocock-skills/*/skills/engineering/retro/SKILL.md, ranks each candidate, and fixes every high and medium one:
    - It prefers a deterministic check (a test, ruff rule, pre-push hook, or CI step) to prose, and keeps CLAUDE.md to navigation pointers.
    - Repo fixes go in `git worktree add ../derbynet-wt-retro-N -b retro-N origin/master`. It runs the affected checks, commits, pushes, and returns a PR body written with /mattpocock-skills:pr.
+   - When the ticket's PR changed a skill's model under `.agents/skills`, the retro PR moves that skill's sync commit to the squash commit, as its SKILL.md says, after rerunning the skill's check. heat-intermission's stayed at 7c3cd879 through #500, #501 and #514 (#501 and #514 retro).
    - Memory files go straight into ~/.claude/projects/-mnt-samsung-dev-derbynet/memory/.
    - Permissions in settings files stay as they are, and a change to ~/.claude/CLAUDE.md is only proposed.
    - It returns the low findings, and creates no branch when nothing is high or medium.
