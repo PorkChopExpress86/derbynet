@@ -195,16 +195,14 @@ def unmarked_evaluate_reads(source: str) -> list[tuple[str, int]]:
             and test.name.startswith("test_")
         ):
             continue
-        for statement in ast.walk(test):
-            if not isinstance(statement, ast.stmt) or statement is test:
+        for statement in (n for top in test.body for n in ast.walk(top)):
+            if not isinstance(statement, ast.stmt):
                 continue
             if isinstance(statement, ast.Expr) and isinstance(
                 statement.value, ast.Call
             ):
                 call = statement.value
-                header = [*call.args, *(k.value for k in call.keywords)]
-                if isinstance(call.func, ast.Attribute):
-                    header.append(call.func.value)
+                header = [call.func, *call.args, *(k.value for k in call.keywords)]
             else:
                 header = list(_header(statement))
             if not any(_reads(node) for node in header):
@@ -270,6 +268,8 @@ def test_one(page):
     for row in page.eval_on_selector_all("tr", "rs => rs.length"):
         pass
     print(page.locator("p").evaluate_all("ps => ps.length"))
+    with open(page.evaluate("window.name")):
+        page.evaluate("window.list").index(3)
     return page.eval_on_selector("p", "p => p.id")
 
 def helper(page):
@@ -282,6 +282,8 @@ def helper(page):
         ("test_one", 14),
         ("test_one", 16),
         ("test_one", 17),
+        ("test_one", 18),
+        ("test_one", 19),
     ]
 
 
