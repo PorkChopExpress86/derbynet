@@ -13,7 +13,7 @@ EXTENDS Naturals, Sequences
  *   - R1 heat results are abstracted to {"none", "v1", "v2"} so any result change
  *     that alters the finalist cut ("v1" <-> "v2" or "none") is observable.
  *
- * Covered source files (sync commit: 48ae59bbb5d882031f104976fba928166449f55b):
+ * Covered source files (sync commit: 7c3cd879a90246a83044ae86ece6206935892679):
  *   - server/racing/engine/heat_state.py
  *   - server/racing/services/heats.py
  *   - server/racing/services/results.py
@@ -356,11 +356,12 @@ DiscardHeat(rnd, h, isCoord) ==
     /\ UNCHANGED <<curRound, curHeat, racing, waiting, finalBuilt,
                    lastHeatRound, lastHeatNum, lastHeatSaved>>
 
-(* restore_results: results.py:336-374 *)
+(* restore_results: results.py:336-378. Racing goes off when the restored
+   heat is the current heat (#499), as reinstate turns it off. *)
 RestoreResults(isCoord) ==
     /\ discardRound /= "none"
     /\ ~HeatHasResult(discardRound, discardNum)
-    /\ (isCoord \/ discardRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in results.py:354
+    /\ (isCoord \/ discardRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in results.py:355
     /\ IF discardRound = "R1" THEN
          LET r1New == [r1 EXCEPT ![discardNum] = discardVal]
          IN
@@ -371,8 +372,9 @@ RestoreResults(isCoord) ==
          /\ r1' = r1
          /\ r2' = discardVal
          /\ finalRoster' = finalRoster
+    /\ racing' = IF discardRound = curRound /\ discardNum = curHeat THEN FALSE ELSE racing
     /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ discardRound = "R1" /\ FinalHasResult(r2)))
-    /\ UNCHANGED <<curRound, curHeat, racing, waiting, finalBuilt,
+    /\ UNCHANGED <<curRound, curHeat, waiting, finalBuilt,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal>>
 

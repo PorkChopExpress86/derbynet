@@ -1,4 +1,4 @@
-Work through the ready tickets one at a time, in a loop, until no ready ticket is left or a stop condition hits.
+Work through the ready tickets in a loop, one at a time or side by side (Several tickets at once), until no ready ticket is left or a stop condition hits.
 
 You are the **lead**. Keep your context small enough to run many tickets: each ticket gets fresh subagents, and you read only their reports and the `plan/bin/pr-wait` output. Brief subagents with context pointers (the ticket number, file paths, commit SHAs), not copied text. Load `SendMessage` with ToolSearch if it is deferred; it sends follow-up work to a subagent that still holds its context.
 
@@ -13,6 +13,14 @@ Steps 2 and 6 rank findings this way:
 1. Move the **frontier**: run `python3 -I plan/lint-issues.py`, and for each `blocked, but every dependency is closed` finding run `gh issue edit N --repo PorkChopExpress86/derbynet --remove-label blocked --add-label ready-for-agent`.
 2. Run `gh issue list --repo PorkChopExpress86/derbynet --label ready-for-agent --state open`. Take the lowest-numbered `kind:ticket` that the roadmap (#2) orders first, and read it with `plan/bin/issue N`.
 3. Skip a ticket whose unticked items all sit under `## Still open` waiting on another open ticket, since its work has merged. Skip `kind:spec` issues too. Note each skip and its reason for the final report.
+
+## Several tickets at once
+
+Run tickets side by side only when `plan/bin/ticket-overlap` names no path their Scope and References share; a pair it names waits for the first to merge. In the session retro of 2026-11-24, #499 ran beside #494, and #500 and #501 waited on #499 for `server/racing/services` and the heat-intermission model. Once each draft PR is open, `plan/bin/pr-overlap <pr>` (Code review, step 1) checks the files the PRs change.
+
+- Each ticket gets its own worktree and its own `DERBYNET_TEST_PREFIX`.
+- Hand-off runs share the one load lock (`tools/hold-load-lock.sh`), so the second ticket's hand-off queues behind the first.
+- Owner decisions that unblock `needs-info` tickets land first, in a small PR of their own. After it merges, edit each issue; `plan/lint-issues.py` then wants a `## Still open` section on each.
 
 ## Set up
 

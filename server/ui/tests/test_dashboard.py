@@ -303,7 +303,36 @@ def test_discard_reaches_only_the_heat_on_screen(coordinator, event, wolves):
     live_of(post(coordinator, undo.replace("&amp;", "&")))
     restored = HeatLane.objects.filter(round=wolves, heat=1).order_by("lane")
     assert [float(x.finish_time) for x in restored] == [2.1, 2.2, 2.3, 2.4]
-    assert current(event)[:2] == (wolves.pk, 3)
+    assert current(event) == (wolves.pk, 3, True), "racing stays on another heat"
+
+
+def test_undo_on_the_current_heat_turns_racing_off(coordinator, event, wolves):
+    """Discard the current heat, turn racing on, then Undo: racing goes off
+    over the times Undo puts back, so the timer's next FINISHED is refused
+    and they stand (#499)."""
+    from racing.services import results
+
+    scheduled(wolves)
+    run_heat(event, (2.1, 2.2, 2.3, 2.4))
+    live_of(post(coordinator, "/dashboard/heat/prev/"))
+    assert current(event) == (wolves.pk, 1, False)
+    html = live_of(
+        post(
+            coordinator, "/dashboard/results/discard/", {"round": wolves.pk, "heat": 1}
+        )
+    )
+    undo = re.search(r'hx-post="([^"]*results/restore[^"]*)"', html).group(1)
+    live_of(post(coordinator, "/dashboard/racing/", {"now_racing": "1"}))
+    assert current(event) == (wolves.pk, 1, True)
+
+    live_of(post(coordinator, undo.replace("&amp;", "&")))
+    assert current(event) == (wolves.pk, 1, False)
+    recorded = results.record_timer_result(
+        event, [(f"lane{i}", "9.9") for i in range(1, 5)]
+    )
+    assert recorded.outcome is results.Outcome.NOT_RACING
+    restored = HeatLane.objects.filter(round=wolves, heat=1).order_by("lane")
+    assert [float(x.finish_time) for x in restored] == [2.1, 2.2, 2.3, 2.4]
 
 
 @pytest.mark.parametrize(

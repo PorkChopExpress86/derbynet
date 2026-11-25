@@ -10,7 +10,7 @@
 # so a long run is never cut short or filtered.  It stops only the loops it
 # started.
 #
-# Usage: server/tools/pytest-under-load.sh [-h | --help] [--postgres] [--loops N] [--flake-ticket] [pytest argument ...]
+# Usage: server/tools/pytest-under-load.sh [-h | --help] [--postgres] [--loops N] [--flake-ticket] [--no-load] [pytest argument ...]
 #
 #   server/tools/pytest-under-load.sh --postgres -m browser -n 4 --count 25 -k phone ui/tests/browser/test_photos.py
 #
@@ -39,6 +39,16 @@
 # status whatever the rerun does: a flake ticket's race keeps its 25 runs.
 # #308, #317, #341 and #348 each started that rerun by hand, sometimes after
 # the lock had gone to the next run.
+#
+# --no-load runs pytest once with no busy loops, whatever --loops says, for
+# a hand-off's browser step (plan/bin/affected-tests prints it), with the
+# same rerun: a clean one passes the step (D138, amending D122), never a
+# flake ticket's.  It waits in the line as a hand-off, ahead of the load
+# runs, as tools/hold-load-lock.sh does, and under a holder of its own
+# lock, such as that script's command, it runs under the holder's lock,
+# with neither a wait nor lines of its own.  #499's hand-off lost a
+# 19-file browser step to the error while other agents ran Docker, and the
+# lead reran the whole step by hand.
 #
 # One load run at a time per machine: it takes an exclusive flock on
 # DERBYNET_LOAD_LOCK (default ~/.cache/derbynet/load-run.lock) before it
@@ -71,6 +81,8 @@ RUNNER=(uv run pytest)
 ALL_ARGS="$*"
 LOOPS=8
 FLAKE_TICKET=
+NO_LOAD=
+DECISION=D122
 usage() {
   sed -n 's/^# \(Usage: .*\)/\1/p' "$0"
   echo "The comment at the top of $0 says more."
@@ -81,9 +93,11 @@ while [ $# -gt 0 ]; do
     --postgres) RUNNER=("$SERVER_DIR/tools/pytest-postgres.sh"); shift ;;
     --loops) LOOPS="$2"; shift 2 ;;
     --flake-ticket) FLAKE_TICKET=--flake-ticket; shift ;;
+    --no-load) NO_LOAD=--no-load; DECISION=D138; shift ;;
     *) break ;;
   esac
 done
+[ -n "$NO_LOAD" ] && LOOPS=0
 
 # It refuses to start through a pipe or under `timeout`: #47 and #48 each
 # lost a 25-repeat run to `timeout 3000 ... | grep`, killed with nothing
@@ -157,12 +171,17 @@ fi
 # command or a load run's own pytest, flock would wait on that holder for
 # ever.
 # Compared as real paths: `dir/./load.lock` or a link is the same lock.
+# A --no-load step runs under that holder's lock instead (D138).
+UNDER_HOLDER=
 if [ -n "${DERBYNET_LOAD_LOCK_HELD:-}" ] &&
    [ "$(realpath -m -- "$DERBYNET_LOAD_LOCK_HELD")" = "$(realpath -m -- "$LOCK")" ]; then
-  echo "pytest-under-load.sh: it runs under a holder of $LOCK, such as" \
-       "tools/hold-load-lock.sh, and would wait on it for ever. Run it after" \
-       "that holder ends." >&2
-  exit 2
+  if [ -z "$NO_LOAD" ]; then
+    echo "pytest-under-load.sh: it runs under a holder of $LOCK, such as" \
+         "tools/hold-load-lock.sh, and would wait on it for ever. Run it after" \
+         "that holder ends." >&2
+    exit 2
+  fi
+  UNDER_HOLDER=1
 fi
 # Appending, so a run that waits leaves the holder's lines in place.
 if ! { mkdir -p "$(dirname "$LOCK")" && exec 9>>"$LOCK"; } 2>/dev/null; then
@@ -201,9 +220,20 @@ trap stop_all EXIT
 # the wait killed the script and left its flock waiting (#391).
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
+# Under its holder, a --no-load step takes no lock, joins no line and
+# writes no holder lines: the holder's stay (LINE_STATE held).  The join's
+# verdict is read by a command of its own, outside the `if`: bash drops a
+# whole command on an arithmetic error, the `if` around a join included.
+KIND=load-run
+[ -n "$NO_LOAD" ] && KIND=hand-off
 trap 'line_fail "$BASH_COMMAND"' ERR
-line_join load-run "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
-  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
+LINE_STATE=
+if [ -n "$UNDER_HOLDER" ]; then
+  LINE_STATE=held
+else
+  line_join "$KIND" "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
+    "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
+fi
 if [ "$LINE_STATE" = queued ]; then
   echo "Waiting for the load lock $LOCK, held by:"
   # Empty from the holder's truncation until its one write lands.
@@ -215,14 +245,16 @@ if [ "$LINE_STATE" = queued ]; then
   # the try's flock exits.
   line_wait_turn
   echo "Got the load lock after $(( $(date +%s) - since )) s"
-elif [ "$LINE_STATE" != took ]; then
+elif [ "$LINE_STATE" != took ] && [ "$LINE_STATE" != held ]; then
   line_fail "the join gave no place and no lock"
 fi
 trap - ERR
 refuse_used_folder
 # One write of the whole text.
-printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
-  "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS" >"$LOCK"
+if [ "$LINE_STATE" != held ]; then
+  printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
+    "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS" >"$LOCK"
+fi
 # Out of the line, now that it holds the lock.
 line_leave
 
@@ -230,7 +262,11 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
 cd "$SERVER_DIR"
-echo "Under load ($LOOPS loops): ${RUNNER[*]} $*"
+if [ -n "$NO_LOAD" ]; then
+  echo "No load (D138): ${RUNNER[*]} $*"
+else
+  echo "Under load ($LOOPS loops): ${RUNNER[*]} $*"
+fi
 echo "Log: $OUT/pytest.log"
 echo "Load lock: $LOCK"
 READY="$OUT/postgres-ready"
@@ -304,7 +340,7 @@ if [ "$status" != 0 ] && grep -q 'net::ERR_NETWORK_CHANGED' "$OUT/pytest.log"; t
     echo "rerun exited $rerun_status; log: $OUT/rerun.log; junit: $OUT/rerun-junit.xml"
     tool=0
     said=$(python3 -I "$SERVER_DIR/tools/network_changed.py" outcome \
-             "$status" "$veth_count" "$rerun_status" $FLAKE_TICKET) || tool=$?
+             "$status" "$veth_count" "$rerun_status" $FLAKE_TICKET $NO_LOAD) || tool=$?
     if [ "$tool" = 0 ] && [[ "$said" =~ $'\n'exit\ ([0-9]+)$ ]]; then
       echo "${said%$'\n'exit *}"
       final=${BASH_REMATCH[1]}
@@ -322,6 +358,6 @@ if [ "$final" = "$status" ]; then
   echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml"
 else
   echo "pytest exited $status; log: $OUT/pytest.log; junit: $OUT/junit.xml;" \
-       "the script exits $final (D122)"
+       "the script exits $final ($DECISION)"
 fi
 exit "$final"
