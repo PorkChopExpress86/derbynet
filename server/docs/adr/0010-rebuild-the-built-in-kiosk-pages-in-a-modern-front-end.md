@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the last paragraph of the Decision names that framework. The same day the owner said the kiosks are laptops, not Raspberry Pis (D63). That fills in the choice the decision left to #71, and the decision itself is unchanged. On 2026-11-02 the owner dropped View Transitions from the kiosk pages (D66).
+Accepted on 2026-10-22, when the owner approved merging the ADR pull request. The owner answered the open questions on 2026-10-21 in [issue #4](https://github.com/PorkChopExpress86/derbynet/issues/4). On 2026-11-01 the owner chose the framework that #71 recommended (D62), and the last paragraph of the Decision names that framework. The same day the owner said the kiosks are laptops, not Raspberry Pis (D63). That fills in the choice the decision left to #71, and the decision itself is unchanged. On 2026-11-02 the owner dropped View Transitions from the kiosk pages (D66). On 2026-11-25 the owner decided that only the now-racing pages pause through a replay, as in PHP (D140), so the `replay-started` and `replay-ended` pause the Decision keeps is theirs; the other kiosk pages keep polling and scrolling.
 
 ## Context
 

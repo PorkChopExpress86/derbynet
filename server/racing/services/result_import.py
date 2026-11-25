@@ -4,6 +4,9 @@ Ported from `website/ajax/action.result.import.inc`. Every step is
 get-or-create, so importing a line twice changes nothing. A line that cannot
 be stored fails with `unable`; the rest of the file's lines are separate
 calls, each in its own transaction.
+
+D143: a result the line writes on the waiting final closes the
+intermission, as D136 does for a result from the timer or by hand.
 """
 
 from dataclasses import dataclass
@@ -15,6 +18,7 @@ from django.utils import timezone
 from core.models import Event
 from core.services import lock_race_state
 from racing.models import HeatLane, RosterEntry, Round
+from racing.services import playlist
 from roster.models import Group, Partition, Racer, Subgroup
 from roster.services import groups
 
@@ -127,6 +131,7 @@ def import_result(event: Event, fields: dict) -> ImportFailure | None:
                 completed=completed,
             )
             RosterEntry.objects.get_or_create(event=event, round=round, racer=racer)
+            playlist.close_intermission_on_result(event)
     except ImportFailure as failure:
         return failure
     except IntegrityError, DatabaseError, groups.GroupFailure:

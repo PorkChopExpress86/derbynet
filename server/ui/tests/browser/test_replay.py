@@ -29,6 +29,7 @@ from ui.tests.browser.conftest import (
     close_tab,
     shoot,
 )
+from ui.tests.browser.helpers import post_message
 from ui.tests.browser.tab_closing import after_the_stop, at_the_server
 from ui.tests.race import race_setup, run_heat, scheduled
 
@@ -269,8 +270,9 @@ def timer(page, message, **fields):
 def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     """Acceptance (D18): with a post-roll of 2 s, a skipback of 4 s and a
     longest clip of 5 s, the clip runs 5 s and ends 2 s after the finish.
-    The kiosk frame hears `replay-started` and `replay-ended`, and the first
-    showing is uploaded under the START name."""
+    The kiosk frame hears `replay-started` and `replay-ended`, and its page,
+    no now-racing page, does not pause (D140). The first showing is uploaded
+    under the START name."""
     fast_replays(
         event,
         replay_skipback_ms=4000,
@@ -299,7 +301,8 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
     )
     expect(page.locator("#playback-background")).to_be_visible()
     assert frame.evaluate("window.__messages") == ["replay-started"]
-    assert frame.evaluate("window.Kiosk.paused") is True
+    # The frame's page is no now-racing page, so it does not pause (D140).
+    assert frame.evaluate("window.Kiosk.paused") is False
     clip = page.evaluate("g_last_clip")
     assert clip["root"] == "Wolves_Round1_Heat01"
     assert clip["end"] - clip["finish"] == 2000
@@ -324,10 +327,10 @@ def test_a_heat_replays_with_the_clip_window_and_uploads(login, event, videos):
 
 
 # The now-racing frame logs, on its own clock, each replay message, a
-# snapshot of every animation's name and play state once kiosk.js has heard
-# the message, each animation that starts, each change of its banner title's
-# text, each place that lands, with how many places show a number then,
-# and each lane that takes the winner's glow.
+# snapshot of every animation's name and play state once kiosk-now-racing.js
+# has heard the message, each animation that starts, each change of its
+# banner title's text, each place that lands, with how many places show a
+# number then, and each lane that takes the winner's glow.
 # A place lands, and a lane glows, when it takes the class it lacked, so a
 # landing is logged once however often the poll writes it again. Its
 # `query=poll` requests are read from the frame's resource timings on the
@@ -564,8 +567,8 @@ def test_a_poll_reply_that_lands_during_a_replay_is_applied(login, event):
       wait after it (kiosk.js `queue()`), and that poll's reply: slack
       `5000` less that wait and that reply.
     - `heat_3 - ended >= REPLAY_LINGER_MS` has no slack: the page's
-      listener logs `replay-ended` before kiosk.js's listener starts the
-      linger."""
+      listener logs `replay-ended` before kiosk-now-racing.js's listener
+      starts the linger."""
     RaceSettings.objects.filter(event=event).update(
         now_racing_linger_ms=REPLAY_LINGER_MS
     )
@@ -614,6 +617,24 @@ def test_a_poll_reply_that_lands_during_a_replay_is_applied(login, event):
     assert [e["title"] for e in titles] == ["Heat 1 of 4", "Heat 2 of 4", "Heat 3 of 4"]
     assert started < titles[1]["at"] < ended
     assert titles[2]["at"] - ended >= REPLAY_LINGER_MS, (ended, titles[2])
+
+
+@pytest.mark.sizes("desktop", reason="the kiosk is a TV")
+def test_now_racing_stays_paused_through_another_message(login, event):
+    """A message other than `replay-ended` during a replay leaves now racing
+    paused, since PHP's on_message() resumes only on `replay-ended`
+    (now-racing.js:10). `post_message` returns once the page has handled
+    each message."""
+    lions = scheduled(race_setup(event, groups=(("Lions", 4),))["Lions"], race=False)
+    page = login("RaceCoordinator")
+    post(page, action="heat.select", roundid=str(lions.pk), heat="1", now_racing="1")
+    page.goto("/kiosk.php?page=kiosks/now-racing.kiosk")
+    expect(page.locator("[data-banner-title]")).to_have_text("Heat 1 of 4")
+    post_message(page, "replay-started")
+    page.wait_for_function("window.Kiosk.paused === true")
+    post_message(page, "another")
+    # one read: the point is that the handled message changed nothing.
+    assert page.evaluate("window.Kiosk.paused") is True
 
 
 @pytest.mark.sizes("desktop", reason="the replay station is a laptop")
