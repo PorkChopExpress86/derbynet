@@ -104,7 +104,7 @@ def test_the_bash_check_leaves_out_a_powershell_block(tmp_path, language):
 
 
 def test_a_function_over_several_lines_is_one_command():
-    """The CHDK zoom block of docs/photo-stand.md, deleted by D139."""
+    """The CHDK zoom block of the photo stand guide that D139 deleted."""
     guide = "# Point it at the server\n\n" + fence(
         "sh",
         "unset prepare_camera_before_shot\n"
@@ -643,7 +643,7 @@ def test_each_stage_a_reason_names_is_an_arm_of_the_script():
     assert sorted(names - set(arms())) == []
 
 
-CHECKS_SH_CHECK = re.compile(r"(server/docker/ci/)checks\.sh ([a-z][a-z-]*)")
+CHECKS_SH_CHECK = re.compile(r"((?:server/docker/ci/)?)checks\.sh ([a-z][a-z-]*)")
 
 
 def test_the_checks_sh_check_a_reason_names_is_found():
@@ -651,11 +651,12 @@ def test_the_checks_sh_check_a_reason_names_is_found():
     D139 deleted it; no reason names a check now, so the pattern is held here."""
     reason = "in its place image.yml runs `server/docker/ci/checks.sh upload`"
     assert CHECKS_SH_CHECK.findall(reason) == [("server/docker/ci/", "upload")]
+    assert CHECKS_SH_CHECK.findall("runs `checks.sh upload`") == [("", "upload")]
 
 
 def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
     named = [
-        (where, check)
+        (where or "server/docker/ci/", check)
         for e in gc.parse_registry(gc.REGISTRY.read_text())
         if e.kind == "reason"
         for where, check in CHECKS_SH_CHECK.findall(e.detail)

@@ -86,9 +86,10 @@ elif args[:2] == ['pr', 'view'] and 'state,mergeCommit' in args:
     print('MERGED abc')
 elif args[:1] == ['api'] and os.environ.get('FAKE_REJECTED'):
     # rejected-workflows' reads, after their --jq: run 44236545824 on #59's
-    # ff00bbc6 failed with no job.
+    # ff00bbc6 failed with no job.  arm-images.yml stands in for #59's Pi
+    # image workflow, which D139 deleted.
     print('0' if args[1].endswith('/jobs') else
-          '44236545824 .github/workflows/pi-images.yml https://example/44236545824')
+          '44236545824 .github/workflows/arm-images.yml https://example/44236545824')
 elif args[:2] == ['pr', 'checks'] and os.environ.get('FAKE_PENDING'):
     print('pending server / tests')
 elif args[:2] == ['pr', 'merge']:
@@ -431,14 +432,14 @@ class PrMerge(unittest.TestCase):
         self.assertEqual(self.merged(), '')
 
     def test_a_workflow_github_rejected_refuses(self):
-        """#59's pi-images.yml showed no check on the PR, and every listed
+        """#59's Pi image workflow showed no check on the PR, and every listed
         check had passed (#59 retro)."""
         head = self.pr('plan/AGENT-BRIEF.md')
         self.env['FAKE_REJECTED'] = '1'
         done = self.merge(head)
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertIn(f'not merging #7; GitHub rejected a workflow file on {head}', done.stderr)
-        self.assertIn('rejected .github/workflows/pi-images.yml https://example/44236545824',
+        self.assertIn('rejected .github/workflows/arm-images.yml https://example/44236545824',
                       done.stderr)
         self.assertEqual(self.merged(), '')
         self.assertEqual(self.ran(), '')

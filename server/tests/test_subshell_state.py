@@ -302,9 +302,11 @@ def test_no_function_that_records_state_runs_in_a_subshell():
     )
 
 
-# #59's round-1 extras/docker/ci/checks.sh at ff00bbc6 (on the PR's branch
-# only; the PR merged squashed): lines 58, 63-71, 148-156, 234, 246, 357
-# and 372 as they were, each function closed after the lines taken from it.
+# #59's round-1 Pi image checks.sh at ff00bbc6 (on the PR's branch only;
+# the PR merged squashed): lines 58, 63-71, 148-156, 234, 246, 357 and 372
+# as they were, each function closed after the lines taken from it.  D139
+# deleted the Pi images, so timer.yaml and stand.yaml stand in for the
+# names of their Compose files.
 ROUND_1 = """\
 COMPOSE_DOWN=()
 cleanup() {
@@ -327,10 +329,10 @@ compose_up() {
     printf '%s\\n' "$id"
 }
 check_timer_compose() {
-    id="$(compose_up "$folder" compose.timer.yaml "$PREFIX-timer-compose")"
+    id="$(compose_up "$folder" timer.yaml "$PREFIX-timer-compose")"
 }
 check_photostand_compose() {
-    STAND="$(compose_up "$folder" compose.photostand.yaml "$PREFIX-photostand-compose")"
+    STAND="$(compose_up "$folder" stand.yaml "$PREFIX-photostand-compose")"
 }
 """  # noqa: E501 (the lines as they were)
 

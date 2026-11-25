@@ -180,7 +180,7 @@ def test_the_old_quickref_pdf_moves_to_the_quick_reference(client, event, prefix
         ("# T\n\n```sh\nrun\n", 3),
         # Text after the only closing fence: the renderer makes inline code.
         ("# T\n\n```sh\nrun\n``` Then more.\n", 3),
-        # dev-timer-protocol.md and photo-stand.md at 565e0c84: a fence
+        # dev-timer-protocol.md and the photo stand guide at 565e0c84: a fence
         # indented under a list item is no fence to the renderer, so the
         # JSON became one inline code span and the list restarted.
         ("# T\n\n1. Ask:\n\n   ```json\n   {}\n   ```\n\n2. Then.\n", 5),

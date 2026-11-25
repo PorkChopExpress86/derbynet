@@ -20,8 +20,9 @@ PR_WAIT = BIN / 'pr-wait'
 
 FF00 = 'ff00bbc6e64593f2c41b54e1f9e702a7455fd431'
 RUNS_URL = 'https://github.com/PorkChopExpress86/derbynet/actions/runs/'
-# GitHub's runs on #59's head ff00bbc6, fields trimmed: pi-images.yml put
-# `${{ runner.temp }}` in a job's env, and GitHub rejected the file.
+# GitHub's runs on #59's head ff00bbc6, fields trimmed: #59's Pi image
+# workflow put `${{ runner.temp }}` in a job's env, and GitHub rejected the
+# file.  D139 deleted that workflow, so arm-images.yml stands in for its name.
 FF00_RUNS = [
     {'id': 44236605187, 'path': '.github/workflows/plan-checks.yml',
      'event': 'pull_request', 'status': 'completed', 'conclusion': 'success'},
@@ -29,14 +30,14 @@ FF00_RUNS = [
      'event': 'pull_request', 'status': 'completed', 'conclusion': 'success'},
     {'id': 44236605153, 'path': '.github/workflows/server.yml',
      'event': 'pull_request', 'status': 'completed', 'conclusion': 'success'},
-    {'id': 44236545824, 'path': '.github/workflows/pi-images.yml',
+    {'id': 44236545824, 'path': '.github/workflows/arm-images.yml',
      'event': 'push', 'status': 'completed', 'conclusion': 'failure'},
 ]
 # Each run's job count, as runs/<id>/jobs answers: the rejected run had none,
-# and a0cb60fa's failed pi-images run 44246355493 had 3.
+# and a0cb60fa's failed Pi image run 44246355493 had 3.
 JOBS = {44236545824: 0, 44236605187: 1, 44236605179: 11, 44236605153: 17,
         44246355493: 3}
-REJECTED_LINE = f'rejected .github/workflows/pi-images.yml {RUNS_URL}44236545824'
+REJECTED_LINE = f'rejected .github/workflows/arm-images.yml {RUNS_URL}44236545824'
 
 # Answers `api` from RUNS and JOBS through the caller's --jq; `pr view` and
 # `pr checks` (for pr-wait) from HEAD and CHECKS.
@@ -65,7 +66,7 @@ elif args[:2] == ['pr', 'checks']:
 
 
 def run(status, conclusion, run_id=44236545824):
-    return {'id': run_id, 'path': '.github/workflows/pi-images.yml', 'event': 'push',
+    return {'id': run_id, 'path': '.github/workflows/arm-images.yml', 'event': 'push',
             'status': status, 'conclusion': conclusion}
 
 
@@ -93,7 +94,7 @@ class RejectedWorkflows(unittest.TestCase):
                          done.stderr)
 
     def test_a_failed_run_with_jobs_is_left_to_its_checks(self):
-        """a0cb60fa's pi-images run failed in its build job, which
+        """a0cb60fa's Pi image run failed in its build job, which
         `gh pr checks` lists as failed."""
         done = self.rejected([run('completed', 'failure', 44246355493)],
                              head='a0cb60fab24b19b133c52e44d35b82c93ad3e6de')
@@ -141,7 +142,7 @@ class RejectedWorkflows(unittest.TestCase):
         self.assertIn('runs/44236545824/jobs after 3 tries', done.stderr)
 
     def test_pr_wait_fails_on_ff00bbc6_with_every_listed_check_passed(self):
-        """pr-wait exited 0 on this head: no check of pi-images showed on the
+        """pr-wait exited 0 on this head: no check of the Pi image workflow showed on the
         PR, and the rest had passed (#59 retro)."""
         checks = [{'bucket': 'pass', 'name': name, 'link': f'https://example/{name}',
                    'workflow': name, 'event': 'pull_request'}
