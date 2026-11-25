@@ -349,10 +349,14 @@ def rebuild_waiting_final(
     intermission rebuilds the waiting final. `changed` holds the round ids
     whose results changed, or None for every round; `ended_before` is the
     ended round as the intermission named it before the change. Runs in
-    the caller's transaction."""
+    the caller's transaction.
+
+    D136: a change that leaves a result on the waiting final closes the
+    intermission instead."""
     # The playlist moves the current heat through `transition`.
     from racing.services import playlist, rounds
 
+    playlist.close_intermission_on_result(event)
     if ended_before is None or (changed is not None and ended_before not in changed):
         return
     playlist.rebuild_waiting_round(event, finalists_for or rounds.playlist_finalists())

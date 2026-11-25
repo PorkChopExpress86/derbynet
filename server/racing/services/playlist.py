@@ -142,6 +142,18 @@ def _next_entry(entry: PlaylistEntry) -> PlaylistEntry | None:
     )
 
 
+def _has_result(round: Round | None) -> bool:
+    return (
+        round is not None
+        and HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists()
+    )
+
+
+def _waits(entry: PlaylistEntry) -> bool:
+    """A step whose round has a result races on as a normal round (D136)."""
+    return entry.waits_for_operator and not _has_result(_round_of(entry))
+
+
 def _is_raced(entry: PlaylistEntry) -> bool:
     round = _round_of(entry)
     return (
@@ -176,7 +188,8 @@ def round_ended(round: Round, finalists_for: FinalistsFor) -> None:
     the intermission, and a final it already holds with no heat run is made
     again when the ended round now picks other finalists (D135); otherwise
     the step runs at once and racing turns back on if the ended step says
-    `continue_racing`. A finish scene still shows while a step waits.
+    `continue_racing`. A step whose round has a result does not wait (D136).
+    A finish scene still shows while a step waits.
     """
     with transaction.atomic():
         state = lock_race_state(round.event_id)
@@ -205,7 +218,7 @@ def _after_round(
             # D135, where PHP keeps the roster (playlist.inc:85).
             _clear_changed_final(state, waiting, after, finalists_for)
         _activate(state, after, finalists_for)
-        waits = after.waits_for_operator
+        waits = _waits(after)
         if waits:
             state.waiting_entry = after
             state.ended_round = ended
@@ -268,7 +281,8 @@ def skip_waiting_step(event, finalists_for: FinalistsFor) -> Round | None:
     prepare the next step whose round is not raced, as `round_ended` does.
 
     If that step waits, the intermission moves to it and still names the
-    round that ended. If it does not wait, it starts with racing on. With no
+    round that ended. If it does not wait, or its round has a result (D136),
+    it starts with racing on. With no
     step left the playlist is done and racing stays off. Returns the next
     step's round, or None. The skipped round keeps its roster.
     """
@@ -284,7 +298,7 @@ def skip_waiting_step(event, finalists_for: FinalistsFor) -> Round | None:
         round = None
         if after is not None:
             round = _activate(state, after, finalists_for)
-        if after is not None and after.waits_for_operator:
+        if after is not None and _waits(after):
             state.waiting_entry = after
         else:
             state.waiting_entry = None
@@ -322,7 +336,7 @@ def _clear_changed_final(
     """Empty the round of its roster and chart, for `_activate` to make
     again, when none of its heats has a result and the cut now picks other
     racers (D27, D135). Returns whether it did."""
-    if HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists():
+    if _has_result(round):
         return False
     if _same_finalists(round, entry, finalists_for):
         return False
@@ -332,15 +346,27 @@ def _clear_changed_final(
     return True
 
 
+def close_intermission_on_result(event) -> None:
+    """Owner decision D136: once a heat of the waiting step's round has a
+    result, the intermission closes, so Skip cannot pass a round that has
+    begun. The current heat and racing stay as they are."""
+    with transaction.atomic():
+        state = lock_race_state(event.id)
+        if state.waiting_entry_id is None or _waits(state.waiting_entry):
+            return
+        state.waiting_entry = None
+        state.ended_round = None
+        state.save(update_fields=["waiting_entry", "ended_round"])
+
+
 def rebuild_waiting_round(event, finalists_for: FinalistsFor) -> bool:
     """Owner decision D27: after a result in the ended round changes, make the
     waiting round's roster and chart again, when the waiting round draws its
     racers from the ended round, none of its heats has a result, and the cut
     now picks other racers. Returns whether it rebuilt them. A current heat
-    outside the waiting round, as during a rerun of the ended round, stays
-    current. `round_ended` does the same when the ended round ends again
-    (D135), so a change made while the intermission was closed is not
-    lost."""
+    outside the waiting round stays current. `round_ended` does the same
+    when the ended round ends again (D135), so a change made while the
+    intermission was closed is not lost."""
     with transaction.atomic():
         state = lock_race_state(event.id)
         if state.waiting_entry_id is None or state.ended_round_id is None:

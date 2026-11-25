@@ -753,7 +753,11 @@ TABLE: tuple[Row, ...] = (
 _RACING_ON_EXTRAS: dict[By, tuple[Step, ...]] = {
     By.MANAGER: (CloseIntermission(), Emit(ApplyRacingScene())),
     By.ROUND_BUTTON: (CloseIntermission(), Emit(ApplyRacingScene())),
-    By.RERUN: (Emit(ApplyRacingScene()), Emit(TimerToConnected())),
+    By.RERUN: (
+        CloseIntermission(),
+        Emit(ApplyRacingScene()),
+        Emit(TimerToConnected()),
+    ),
     By.WAITING_STEP: (CloseIntermission(), Emit(ApplyRacingScene())),
     # A step's continue_racing keeps the scene the crew chose (playlist.inc).
     By.PLAYLIST: (),
