@@ -1,7 +1,8 @@
 """The decisions `tools/pytest-under-load.sh` makes after a load run fails
 with Chromium's net::ERR_NETWORK_CHANGED, which marks the machine's network
 changing as another project's container joins or leaves a Docker bridge
-(D122, #373). The script runs pytest; this module reads its text.
+(D122, #373), or after a hand-off's browser step it runs with no load
+(D138). The script runs pytest; this module reads its text.
 
 - `rerun_args(junit, log, args)`: when every failure and error in the run's
   junit.xml carries the error as a page load or a failed request does, the
@@ -9,18 +10,18 @@ changing as another project's container joins or leaves a Docker bridge
   run's own `-m`, `-k` and `-p` options, then `-n 0` and the files the
   summary names. Otherwise `None` and the reason: a count line, then one
   line for each failure that is not one, by its test.
-- `outcome(status, veth, rerun_status, flake_ticket)`: the script's exit
-  status and the line that says why. A clean rerun with veth lines in the
-  run's window passes the run for D101's repeats only; a flake ticket's
-  run, a veth count of 0 or one not read, and a failed rerun keep pytest's
-  status.
+- `outcome(status, veth, rerun_status, flake_ticket, no_load)`: the
+  script's exit status and the line that says why. A clean rerun with veth
+  lines in the run's window passes the run for D101's repeats only, or,
+  with `no_load`, the hand-off step (D138); a flake ticket's run, a veth
+  count of 0 or one not read, and a failed rerun keep pytest's status.
 
 Usage, from the script:
 
     network_changed.py rerun-args JUNIT LOG ARGS_FILE [-- RUN_ARG ...]
         writes one rerun argument per line to ARGS_FILE and exits 0, or
         prints the reason there is no rerun and exits 1
-    network_changed.py outcome STATUS VETH RERUN_STATUS [--flake-ticket]
+    network_changed.py outcome STATUS VETH RERUN_STATUS [--flake-ticket] [--no-load]
         prints the outcome line, then `exit N` with the script's status,
         and exits 0; VETH is a count, or empty when the kernel log was
         not read
@@ -243,7 +244,11 @@ def rerun_args(
 
 
 def outcome(
-    status: int, veth: int | None, rerun_status: int, flake_ticket: bool
+    status: int,
+    veth: int | None,
+    rerun_status: int,
+    flake_ticket: bool,
+    no_load: bool = False,
 ) -> tuple[int, str]:
     """(the script's exit status, the line that says why)."""
     seen = "no veth count" if veth is None else f"{veth} veth lines"
@@ -261,10 +266,17 @@ def outcome(
             f"{rerun}, but with no veth lines counted the status stays"
             f" pytest's {status} (D122)."
         )
-    return 0, (
-        f"{rerun}: the run counts as passed for D101's repeats only (D122),"
-        " never for a flake ticket; its failures stay in pytest.log."
+    passed = (
+        "the hand-off step counts as passed (D138, amending D122)"
+        if no_load
+        else "the run counts as passed for D101's repeats only (D122)"
     )
+    return 0, (
+        f"{rerun}: {passed}, never for a flake ticket; its failures stay in pytest.log."
+    )
+
+
+OUTCOME_OPTIONS = ("--flake-ticket", "--no-load")
 
 
 def read(path: str) -> str | None:
@@ -285,13 +297,22 @@ def main(argv: list[str]) -> int:
         with open(argv[3], "w", encoding="utf-8") as handle:
             handle.write("".join(f"{arg}\n" for arg in found))
         return 0
-    if argv[:1] == ["outcome"] and len(argv) in (4, 5):
-        flake = argv[4:] == ["--flake-ticket"]
-        if len(argv) == 5 and not flake:
-            print(f"network_changed.py: unknown option {argv[4]}", file=sys.stderr)
+    options = argv[4:]
+    if argv[:1] == ["outcome"] and 4 <= len(argv) <= 6:
+        if wrong := [o for o in options if o not in OUTCOME_OPTIONS]:
+            print(f"network_changed.py: unknown option {wrong[0]}", file=sys.stderr)
+            return 2
+        if len(set(options)) < len(options):
+            print("network_changed.py: an option given twice", file=sys.stderr)
             return 2
         veth = int(argv[2]) if argv[2] else None
-        status, line = outcome(int(argv[1]), veth, int(argv[3]), flake)
+        status, line = outcome(
+            int(argv[1]),
+            veth,
+            int(argv[3]),
+            "--flake-ticket" in options,
+            "--no-load" in options,
+        )
         print(f"{line}\nexit {status}")
         return 0
     print(__doc__.split("Usage, from the script:", 1)[1], file=sys.stderr)

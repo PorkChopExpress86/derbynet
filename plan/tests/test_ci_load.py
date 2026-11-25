@@ -88,6 +88,23 @@ class Plan(unittest.TestCase):
         self.assertIn('tools/hold-load-lock.sh uv run pytest', skip['line'])
         self.assertIn('D133', skip['why'])
 
+    def test_a_hand_off_s_no_load_line_is_skipped_with_its_reason(self):
+        """D138's hand-off browser lines start with pytest-under-load.sh, but
+        run once with no load: CI's load run shards none of them."""
+        text = D133_KIOSKS + textwrap.dedent('''\
+            Run from server/ (start a run longer than a minute in the background):
+              tools/pytest-under-load.sh --no-load -n auto -m browser ui/tests/browser/test_kiosks.py
+              tools/pytest-under-load.sh --no-load --postgres -n auto -m browser ui
+              DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh --no-load -n auto -m browser ui
+            ''')
+        plan = TOOL.plan(text)
+        self.assertEqual([c['font'] for c in plan['commands']], [None])
+        self.assertEqual(len(plan['shards']), 5)
+        no_load = [s for s in plan['skipped'] if '--no-load' in s['line']]
+        self.assertEqual(len(no_load), 3)
+        for skip in no_load:
+            self.assertIn('D138', skip['why'])
+
     def test_shard_counts_sum_to_the_command_count(self):
         for total, per, counts in ((25, 5, [5] * 5), (5, 5, [5]), (7, 5, [4, 3]),
                                    (2, 1, [1, 1]), (1, 5, [1])):

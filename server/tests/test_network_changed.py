@@ -571,6 +571,36 @@ def test_the_outcome_names_the_first_run_the_veth_count_and_the_rerun():
 
 
 @pytest.mark.parametrize(
+    "status, veth, rerun, flake, expected",
+    [
+        (1, 3, 0, False, 0),
+        (1, 1, 0, False, 0),
+        (1, 3, 0, True, 1),
+        (1, 0, 0, False, 1),
+        (1, None, 0, False, 1),
+        (1, 3, 1, False, 1),
+        (3, None, 0, True, 3),
+    ],
+)
+def test_a_hand_off_step_with_no_load_keeps_d122_s_conditions(
+    status, veth, rerun, flake, expected
+):
+    """D138 amends D122's scope, not its conditions: a hand-off step run
+    with no load passes on the same clean rerun with veth lines, and a
+    flake ticket keeps pytest's status."""
+    assert nc.outcome(status, veth, rerun, flake, no_load=True)[0] == expected
+
+
+def test_a_hand_off_step_s_pass_names_d138_not_d101_s_repeats():
+    assert nc.outcome(1, 3, 0, False, no_load=True)[1] == (
+        "The first run exited 1, with 3 veth lines in its window; the rerun"
+        " passed: the hand-off step counts as passed (D138, amending D122),"
+        " never for a flake ticket; its failures stay in pytest.log."
+    )
+    assert nc.outcome(1, 3, 0, True, no_load=True)[1] == nc.outcome(1, 3, 0, True)[1]
+
+
+@pytest.mark.parametrize(
     "run_args",
     [["-p", "no:xdist"], ["-pno:xdist"]],
     ids=["two-words", "one-word"],
@@ -619,11 +649,20 @@ def test_the_command_line(tmp_path, capsys):
     assert nc.main(["outcome", "2", "", "0"]) == 0
     out = capsys.readouterr().out
     assert "no veth count" in out and out.endswith("\nexit 2\n")
+    for options in (["--no-load"], ["--no-load", "--flake-ticket"]):
+        assert nc.main(["outcome", "1", "3", "0", *options]) == 0
+        out = capsys.readouterr().out
+        assert ("hand-off step counts" in out) == (options == ["--no-load"]), options
+        assert out.endswith("\nexit 0\n" if len(options) == 1 else "\nexit 1\n")
+    assert nc.main(["outcome", "1", "3", "0", "--flake-ticket", "--no-load"]) == 0
+    assert capsys.readouterr().out.endswith("\nexit 1\n")
 
     for wrong in (
         ["outcome", "1", "3", "0", "--flake"],
         ["outcome", "1", "3"],
         ["outcome", "1", "3", "0", "--flake-ticket", "x"],
+        ["outcome", "1", "3", "0", "--no-load", "--no-load"],
+        ["outcome", "1", "3", "0", "--no-load", "--flake-ticket", "x"],
         ["rerun-args", *files],
         ["status", "1", "3", "0"],
     ):

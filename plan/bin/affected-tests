@@ -57,7 +57,7 @@ targets, then:
   tool prints (D101). A text-measuring file named
   `ui/tests/browser/test_kiosk*.py` repeats under load in the default font
   only, and its one DejaVu Sans run is the hand-off's, with no load and no
-  --count, under `tools/hold-load-lock.sh`, a flake ticket's whole-file 25
+  --count, on the load lock, a flake ticket's whole-file 25
   included (D133, amending D101's repeats; D85's second font under load stays
   for other files);
 - before the commands, `tools/docstring_claims.py` on each changed test file
@@ -74,7 +74,10 @@ targets, then:
   helpers (#345 retro): run them before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
-- the commands, from server/.
+- the commands, from server/. Each `-m browser` line, the DejaVu Sans one
+  among them, runs through `tools/pytest-under-load.sh --no-load`, which
+  reruns a file that failed only on net::ERR_NETWORK_CHANGED (D138, amending
+  D122).
 - last, each commit on BASE past the merge base that touches a file the
   branch changes or a test it prints, or an area of pr-merge's rule the
   branch changes too (`master_moved()`): merge BASE before the hand-off run.
@@ -192,6 +195,10 @@ MEASURES = re.compile(
     r'bounding_box\(|getBoundingClientRect|getClientRects|scrollWidth|'
     r'scrollHeight|clientWidth|clientHeight|offsetWidth|offsetHeight|'
     r'fontSize|font-size|font_size')
+# D138: a hand-off's browser step, which reruns a file that failed only on
+# net::ERR_NETWORK_CHANGED (#499's step lost 19 files to it).
+NO_LOAD = 'tools/pytest-under-load.sh --no-load'
+
 # D133: the browser test files whose font repeats are one font under load.
 KIOSK_BROWSER_FILE = re.compile(r'ui/tests/browser/test_kiosk[^/]*\.py')
 DB_CODE = re.compile(
@@ -2501,7 +2508,7 @@ def load_repeats(rel, base, head, module_text, postgres=False):
             say('      D133: a kiosk file repeats under load in the default font '
                 'only. Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line '
                 'under "Run from server/" below, with no load and no --count, '
-                'under tools/hold-load-lock.sh.')
+                'on the load lock (D138).')
         else:
             say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
     return out
@@ -2637,7 +2644,7 @@ def report(plan, tree):
             'or changes (D101); none for an import-only move (D97). A flake ticket '
             'keeps 25 of the whole file, on the database it failed on, whatever this '
             'prints (owner, 2026-11-11). A kiosk file takes the default font under '
-            'load and DejaVu Sans once under hold-load-lock.sh (D133):')
+            'load and DejaVu Sans once with no load (D133):')
         if not plan.from_git:
             say('  (--stdin has no BASE to compare with, so no file counts as an '
                 'import-only move, D97: each keeps its count, of the whole file, D101)')
@@ -2680,17 +2687,17 @@ def report(plan, tree):
     if plain:
         say(f'  uv run pytest -n auto {" ".join(plain)}')
     if browser:
-        say(f'  uv run pytest -n auto -m browser {" ".join(browser)}')
+        say(f'  {NO_LOAD} -n auto -m browser {" ".join(browser)}')
     if plan.postgres:
         if plain:
             say(f'  tools/pytest-postgres.sh -n auto {" ".join(plain)}')
         if browser:
-            say(f'  tools/pytest-postgres.sh -n auto -m browser {" ".join(browser)}')
+            say(f'  {NO_LOAD} --postgres -n auto -m browser {" ".join(browser)}')
     if not plain and not browser:
         say('  (no pytest target: CI\'s full run covers the diff, D85)' if plan.everything
             else '  (no pytest target: the checks below cover the diff)')
     if measured:
-        say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
+        say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" {NO_LOAD} -n auto -m browser '
             f'{" ".join(measured)}')
     for line in plan.commands:
         say(f'  {line}')

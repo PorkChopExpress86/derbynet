@@ -203,9 +203,18 @@ def test_holds():
 
 
 def start(
-    tmp_path, name, lock, extra_env=None, go=False, loops=1, under=(), script=SCRIPT
+    tmp_path,
+    name,
+    lock,
+    extra_env=None,
+    go=False,
+    loops=1,
+    under=(),
+    script=SCRIPT,
+    options=(),
 ):
-    """The script (or `script`, a copy of it) on a stub of its own in
+    """The script (or `script`, a copy of it), with `options` of its own, on
+    a stub of its own in
     `tmp_path/name`, in a session of its own so the test can kill all it
     started, with its output in `tmp_path/name.out` (a file, as
     run_in_background gives it). With `go` its stub passes at once; `under`
@@ -228,6 +237,7 @@ def start(
             *RESET_SIGNALS_ARGV,
             *under,
             str(script),
+            *options,
             "--loops",
             str(loops),
             "-p",
@@ -268,7 +278,10 @@ def load_run_steps(out, run_dir):
     """The steps a load run with its output in `out` and its results in
     `run_dir` prints or writes on the way to its end, as (step, check)."""
     return (
-        ("the `Under load` line", lambda: "Under load (" in out.read_text()),
+        (
+            "the `Under load` or `No load` line",
+            lambda: re.search(r"^(Under|No) load \(", out.read_text(), re.M),
+        ),
         ("the first run's junit file", (run_dir / "junit.xml").exists),
         ("the `Rerunning` line", lambda: "Rerunning the failed" in out.read_text()),
         ("the rerun's junit file", (run_dir / "rerun-junit.xml").exists),
@@ -2268,9 +2281,15 @@ printf 'veth1 entered\\nveth2 left\\nveth3 entered\\neth0 up\\n'
 
 
 def load_run_of(
-    tmp_path, test_body, *args, journalctl=JOURNALCTL, options="", python3=None
+    tmp_path,
+    test_body,
+    *args,
+    journalctl=JOURNALCTL,
+    options="",
+    python3=None,
+    loops="--loops 0",
 ):
-    """pytest-under-load.sh, with `options` of its own, on a stub test file
+    """pytest-under-load.sh, with `loops` and `options` of its own, on a stub test file
     holding `test_body`, with `journalctl`, and `python3` when given, as
     stand-ins first on PATH: (its exit code, its output, the journalctl
     arguments file)."""
@@ -2285,7 +2304,7 @@ def load_run_of(
         f"def test_loads():\n{test_body}\n\n\ndef test_passes():\n    pass\n"
     )
     command = (
-        f"'{SCRIPT}' --loops 0 {options} -p no:cacheprovider {' '.join(args)}"
+        f"'{SCRIPT}' {loops} {options} -p no:cacheprovider {' '.join(args)}"
         f" '{tmp_path}'"
     )
     out = tmp_path / "out"
@@ -2475,6 +2494,155 @@ def test_a_clean_rerun_with_no_veth_count_keeps_pytest_s_status(
         f"The first run exited 1, with {seen} in its window; the rerun passed,"
         " but with no veth lines counted the status stays pytest's 1 (D122)."
     ) in out
+
+
+# A stub test body that counts the busy loops the script runs beside it:
+# the children of its nearest ancestor that runs pytest-under-load.sh whose
+# command line is the loop's.
+COUNT_LOOPS = """\
+    import os
+    from pathlib import Path
+
+    def parent(pid):
+        return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+
+    script = os.getpid()
+    while b"pytest-under-load.sh" not in Path(f"/proc/{script}/cmdline").read_bytes():
+        script = parent(script)
+    loops = 0
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            if parent(stat.parent.name) == script and b"while :" in (
+                stat.parent / "cmdline"
+            ).read_bytes():
+                loops += 1
+        except (OSError, ValueError):
+            pass
+    Path(__file__).with_name("loops").write_text(str(loops))
+"""
+
+
+@pytest.mark.parametrize(
+    "loops, options, counted",
+    [
+        ("--loops 2", "", 2),
+        ("", "--no-load", 0),
+        ("--loops 2", "--no-load", 0),
+        ("", "--no-load --loops 2", 0),
+    ],
+    ids=["loops", "no-load", "loops-then-no-load", "no-load-then-loops"],
+)
+def test_no_load_runs_pytest_with_no_busy_loops(tmp_path, loops, options, counted):
+    """D138: a hand-off's browser step runs once with no load, whatever
+    --loops says; the control run counts its two loops."""
+    code, out, _ = load_run_of(tmp_path, COUNT_LOOPS, loops=loops, options=options)
+    assert code == 0, out
+    assert (tmp_path / "loops").read_text() == str(counted)
+    assert ("No load (D138): " in out) == (counted == 0), out
+    assert ("Under load (2 loops): " in out) == (counted == 2), out
+
+
+def test_a_no_load_step_reruns_a_network_change_alone_and_passes(tmp_path):
+    """D138: a hand-off step that fails only on a changed network, with
+    veth lines over its run, reruns the failed file alone and exits 0; the
+    first run's log, junit file and status stay as they were (D122)."""
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), loops="", options="--no-load"
+    )
+    assert code == 0, out
+    assert_reran(tmp_path)
+    run_dir = tmp_path / "run"
+    assert "1 failed, 1 passed" in (run_dir / "pytest.log").read_text()
+    assert 'failures="1"' in (run_dir / "junit.xml").read_text()
+    assert "2 passed" in (run_dir / "rerun.log").read_text()
+    assert (
+        "The first run exited 1, with 3 veth lines in its window; the rerun"
+        " passed: the hand-off step counts as passed (D138, amending D122)"
+    ) in out
+    assert out.rstrip().splitlines()[-1].startswith("pytest exited 1; log: ")
+    assert out.rstrip().endswith("the script exits 0 (D138)")
+
+
+def test_a_no_load_step_with_no_veth_lines_keeps_pytest_s_status(tmp_path):
+    code, out, _ = load_run_of(
+        tmp_path,
+        once(PAGE_LOAD_ERROR),
+        journalctl="#! /bin/sh\necho 'eth0 up'\n",
+        loops="",
+        options="--no-load",
+    )
+    assert_reran(tmp_path)
+    assert code == 1, out
+    assert "with 0 veth lines in its window; the rerun passed, but" in out
+    assert "script exits" not in out
+
+
+def test_a_no_load_step_with_another_failure_starts_no_rerun(tmp_path):
+    (tmp_path / "test_other.py").write_text("def test_other():\n    assert False\n")
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), loops="", options="--no-load"
+    )
+    assert code == 1, out
+    assert "1 of 2 failures and errors are not a changed network" in out
+    assert not (tmp_path / "run" / "rerun.log").exists()
+
+
+def test_a_flake_ticket_s_no_load_step_keeps_pytest_s_status(tmp_path):
+    code, out, _ = load_run_of(
+        tmp_path, once(PAGE_LOAD_ERROR), loops="", options="--no-load --flake-ticket"
+    )
+    assert code == 1, out
+    assert "2 passed" in (tmp_path / "run" / "rerun.log").read_text()
+    assert "the rerun passed, and --flake-ticket keeps pytest's status 1" in out
+    assert "script exits" not in out
+
+
+def test_a_no_load_step_waits_in_the_line_as_a_hand_off(tmp_path):
+    """A hand-off's step goes ahead of the load runs, as hold-load-lock.sh's
+    commands do (#419)."""
+    lock, held = held_lock(tmp_path)
+    run = None
+    try:
+        run = start(tmp_path, "step", lock, go=True, options=("--no-load",))
+        wait_until(lambda: entries(lock), "its entry in the line", 30)
+        [entry] = entries(lock)
+        kind = Path(f"{os.path.realpath(lock)}.line/{entry}").read_text()
+        assert kind.splitlines()[0] == "kind hand-off"
+        os.close(held)
+        held = None
+        assert run.wait(timeout=90) == 0
+    finally:
+        if held is not None:
+            os.close(held)
+        finish(tmp_path, *([run] if run else []))
+
+
+def test_a_no_load_step_under_a_holder_of_its_lock_runs_under_it(tmp_path):
+    """A hand-off script under tools/hold-load-lock.sh runs the step under
+    the holder's lock: it neither waits for it nor writes its own lines
+    (D138); a load run there is still refused."""
+    lock = tmp_path / "load.lock"
+    step = tmp_path / "step"
+    step.mkdir()
+    (step / "test_step.py").write_text(HOLD)
+    (step / "go").write_text("")
+    command = f"'{SCRIPT}' --no-load -p no:cacheprovider '{step}'"
+    run = hold(
+        tmp_path,
+        lock,
+        command,
+        extra_env={"DERBYNET_LOAD_RUN_DIR": str(tmp_path / "step-run")},
+    )
+    try:
+        assert run.wait(timeout=90) == 0, (tmp_path / "handoff.out").read_text()
+    finally:
+        finish(tmp_path, run)
+    out = (tmp_path / "handoff.out").read_text()
+    assert "runs under a holder" not in out
+    assert "No load (D138): " in out
+    assert lock.read_text().splitlines()[-1].startswith("args hold-load-lock.sh: ")
+    assert (step / "started").read_text().split()[1] == str(lock)
+    assert entries(lock) == []
 
 
 def test_a_run_without_xdist_is_rerun_without_n(tmp_path):
