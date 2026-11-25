@@ -425,7 +425,7 @@ RacingHeatAllowed ==
     racing => (curRound /= "none" /\ HeatExists(curRound, curHeat) /\ ~HeatHasResult(curRound, curHeat))
 
 \* 2. While the intermission is open and the final has not raced, the waiting
-\*    final's roster matches Round 1's current standings (D27).
+\*    final's roster matches Round 1's current standings (D27, D135).
 WaitingFinalMatchesStandings ==
     (waiting /\ ~FinalHasResult(r2)) => (finalBuilt /\ finalRoster = r1)
 
