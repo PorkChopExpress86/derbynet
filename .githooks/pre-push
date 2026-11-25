@@ -230,13 +230,26 @@ esac
 # commit on one of them while this hook runs: #500's implementer made two
 # commits during the checks of 106ef5b6, and the hook refused the push 637 s
 # in (#500 retro). The lock sits in the common git dir, so a commit from any
-# worktree sees it, and a lock whose pid is gone refuses nothing.
-LOCK="$(cd "$(git rev-parse --git-common-dir)" && pwd)/pre-push-$$.lock"
-for pair in ${locals[@]+"${locals[@]}"}; do
-  ref=${pair#* }
-  [ "$ref" != HEAD ] || ref=$(git symbolic-ref -q HEAD || echo HEAD)
-  echo "$ref"
-done >"$LOCK"
+# worktree sees it, and a lock whose pid is gone refuses nothing. Each
+# branch below writes it once its trap is set, so a signal can't leave it
+# behind; a SIGKILL can, and the next push removes each lock whose pid is
+# gone, before a new process takes that pid (PR #517's review).
+LOCKS="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
+LOCK="$LOCKS/pre-push-$$.lock"
+write_lock() {
+  local left owner pair ref
+  for left in "$LOCKS"/pre-push-*.lock; do
+    [ -e "$left" ] || continue
+    owner=${left##*/pre-push-}
+    owner=${owner%.lock}
+    [ -e "/proc/$owner" ] || rm -f "$left"
+  done
+  for pair in ${locals[@]+"${locals[@]}"}; do
+    ref=${pair#* }
+    [ "$ref" != HEAD ] || ref=$(git symbolic-ref -q HEAD || echo HEAD)
+    echo "$ref"
+  done >"$LOCK"
+}
 if [ ${#shas[@]} -eq 1 ]; then
   MAIN="$ROOT"
   CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
@@ -287,6 +300,7 @@ if [ ${#shas[@]} -eq 1 ]; then
   trap 'exit 129' HUP
   trap 'exit 130' INT
   trap 'exit 143' TERM
+  write_lock
   mkdir -p "$CACHE"
   echo "pre-push: the checks run in $COPY, at ${shas[0]:0:8}" >&2
   git worktree add -q --detach "$COPY" "${shas[0]}"
@@ -313,6 +327,7 @@ else
     exit "$status"
   }
   trap check_tree EXIT
+  write_lock
 fi
 run_checks() {
 # The guides' check, as plan-checks.yml runs it, printing only its failures

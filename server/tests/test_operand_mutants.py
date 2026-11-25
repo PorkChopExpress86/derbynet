@@ -549,12 +549,9 @@ def test_a_python_file_on_disk_lists_every_condition_and_operand_by_ast(tmp_path
     assert 7 not in {m.line for m in found}, "line 7's condition is on no added line"
 
 
-def test_an_assert_s_and_operand_is_made_false_only(tmp_path):
-    """In a passing test each operand of an assert's `and` is true, so made
-    True it changes nothing: #500's `assert raced.exists() and
-    unraced.exists()` and `assert racers and heats` listed such mutants,
-    which could not die (#500 retro). An `or` inside the `and`, an
-    assert's own `or`, and an `and` in an `if` keep both."""
+def operand_mutants_of(tmp_path, path: str) -> set[tuple[int, str, str]]:
+    """The operand mutants of a test with asserts and an `if`, every line
+    added, written at `path`."""
     text = (
         "def test_x(a, b, c):\n"
         "    assert a and (b or c)\n"
@@ -562,27 +559,52 @@ def test_an_assert_s_and_operand_is_made_false_only(tmp_path):
         "        pass\n"
         "    assert a or c\n"
     )
-    (tmp_path / "t.py").write_text(text)
-    diff = "+++ b/t.py\n@@ -0,0 +1,5 @@\n"
-    diff += "".join(f"+{x}\n" for x in text.splitlines())
+    (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / path).write_text(text)
+    lines = text.splitlines()
+    diff = f"+++ b/{path}\n@@ -0,0 +1,{len(lines)} @@\n"
+    diff += "".join(f"+{x}\n" for x in lines)
     found = om.mutants(diff, tmp_path)
-    found = {(m.line, m.old, m.new) for m in found if m.kind == "operand"}
-    assert found == {
-        (2, "a", "False"),
-        (2, "b or c", "False"),
-        (2, "b", "True"),
-        (2, "b", "False"),
-        (2, "c", "True"),
-        (2, "c", "False"),
-        (3, "a", "True"),
-        (3, "a", "False"),
-        (3, "b", "True"),
-        (3, "b", "False"),
-        (5, "a", "True"),
-        (5, "a", "False"),
-        (5, "c", "True"),
-        (5, "c", "False"),
+    return {(m.line, m.old, m.new) for m in found if m.kind == "operand"}
+
+
+def every_operand() -> set[tuple[int, str, str]]:
+    """operand_mutants_of()'s operands, each made True and made False."""
+    olds = {2: ("a", "b or c", "b", "c"), 3: ("a", "b"), 5: ("a", "c")}
+    return {
+        (line, old, new)
+        for line, names in olds.items()
+        for old in names
+        for new in ("True", "False")
     }
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "test_t.py",
+        "app/t_test.py",
+        "app/conftest.py",
+        "app/tests/replay.py",
+    ],
+)
+def test_a_test_module_s_assert_and_operand_is_made_false_only(tmp_path, path):
+    """In a passing test each operand of an assert's `and` is true, so made
+    True it changes nothing: #500's `assert raced.exists() and
+    unraced.exists()` and `assert racers and heats` listed such mutants,
+    which could not die (#500 retro). An `or` inside the `and`, an
+    assert's own `or`, and an `and` in an `if` keep both."""
+    assert operand_mutants_of(tmp_path, path) == every_operand() - {
+        (2, "a", "True"),
+        (2, "b or c", "True"),
+    }
+
+
+@pytest.mark.parametrize("path", ["tools/race_day_screens.py", "app/testing.py"])
+def test_an_assert_outside_the_tests_keeps_both(tmp_path, path):
+    """A tool's assert can fail, as race_day_screens.py's check of a reply
+    can, so each operand made True can die (PR #517's review)."""
+    assert operand_mutants_of(tmp_path, path) == every_operand()
 
 
 def test_a_line_mutant_on_disk_has_its_span_where_its_text_is_once(tmp_path):

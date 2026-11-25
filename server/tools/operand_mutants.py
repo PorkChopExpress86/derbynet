@@ -52,9 +52,10 @@ A Python file on disk is read by its AST instead, for its conditions:
 each `if`, `elif`, `while`, ternary, comprehension and `case` guard
 condition, and each
 operand of every `and` and `or` (a `return a and b` too), wherever it
-spans lines, when it touches an added line. An operand of an `assert`'s
-top-level `and` is made False only, since a passing test holds it true
-already (#500 retro). Its `old` is then the text of
+spans lines, when it touches an added line. In a test module (test_*.py,
+*_test.py, conftest.py, or under a `tests` folder) an operand of an
+`assert`'s top-level `and` is made False only, since a passing test holds
+it true already (#500 retro). Its `old` is then the text of
 its span, which can hold a newline, printed on one line; the line printed
 is the span's first. A loop whose header touches an added line gets a
 mutant whose body never runs: a `while` its condition made False, a `for`
@@ -397,12 +398,26 @@ def crowded(text: str, added: set[int]) -> list[tuple[int, int]]:
     )
 
 
+def is_test(path: str) -> bool:
+    """Whether `path` holds tests or their helpers: test_*.py, *_test.py,
+    conftest.py, or any file under a `tests` folder."""
+    parts = Path(path).parts
+    name = parts[-1]
+    return (
+        name.startswith("test_")
+        or name.endswith("_test.py")
+        or name == "conftest.py"
+        or "tests" in parts[:-1]
+    )
+
+
 def python_conditions(
-    text: str, added: set[int]
+    text: str, added: set[int], test: bool = False
 ) -> list[tuple[int, str, str, str, tuple[int, int]]]:
     """(line, kind, old, new, span) for each condition and `and`/`or` operand
     of a Python module that touches a line in `added`; [] when it does not
-    parse, which mutants() takes as no AST."""
+    parse, which mutants() takes as no AST. In a `test` module an assert's
+    `and` operands are made False only."""
     tree = ast.parse(text)
     lines = text.split("\n")
     starts = offsets(text)
@@ -423,11 +438,14 @@ def python_conditions(
     tests, ops, loops = [], [], []
     # In a passing test each operand of an assert's top-level `and` is true,
     # so made True it changes nothing and can't die: #500's two `assert a and
-    # b` listed four such mutants (#500 retro).
+    # b` listed four such mutants (#500 retro). An assert outside the tests,
+    # such as a tool's check of a reply, can fail, so it keeps both (PR #517's
+    # review).
     true_in_assert = set()
     for node in ast.walk(tree):
         if (
-            isinstance(node, ast.Assert)
+            test
+            and isinstance(node, ast.Assert)
             and isinstance(node.test, ast.BoolOp)
             and isinstance(node.test.op, ast.And)
         ):
@@ -574,7 +592,9 @@ def mutants(diff: str, root: Path | None = None) -> list[Mutant]:
         conditions, spans = [], None
         if python and text is not None:
             try:
-                conditions = python_conditions(text, {line for line, _ in rows})
+                conditions = python_conditions(
+                    text, {line for line, _ in rows}, is_test(path)
+                )
                 spans = string_spans(text)
                 by_ast = True
             except SyntaxError:

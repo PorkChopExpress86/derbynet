@@ -15,7 +15,12 @@ too: the Bash tool moves it to the background after about 3 min, where it
 is one more waiter (plan/AGENT-BRIEF.md, Evidence). #409, #463, the #499
 retro and #500 each typed one on a run's log; #500's was TaskStopped
 (#500 retro). A loop inside a quoted string, a heredoc body or a comment
-is left alone, as a script being written, and so is a `for` loop.
+is left alone, as a script being written, and so is a `for` loop. A
+`sleep` counts only inside the loop's own `do ... done`, so a sleep after
+a `while read` loop is no waiter. A counter loop, whose condition is one
+comparison with a literal of at most 60 (`while [ $i -lt 5 ]`), runs as a
+`for _ in $(seq 5)` loop does; one joined with `||` or `&&` to a check,
+`until grep ... || [ $i -ge 30 ]`, is a waiter (PR #517's review).
 """
 
 import json
@@ -23,11 +28,29 @@ import os
 import re
 import sys
 
-# The loop's header, its `do` after a `;` or a newline as in
-# plan/tests/test_stub_loops.py's HEAD, then a sleep before its `done`.
-FOREGROUND_WAIT = re.compile(
-    r"(?<![\w-])(?:until|while)\b[^\n;]*(?:;|\n)\s*do\b.*?\bsleep\b.*?\bdone\b", re.S
-)
+# A loop's header, its `do` after a `;` or a newline as in
+# plan/tests/test_stub_loops.py's HEAD.
+HEADER = re.compile(r"(?<![\w-])(?:until|while)\b(?P<condition>[^\n;]*)(?:;|\n)\s*do\b")
+COUNTER = re.compile(r"\[\s*\S+\s+-(?:lt|le|ge|gt)\s+(\d+)\s*\]")
+DO_DONE = re.compile(r"\b(do|done)\b")
+MAX_COUNT = 60
+
+
+def waits(code):
+    """Whether `code` holds an `until` or `while` loop whose own body sleeps,
+    other than a counter loop."""
+    for header in HEADER.finditer(code):
+        counter = COUNTER.fullmatch(header["condition"].strip())
+        if counter and int(counter[1]) <= MAX_COUNT:
+            continue
+        depth = 1
+        for word in DO_DONE.finditer(code, header.end()):
+            depth += 1 if word[1] == "do" else -1
+            if depth == 0:
+                if re.search(r"\bsleep\b", code[header.end() : word.start()]):
+                    return True
+                break
+    return False
 
 
 def code_of(command):
@@ -80,7 +103,7 @@ def main():
     tool_input = call.get("tool_input") or {}
     command = tool_input.get("command") or ""
     if tool_input.get("run_in_background") is not True:
-        if FOREGROUND_WAIT.search(code_of(command)):
+        if waits(code_of(command)):
             deny(
                 "A foreground until or while loop that sleeps is a waiter, which "
                 "the Bash tool moves to the background after about 3 min "

@@ -51,6 +51,30 @@ class ForegroundWaiter(unittest.TestCase):
         command = "cat > note <<'EOF'; until grep -q x log; do sleep 5; done\nbody\nEOF"
         self.assertEqual(decision(command), 'deny')
 
+    def test_a_sleep_in_the_loop_s_own_body_is_a_waiter(self):
+        """A loop nested in the body ends first, and the outer body goes on."""
+        for command in (
+            'while read -r l; do for i in 1 2; do echo $i; done; sleep 1; done <f',
+            'echo start; until [ -s f ]; do sleep 1; done; echo done',
+            # A counter joined to a check is a waiter, and so is a counter
+            # past the hook's MAX_COUNT.
+            'i=0; until grep -q x f || [ $i -ge 30 ]; do i=$((i + 1)); sleep 10; done',
+            'i=0; while [ $i -lt 61 ]; do i=$((i + 1)); sleep 1; done',
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(decision(command), 'deny')
+
+    def test_a_sleep_after_the_loop_or_a_counter_loop_runs(self):
+        """PR #517's review: a sleep after a `while read` loop was denied."""
+        for command in (
+            'while read l; do echo $l; done <f; sleep 3; echo done',
+            'while read -r l; do echo $l; done <f\nsleep 1',
+            'i=0; while [ $i -lt 5 ]; do sleep 1; i=$((i + 1)); done',
+            'i=0; until [ "$i" -ge 60 ]; do sleep 1; i=$((i + 1)); done',
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(decision(command))
+
     def test_the_same_loop_in_the_background_runs(self):
         for command in WAITERS:
             with self.subTest(command=command):

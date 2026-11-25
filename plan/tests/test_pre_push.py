@@ -499,6 +499,19 @@ class TreeChanged(unittest.TestCase):
                 self.assertNotIn(self.CHANGED, result.stderr)
 
 
+class TwoCommitLock(unittest.TestCase):
+    """The lock .githooks/pre-commit reads covers a push of two commits,
+    whose checks read the working tree, too (#500 retro)."""
+
+    edit = TreeChanged.edit
+
+    def test_a_push_of_two_commits_locks_both_refs_while_its_checks_run(self):
+        line = ("assert [p.read_text() for p in (REPO / '.git').glob('pre-push-*.lock')]"
+                " == ['refs/heads/b\\nrefs/heads/m\\n'], 'the lock'")
+        result = push('notes/x.md', two_commits=True, plan_test=self.edit(line))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
 class TreeCopy(unittest.TestCase):
     """A push of one commit runs its checks in a detached copy of it, so the
     working tree is free while they run: #400's implementer edited it during
@@ -708,6 +721,23 @@ class CopySignals(unittest.TestCase):
                 hook.communicate(timeout=60)
                 self.assertEqual(list((self.repo / '.git').glob('pre-push-*.lock')), [])
                 self.assertEqual(self.git('rev-parse', 'HEAD'), self.head)
+
+    def test_the_next_push_removes_a_lock_whose_pid_is_gone(self):
+        """A SIGKILL runs no trap, so its lock stays, and a process that later
+        takes its pid would block a commit (PR #517's review). A live pid's
+        lock stays."""
+        sleeper = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(sleeper.wait)
+        self.addCleanup(sleeper.kill)
+        gone = self.repo / '.git' / 'pre-push-999999999.lock'
+        live = self.repo / '.git' / f'pre-push-{sleeper.pid}.lock'
+        for lock in (gone, live):
+            lock.write_text('refs/heads/master\n')
+        hook = self.start()
+        _, err = hook.communicate(timeout=120)
+        self.assertEqual(hook.returncode, 0, err)
+        self.assertFalse(gone.exists())
+        self.assertTrue(live.exists())
 
     def test_the_next_push_removes_a_killed_hooks_copy_and_its_checks(self):
         hook, pid = self.hanging()
