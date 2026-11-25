@@ -17,7 +17,7 @@
 // - Inside replay.php, `replay-started` pauses the page's content polls and
 //   `replay-ended` resumes them, as now-racing.js:3-16 suspends its poller;
 //   the other PHP pages ignore the messages. A reply still out is handled,
-//   and no animation pauses, as PHP pauses none (D137).
+//   and no animation pauses: now-racing.js:8-15 touches none (D137).
 (function () {
   'use strict';
 
