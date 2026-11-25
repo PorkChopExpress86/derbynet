@@ -132,6 +132,7 @@ def race_first_final_heat(event, final, finalists_for):
 def end_round_1_again(event, round1, finalists_for):
     """Rerun round 1's last heat with the times it had, so the round ends
     again with the same finalists."""
+    assert round1.number == 1
     heat = last_heat(round1)
     assert select_heat(event, round_id=round1.id, heat=heat) is None
     assert rerun(event, "current", finalists_for=finalists_for) is None
@@ -224,6 +225,7 @@ def test_skip_does_not_stop_at_a_next_step_that_has_a_result():
         finish_time=3.0, completed=timezone.now()
     )
     assert len(heats_of(outlaws)) > 1
+    assert raced_heats(outlaws) == [1]
 
     assert skip_waiting_step(event, finalists_for) == outlaws
     assert_no_intermission(event)

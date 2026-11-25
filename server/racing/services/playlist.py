@@ -143,10 +143,7 @@ def _next_entry(entry: PlaylistEntry) -> PlaylistEntry | None:
 
 
 def _has_result(round: Round | None) -> bool:
-    return (
-        round is not None
-        and HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists()
-    )
+    return HeatLane.objects.filter(round=round).filter(HAS_RESULT).exists()
 
 
 def _waits(entry: PlaylistEntry) -> bool:
