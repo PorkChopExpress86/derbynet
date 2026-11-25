@@ -52,4 +52,4 @@ The pages list each photo folder when they open. A photo file copied into the fo
 
 ## A photo stand
 
-A photo stand takes car photos by itself as each car is scanned, and sends them to the server. Existing Raspberry Pi photo stands keep working. [The photo capture stand](photo-stand.md) describes it.
+A photo stand takes car photos by itself as each car is scanned, and sends them to the server. Existing Raspberry Pi photo stands keep working.

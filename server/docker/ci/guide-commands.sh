@@ -10,7 +10,7 @@
 # of this file and to a live workflow step that runs it.
 #
 # Usage: server/docker/ci/guide-commands.sh STAGE ...
-#   .github/workflows/image.yml, pi-images.yml and server.yml name the stages
+#   .github/workflows/image.yml and server.yml name the stages
 #   they run; GUIDE_WORK (default a new folder) keeps the state the stages of
 #   one workflow job share, so the stages run in the order the workflow lists.
 #
@@ -45,19 +45,6 @@
 #   dev-shell-suite  its shell-suite block from the repository root: a
 #                    development server in the background, and
 #                    testing/reset-database.sh against it
-#   pi-timer-folder  docs/pi-setup.md's folder and download for the timer:
-#                    the file the guide downloads is in the checkout
-#   pi-timer-env     its .env lines, written to .env as the guide shows
-#   pi-timer         docker compose -f compose.timer.yaml up -d: the jar logs in
-#                    to the server at the address .env names
-#   pi-timer-update  its Update commands: the jar logs in again
-#   pi-photostand-folder
-#                    the same for its photo stand: folder and download,
-#   pi-photostand-env
-#                    .env lines,
-#   pi-photostand    and docker compose -f compose.photostand.yaml up -d: the
-#                    stand logs in to that server, and its container has each
-#                    .env setting
 #
 # What differs from a reader's computer, and why the commands stay as written:
 # - The guides name `derbynet`, `derbynet_data` and port 80, which no prefix
@@ -74,21 +61,6 @@
 # - docs/database.md copies the reader's own folder, /path/to/pack42; the
 #   import stages copy one they make from transfer/tests/fixtures/legacy,
 #   then run the import as written.
-# - The Pi stages read .env as written, and refuse to run when the
-#   environment sets one of its settings, which Compose would take first.
-#   The server answers at the address .env's DERBYNET_SERVER names, which the
-#   script gives this Docker daemon's machine as the gateway of a network of
-#   its own (guide-pi).  That machine needs the timer's port the .env names,
-#   /dev/ttyUSB0: pi-images.yml makes one like /dev/null.  The environment
-#   sets only what .env leaves out: TIMER_ARGS (-simulate-timer -lanes 4,
-#   since no timer is on that port), DERBYNET_TIMER_IMAGE and
-#   DERBYNET_PHOTOSTAND_IMAGE (TIMER_IMAGE, default derbynet_timer:ci, and
-#   PHOTOSTAND_IMAGE, default derbynet_photostand:ci, in the registry), and
-#   DERBYNET_INPUT_DIR, a folder holding a stand-in for the scanner .env
-#   names.  HOME is a folder of the script's, for ~.
-# - PI_PLATFORM, which a machine that is not a Pi's arm64 sets to
-#   linux/arm64 (QEMU runs the image), becomes DOCKER_DEFAULT_PLATFORM for the
-#   Pi's commands; CI's arm runner leaves it unset.
 # - GUIDE_HOST (default localhost) is where the stages reach a port that a
 #   guide command publishes.
 # - Not in a guide's text: the stages' own checks of what the commands did.
@@ -101,8 +73,6 @@ trap 'exit 143' TERM INT
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SERVER_DIR="$ROOT/server"
 IMAGE="${IMAGE:-derbynet_server:dev}"
-TIMER_IMAGE="${TIMER_IMAGE:-derbynet_timer:ci}"
-PHOTOSTAND_IMAGE="${PHOTOSTAND_IMAGE:-derbynet_photostand:ci}"
 GUIDE_HOST="${GUIDE_HOST:-localhost}"
 WAIT_SECONDS="${WAIT_SECONDS:-300}"
 GHCR_SERVER=ghcr.io/porkchopexpress86/derbynet_server
@@ -170,8 +140,7 @@ cleanup() {
     docker ps -aq --filter 'name=^guide-' | xargs -r docker rm -fv >/dev/null || true
     docker volume ls -q --filter 'name=^guide-' | xargs -r docker volume rm >/dev/null || true
     docker network ls -q --filter 'name=^guide-' | xargs -r docker network rm >/dev/null || true
-    docker rmi "$GHCR_SERVER:latest" \
-        ${REG:+"$REG/derbynet_server:ci" "$REG/derbynet_timer:ci" "$REG/derbynet_photostand:ci"} >/dev/null 2>&1 || true
+    docker rmi "$GHCR_SERVER:latest" ${REG:+"$REG/derbynet_server:ci"} >/dev/null 2>&1 || true
     exit "$status"
 }
 trap cleanup EXIT
@@ -189,7 +158,7 @@ wait_for() { # wait_for <what> <command ...>
 http_ok() { curl -fsS -m 10 -o /dev/null "$@"; }
 healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "$1")" = healthy ]; }
 
-# Starts the registry that DERBYNET_IMAGE and the timer's image come from, once.
+# Starts the registry that DERBYNET_IMAGE comes from, once.
 registry() {
     [ -z "$REG" ] || return 0
     docker run -d --name guide-registry -p 127.0.0.1:5000:5000 "$REGISTRY_IMAGE" >/dev/null
@@ -231,17 +200,6 @@ run_guide() {
         say "docs/$where: $command"
         eval "$command" || fail "docs/$where exited $?: $command"
         [ -z "$hook" ] || "$hook" "$where" "$command"
-    done
-}
-
-# write_env <stage>: the stage's lines are the content of .env, written as
-# the guide shows them.
-write_env() {
-    local i
-    stage_records "$1"
-    for ((i = 0; i < ${#RECORDS[@]}; i += 2)); do
-        say "docs/${RECORDS[i]}: ${RECORDS[i + 1]} >> .env"
-        printf '%s\n' "${RECORDS[i + 1]}" >> .env
     done
 }
 
@@ -480,155 +438,6 @@ stage_dev_shell_suite() {
     set +m
 }
 
-# The server at the address the guide's .env names: DERBYNET_SERVER among
-# the lines of stage $1.  This Docker daemon's machine takes that address as
-# the gateway of a network of the script's, guide-pi, and the server publishes
-# port 80 there, so a container reaches it as a Pi reaches the server on the
-# LAN.  The script reaches the server at GUIDE_HOST, on a second port.
-pi_server() { # pi_server <env stage>
-    local url address port
-    [ -z "${PI_BASE:-}" ] || return 0
-    stage_records "$1"
-    url="$(printf '%s\n' "${RECORDS[@]}" | sed -n "s/^DERBYNET_SERVER='\(.*\)'$/\1/p")"
-    address="${url#http://}"
-    [[ "$address" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-        || fail "stage $1 names no DERBYNET_SERVER='http://<address>': '$url'"
-    reset_guide_state
-    registry
-    docker network create --subnet "${address%.*}.0/24" --gateway "$address" guide-pi >/dev/null
-    docker run -d --name guide-server --network guide-pi -p "$address:80:80" -p 80 \
-        -v guide-server-data:/var/lib/derbynet "$IMAGE" >/dev/null
-    port="$(docker port guide-server 80/tcp | awk -F: -v a="$address" '$1 != a {p = $NF} END {print p}')"
-    [ -n "$port" ] || fail "guide-server publishes no second port"
-    PI_BASE="http://$GUIDE_HOST:$port"
-    wait_for "the server" http_ok "$PI_BASE/index.php"
-    curl -sf -d 'action=setup.nodata&ez-new=docs' "$PI_BASE/action.php" >/dev/null \
-        || fail "the server took no setup.nodata"
-}
-
-pi_image() { # pi_image <local image> <name>: the image in the registry, named
-    docker tag "$1" "$REG/$2:ci"
-    docker push -q "$REG/$2:ci" >/dev/null
-    printf '%s\n' "$REG/$2:ci"
-}
-
-# ~ is the script's own folder from here on; uv and docker keep the caches,
-# interpreters and plugins they found under the real one.
-pi_home() {
-    [ "$HOME" != "$WORK/home" ] || return 0
-    export UV_CACHE_DIR="${UV_CACHE_DIR:-$(uv cache dir)}"
-    export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$(uv python dir)}"
-    export DOCKER_CONFIG="${DOCKER_CONFIG:-$HOME/.docker}"
-    export HOME="$WORK/home"
-    mkdir -p "$HOME"
-}
-
-pi_download_after() { # pi_download_after <where> <command>: the file the guide downloads exists
-    local path
-    case "$2" in
-        curl*)
-            path="${2##*/master/}"
-            [ -f "$ROOT/$path" ] || fail "the guide downloads $path, which the checkout lacks" ;;
-    esac
-}
-
-new_env() { # new_env <folder>: in ~/<folder>, with no .env yet
-    [ "$PWD" = "$HOME/$1" ] || fail "the .env stage runs in ~/$1, after the folder's stage"
-    rm -f .env
-}
-
-# Compose takes a setting from the environment before .env, so a setting
-# both name would leave .env's unread.
-env_unshadowed() {
-    local key
-    for key in $(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env); do
-        [ -z "${!key+set}" ] || fail "the environment sets $key, which Compose would take before .env's"
-    done
-    [ -z "${PI_PLATFORM:-}" ] || export DOCKER_DEFAULT_PLATFORM="$PI_PLATFORM"
-}
-
-logged_in() { # logged_in <compose file> <line>
-    grep -q "$2" <<<"$(docker compose -f "$1" logs 2>&1)"
-}
-
-stage_pi_timer_folder() {
-    pi_home
-    cd "$HOME"
-    run_guide pi-timer-folder pi_download_after
-}
-
-stage_pi_timer_env() {
-    new_env derbynet-timer
-    write_env pi-timer-env
-    cat .env
-}
-
-pi_timer_env() {
-    pi_server pi-timer-env
-    env_unshadowed
-    export TIMER_ARGS='-simulate-timer -lanes 4'
-    DERBYNET_TIMER_IMAGE="$(pi_image "$TIMER_IMAGE" derbynet_timer)"
-    export DERBYNET_TIMER_IMAGE
-}
-
-stage_pi_timer() {
-    [ -f .env ] || fail "pi-timer needs the .env that pi-timer-env writes"
-    pi_timer_env
-    run_guide pi-timer
-    wait_for "the timer's login" logged_in compose.timer.yaml 'Successful login'
-    docker compose -f compose.timer.yaml logs 2>&1 | grep -E 'Waiting for|Starting derby-timer|Successful login'
-}
-
-stage_pi_timer_update() {
-    pi_timer_env
-    run_guide pi-timer-update
-    grep -qx timer <<<"$(docker compose -f compose.timer.yaml ps --status running --format '{{.Service}}')" \
-        || fail "the timer is not running after the update"
-    wait_for "the timer's login" logged_in compose.timer.yaml 'Successful login'
-}
-
-stage_pi_photostand_folder() {
-    pi_home
-    cd "$HOME"
-    run_guide pi-photostand-folder pi_download_after
-}
-
-stage_pi_photostand_env() {
-    new_env derbynet-photostand
-    write_env pi-photostand-env
-    cat .env
-}
-
-# Each NAME='value' line of .env is NAME=value in the stand's environment.
-settings_reached() {
-    local seen line
-    seen="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' \
-        "$(docker compose -f compose.photostand.yaml ps -q photostand)")"
-    while IFS= read -r line; do
-        line="${line/=\'/=}"
-        grep -qxF -- "${line%\'}" <<<"$seen" || fail "the stand's environment lacks .env's $line"
-    done < .env
-    say "the stand's environment has each .env setting"
-}
-
-stage_pi_photostand() {
-    local scanner
-    [ -f .env ] || fail "pi-photostand needs the .env that pi-photostand-env writes"
-    pi_server pi-photostand-env
-    env_unshadowed
-    DERBYNET_PHOTOSTAND_IMAGE="$(pi_image "$PHOTOSTAND_IMAGE" derbynet_photostand)"
-    # A stand-in for the scanner .env names, so the stand reads no device of
-    # this machine's.
-    scanner="$(set -a && . ./.env && printf '%s' "${BARCODE_SCANNER_DEVS:-}")"
-    mkdir -p "$WORK/input/by-id"
-    [ -z "$scanner" ] || [ -p "$WORK/input/by-id/$scanner" ] || mkfifo "$WORK/input/by-id/$scanner"
-    export DERBYNET_PHOTOSTAND_IMAGE DERBYNET_INPUT_DIR="$WORK/input"
-    run_guide pi-photostand
-    wait_for "the photo stand's login" logged_in compose.photostand.yaml 'Successfully logged in'
-    docker compose -f compose.photostand.yaml logs 2>&1 | grep -E 'Successfully logged in'
-    settings_reached
-}
-
 [ $# -gt 0 ] || { sed -n '/^# Stages:/,/^# What differs/p' "$0" >&2; exit 2; }
 # The development stages use no Docker, so a machine with none runs them.
 for stage in "$@"; do
@@ -654,13 +463,6 @@ for stage in "$@"; do
         dev-setup) stage_dev_setup ;;
         dev-browser) stage_dev_browser ;;
         dev-shell-suite) stage_dev_shell_suite ;;
-        pi-timer-folder) stage_pi_timer_folder ;;
-        pi-timer-env) stage_pi_timer_env ;;
-        pi-timer) stage_pi_timer ;;
-        pi-timer-update) stage_pi_timer_update ;;
-        pi-photostand-folder) stage_pi_photostand_folder ;;
-        pi-photostand-env) stage_pi_photostand_env ;;
-        pi-photostand) stage_pi_photostand ;;
         *) echo "guide-commands.sh: no stage $stage" >&2; exit 2 ;;
     esac
     say "stage $stage passed"

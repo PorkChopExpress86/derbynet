@@ -15,12 +15,6 @@
 # `sleep 1` lasts; this script points FIRST_SLEEP_MARK at
 # $TMPDIR/race-cases.<case>.first-sleep for it.
 # Each case's output is kept in $TMPDIR/race-cases.<case>.log.
-#
-# in-image runs the jar through extras/docker/ci/timer-java, as
-# extras/docker/ci/checks.sh timer does (#518): the timer image's java runs
-# the jar built here.  It needs docker and TIMER_IMAGE, the timer image's
-# tag, and is skipped without TIMER_IMAGE.  PREFIX (default race-cases)
-# names its container.
 
 BASE_URL=$1
 shift
@@ -50,7 +44,6 @@ heat-8s|HEAT_SECONDS=8|pass|raced every heat
 race-60s|RACE_SECONDS=60|fail|did not complete round [0-9]*: the round did not finish within 60s
 race-120s|RACE_SECONDS=120|pass|raced every heat
 dump-on-pass|DUMP_AFTER=0 FIRST_SLEEP=$HOLD|pass|^Full thread dump|$HOLD
-in-image|JAVA=$TESTING/../extras/docker/ci/timer-java PREFIX=${PREFIX:-race-cases} DUMP_AFTER=0 FIRST_SLEEP=$HOLD|pass|^Full thread dump|$HOLD
 slow-start|JAVA_DELAY=151|pass|raced every heat
 slow-start-identify-120s|JAVA_DELAY=151 IDENTIFY_SECONDS=120|fail|did not complete round [0-9]*: the timer was not identified within 120s
 jar-exits|JAVA_EXIT=1|fail|did not complete round [0-9]*: derby-timer.jar exited
@@ -61,10 +54,6 @@ STATUS=0
 while IFS='|' read -r name env want expect least; do
     [ -n "$name" ] || continue
     if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qxF "$name"; then
-        continue
-    fi
-    if [ "$name" = in-image ] && [ -z "${TIMER_IMAGE:-}" ]; then
-        echo "skipped $name: set TIMER_IMAGE to the timer image's tag"
         continue
     fi
     log="${TMPDIR:-/tmp}/race-cases.$name.log"

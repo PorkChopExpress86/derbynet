@@ -103,8 +103,15 @@ def test_the_bash_check_leaves_out_a_powershell_block(tmp_path, language):
     assert shell_commands(tmp_path) == [("g.md", 5, "ls")]
 
 
-def test_the_function_in_photo_stand_md_is_one_command():
-    texts = [c.text for c in gc.guide_commands() if c.guide == "photo-stand.md"]
+def test_a_function_over_several_lines_is_one_command():
+    """The CHDK zoom block of docs/photo-stand.md, deleted by D139."""
+    guide = "# Point it at the server\n\n" + fence(
+        "sh",
+        "unset prepare_camera_before_shot\n"
+        'prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}',
+    )
+    texts = [c.text for c in gc.commands("g.md", guide)]
+    assert texts[0] == "unset prepare_camera_before_shot"
     assert (
         'prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}'
         in texts
@@ -636,16 +643,23 @@ def test_each_stage_a_reason_names_is_an_arm_of_the_script():
     assert sorted(names - set(arms())) == []
 
 
+CHECKS_SH_CHECK = re.compile(r"(server/docker/ci/)checks\.sh ([a-z][a-z-]*)")
+
+
+def test_the_checks_sh_check_a_reason_names_is_found():
+    """timer-operation.md's reasons named the timer image's checks.sh until
+    D139 deleted it; no reason names a check now, so the pattern is held here."""
+    reason = "in its place image.yml runs `server/docker/ci/checks.sh upload`"
+    assert CHECKS_SH_CHECK.findall(reason) == [("server/docker/ci/", "upload")]
+
+
 def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
     named = [
-        (where or "extras/docker/ci/", check)
+        (where, check)
         for e in gc.parse_registry(gc.REGISTRY.read_text())
         if e.kind == "reason"
-        for where, check in re.findall(
-            r"((?:extras|server)/docker/ci/)?checks\.sh ([a-z][a-z-]*)", e.detail
-        )
+        for where, check in CHECKS_SH_CHECK.findall(e.detail)
     ]
-    assert named
     for where, check in named:
         assert re.search(
             rf"^ +{re.escape(check)}\) check_\w+ ;;$",
@@ -658,8 +672,7 @@ def test_the_script_starts_the_registry_the_workflows_pin():
     pinned = re.compile(r"registry:3@sha256:[0-9a-f]{64}")
     script = set(pinned.findall(SCRIPT.read_text()))
     assert len(script) == 1
-    for workflow in ("image.yml", "pi-images.yml"):
-        assert set(pinned.findall((WORKFLOWS / workflow).read_text())) == script
+    assert set(pinned.findall((WORKFLOWS / "image.yml").read_text())) == script
 
 
 # The guard and the cleanup, against a stand-in `docker` that logs each call

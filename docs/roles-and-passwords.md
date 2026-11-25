@@ -43,4 +43,4 @@ The laptop that runs the browser timer logs in as RaceCoordinator (D53). The bro
 
 ## The photo stand
 
-A Raspberry Pi photo stand uploads photos as the Photo role. If you change the Photo password, change it in the photo stand's settings too. See [the photo stand guide](photo-stand.md).
+A Raspberry Pi photo stand uploads photos as the Photo role. If you change the Photo password, change it in the photo stand's settings too.
