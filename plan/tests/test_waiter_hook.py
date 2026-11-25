@@ -12,7 +12,8 @@ from pathlib import Path
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
 
-HOOK = Path(__file__).resolve().parents[2] / '.claude' / 'hooks' / 'refuse-duplicate-waiter.py'
+ROOT = Path(__file__).resolve().parents[2]
+HOOK = ROOT / '.claude' / 'hooks' / 'refuse-duplicate-waiter.py'
 
 # The waiters, as the agents typed them, but the last.
 WAITERS = (
@@ -29,9 +30,9 @@ WAITERS = (
 )
 
 
-def decision(command, background=False):
-    """The hook's decision for a Bash call: 'deny', or None to let it run."""
-    call = {'tool_name': 'Bash',
+def decision(command, background=False, tool='Bash'):
+    """The hook's decision for a call: 'deny', or None to let it run."""
+    call = {'tool_name': tool,
             'tool_input': {'command': command, 'run_in_background': background}}
     done = subprocess.run([sys.executable, '-I', str(HOOK)], input=json.dumps(call),
                           capture_output=True, text=True, check=True)
@@ -95,6 +96,26 @@ class ForegroundWaiter(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertIsNone(decision(command))
+
+
+class MonitorWatch(unittest.TestCase):
+    """A Monitor command is a watch, the tool the refusal names. Matched on
+    `Bash` alone, Claude Code sent this hook each Monitor call named `Bash`
+    (https://code.claude.com/docs/en/hooks), and the #501 and #514 retro's
+    Monitor watch on its push log was refused."""
+
+    WATCH = "until grep -q '^push exit' push.log; do sleep 5; done; grep '^push exit' push.log"
+
+    def test_a_monitor_watch_runs_and_the_same_loop_under_bash_is_refused(self):
+        self.assertIsNone(decision(self.WATCH, tool='Monitor'))
+        self.assertEqual(decision(self.WATCH), 'deny')
+
+    def test_the_hook_is_matched_on_monitor_by_name(self):
+        """So Claude Code sends a Monitor call under its own name."""
+        hooks = json.loads((ROOT / '.claude' / 'settings.json').read_text())['hooks']
+        matchers = [entry['matcher'].split('|') for entry in hooks['PreToolUse']
+                    if any(HOOK.name in hook['command'] for hook in entry['hooks'])]
+        self.assertEqual(matchers, [['Bash', 'Monitor']])
 
 
 if __name__ == '__main__':
