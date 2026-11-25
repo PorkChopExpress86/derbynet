@@ -34,7 +34,9 @@
 #
 # COMMAND must not start tools/pytest-under-load.sh on the same lock, which
 # would wait on this script for ever: that script refuses to start under a
-# holder of its own lock.  Run the load repeats after this script ends.
+# holder of its own lock.  Run the load repeats after this script ends.  Its
+# --no-load, a hand-off's browser step, runs under this script's lock
+# instead (D138).
 
 set -e -E -o pipefail
 

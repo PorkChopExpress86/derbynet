@@ -174,7 +174,7 @@ class Everything(unittest.TestCase):
         self.assertIn('[everything]', out)
         self.assertIn('CI runs the full suites on both databases (D85)', out)
         cmds = commands(out)
-        self.assertIn('  uv run pytest -n auto -m browser '
+        self.assertIn('  tools/pytest-under-load.sh --no-load -n auto -m browser '
                       'ui/tests/browser/test_kiosk_ondeck_labels.py\n', cmds)
         self.assertNotIn('  uv run pytest -n auto\n', cmds)
         self.assertNotIn('-m browser ui\n', cmds)
@@ -187,7 +187,7 @@ class Everything(unittest.TestCase):
         out = run('server/derbynet/settings.py',
                   'server/ui/tests/browser/test_kiosk_ondeck_labels.py')
         self.assertIn('server/derbynet/settings.py: the database settings', out)
-        self.assertIn('  tools/pytest-postgres.sh -n auto -m browser '
+        self.assertIn('  tools/pytest-under-load.sh --no-load --postgres -n auto -m browser '
                       'ui/tests/browser/test_kiosk_ondeck_labels.py', commands(out))
         out = run('server/ui/tests/browser/conftest.py')
         self.assertIn('Postgres: not needed', out)
@@ -857,7 +857,7 @@ class TestFile(unittest.TestCase):
     def test_a_browser_test_runs_itself_under_the_browser_marker(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
         self.assertIn('[test-file] the test file itself\n', out)
-        self.assertIn('uv run pytest -n auto -m browser '
+        self.assertIn('tools/pytest-under-load.sh --no-load -n auto -m browser '
                       'ui/tests/browser/test_kiosk_ondeck_labels.py', commands(out))
         self.assertNotIn('uv run pytest -n auto ui/', commands(out))
 
@@ -872,7 +872,8 @@ class TestFile(unittest.TestCase):
     def test_a_kiosk_layout_test_repeats_5_in_the_default_font_only_under_load(self):
         out = run('server/ui/tests/browser/test_kiosk_ondeck_labels.py')
         self.assertIn('test_kiosk_ondeck_labels.py: 5 repeats, deterministic', out)
-        self.assertNotIn('DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh', out)
+        self.assertNotIn('DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh '
+                         '-m browser', out)
 
     def test_a_test_that_holds_a_request_repeats_25(self):
         out = run('server/ui/tests/browser/test_dashboard.py')
@@ -888,7 +889,50 @@ class TestFile(unittest.TestCase):
     def test_a_file_with_one_marked_test_runs_both_ways(self):
         out = commands(run('server/ui/tests/test_mixed.py'))
         self.assertIn('uv run pytest -n auto ui/tests/test_mixed.py', out)
-        self.assertIn('uv run pytest -n auto -m browser ui/tests/test_mixed.py', out)
+        self.assertIn('tools/pytest-under-load.sh --no-load -n auto -m browser '
+                      'ui/tests/test_mixed.py', out)
+
+    def test_only_the_browser_lines_run_through_the_no_load_rerun(self):
+        """D138: each `-m browser` hand-off line, on SQLite, on Postgres and
+        in DejaVu Sans, runs through pytest-under-load.sh --no-load, which
+        reruns a file that failed only on net::ERR_NETWORK_CHANGED; the
+        plain lines stay as they were."""
+        out = commands(run('server/derbynet/settings.py', 'server/ui/tests/test_mixed.py',
+                           'server/ui/tests/browser/test_kiosk_ondeck_labels.py'))
+        browser = 'ui/tests/browser/test_kiosk_ondeck_labels.py ui/tests/test_mixed.py'
+        self.assertIn(f'  tools/pytest-under-load.sh --no-load -n auto -m browser {browser}\n', out)
+        self.assertIn(f'  tools/pytest-under-load.sh --no-load --postgres -n auto -m browser {browser}\n', out)
+        self.assertIn('  DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh --no-load -n auto -m browser '
+                      'ui/tests/browser/test_kiosk_ondeck_labels.py\n', out)
+        self.assertIn('  uv run pytest -n auto tests ui/tests/test_mixed.py\n', out)
+        self.assertIn('  tools/pytest-postgres.sh -n auto tests ui/tests/test_mixed.py\n', out)
+        self.assertNotIn('pytest -n auto -m browser', out)
+
+    def test_flake_ticket_prints_the_flag_on_every_load_script_line(self):
+        """D122/D138: a flake ticket's load repeats and hand-off browser lines
+        keep pytest's status after a clean rerun, so `--flake-ticket` prints
+        the script's flag on each of them (#506 review); other lines stay."""
+        files = ['server/derbynet/settings.py', 'server/ui/tests/test_mixed.py',
+                 'server/ui/tests/browser/test_kiosk_ondeck_labels.py']
+        plain = run(*files)
+        with tempfile.TemporaryDirectory() as tmp:
+            for rel, text in TREE.items():
+                (Path(tmp) / rel).parent.mkdir(parents=True, exist_ok=True)
+                (Path(tmp) / rel).write_text(text)
+            out = subprocess.run(
+                [sys.executable, '-I', str(AFFECTED), '--stdin', '--root', tmp,
+                 '--flake-ticket'],
+                input=''.join(f'{f}\n' for f in files), capture_output=True,
+                text=True, check=True).stdout
+        script = [ln.strip() for ln in out.splitlines()
+                  if 'tools/pytest-under-load.sh' in ln and 'D133' not in ln]
+        self.assertGreaterEqual(len(script), 4, out)
+        for line in script:
+            self.assertRegex(line, r'^(DERBYNET_BROWSER_FONT="DejaVu Sans" )?'
+                             r'tools/pytest-under-load\.sh --flake-ticket ')
+        self.assertEqual(out.replace('tools/pytest-under-load.sh --flake-ticket ',
+                                     'tools/pytest-under-load.sh '), plain)
+        self.assertNotIn('--flake-ticket', plain)
 
     def test_a_test_file_the_root_conftest_imports_leaves_the_full_run_to_ci(self):
         tree = {**TREE, 'server/conftest.py': 'from ui.tests.test_mixed import x\n',
@@ -1116,8 +1160,9 @@ class UiPage(unittest.TestCase):
         self.assertIn('ui/tests/browser/test_kiosk_ondeck_labels.py', run_)
         self.assertIn('ui/tests/test_kiosk_pages.py', run_)
         self.assertNotIn('test_dashboard.py', run_)
-        self.assertIn('DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m '
-                      'browser ui/tests/browser/test_kiosk_ondeck_labels.py', run_)
+        self.assertIn('DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh '
+                      '--no-load -n auto -m browser '
+                      'ui/tests/browser/test_kiosk_ondeck_labels.py', run_)
 
     def test_a_test_that_names_a_file_loaded_only_with_it_runs(self):
         """test_table_columns.py opens /ondeck/, which loads kiosk-ondeck.js
@@ -3203,16 +3248,16 @@ def dejavu_commands(out, naming=''):
 class FontUnderLoad(unittest.TestCase):
     """D133: a kiosk browser file repeats under load in the default font
     only, and the one DejaVu Sans run it gets is the hand-off's line, which
-    runs under hold-load-lock.sh; any other file that measures text keeps
-    both fonts under load."""
+    runs with no load on the load lock (D138); any other file that measures
+    text keeps both fonts under load."""
 
     KIOSK = 'ui/tests/browser/test_kiosk_sheet.py'
     DEJAVU = 'DERBYNET_BROWSER_FONT="DejaVu Sans"'
     NOTE = ('      D133: a kiosk file repeats under load in the default font only. '
             'Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line under '
-            '"Run from server/" below, with no load and no --count, under '
-            'tools/hold-load-lock.sh.\n')
-    HAND_OFF = ('  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
+            '"Run from server/" below, with no load and no --count, on the load '
+            'lock (D138).\n')
+    HAND_OFF = ('  DERBYNET_BROWSER_FONT="DejaVu Sans" tools/pytest-under-load.sh --no-load -n auto -m browser '
                 'ui/tests/browser/test_kiosk_ondeck_labels.py\n')
     LAYOUT = 'ui/tests/browser/test_layout.py'
 
@@ -3290,7 +3335,8 @@ class FontUnderLoad(unittest.TestCase):
         load = f'tools/pytest-under-load.sh -m browser -n 4 --count 5 {self.LAYOUT}'
         self.assertEqual(dejavu_commands(out), [
             f'{self.DEJAVU} {load}',
-            f'{self.DEJAVU} uv run pytest -n auto -m browser {self.LAYOUT}'])
+            f'{self.DEJAVU} tools/pytest-under-load.sh --no-load -n auto -m browser '
+            f'{self.LAYOUT}'])
         self.assertNotIn('tools/hold-load-lock.sh', out)
         self.assertNotIn('D133: a kiosk file', out)
 
@@ -3299,7 +3345,8 @@ class FontUnderLoad(unittest.TestCase):
         out = run(f'server/{kiosk}', f'server/{self.LAYOUT}', tree=self.layout_tree())
         in_kiosk = dejavu_commands(out, kiosk)
         self.assertEqual(len(in_kiosk), 1)
-        self.assertNotIn('tools/pytest-under-load.sh', in_kiosk[0])
+        self.assertNotIn('--count', in_kiosk[0])
+        self.assertIn('tools/pytest-under-load.sh --no-load ', in_kiosk[0])
         self.assertEqual(len(dejavu_commands(out, self.LAYOUT)), 2)
 
 

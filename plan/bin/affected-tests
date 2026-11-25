@@ -2,7 +2,7 @@
 """Maps a branch's changed files to the tests that cover them, and prints the
 commands to run before a push (owner, 2026-11-11).
 
-Usage: plan/bin/affected-tests [BASE]          # BASE defaults to origin/master
+Usage: plan/bin/affected-tests [--flake-ticket] [BASE]  # BASE defaults to origin/master
        plan/bin/affected-tests --stdin < FILES  # one repo-relative path a line
        plan/bin/affected-tests --source-checks [--stdin] ...  # see below
 
@@ -57,7 +57,7 @@ targets, then:
   tool prints (D101). A text-measuring file named
   `ui/tests/browser/test_kiosk*.py` repeats under load in the default font
   only, and its one DejaVu Sans run is the hand-off's, with no load and no
-  --count, under `tools/hold-load-lock.sh`, a flake ticket's whole-file 25
+  --count, on the load lock, a flake ticket's whole-file 25
   included (D133, amending D101's repeats; D85's second font under load stays
   for other files);
 - before the commands, `tools/docstring_claims.py` on each changed test file
@@ -74,7 +74,10 @@ targets, then:
   helpers (#345 retro): run them before the first hand-off run,
   since a claim or a mutant they find means an edit, and the run starts
   again (#312 retro);
-- the commands, from server/.
+- the commands, from server/. Each `-m browser` line, the DejaVu Sans one
+  among them, runs through `tools/pytest-under-load.sh --no-load`, which
+  reruns a file that failed only on net::ERR_NETWORK_CHANGED (D138, amending
+  D122).
 - last, each commit on BASE past the merge base that touches a file the
   branch changes or a test it prints, or an area of pr-merge's rule the
   branch changes too (`master_moved()`): merge BASE before the hand-off run.
@@ -110,6 +113,10 @@ looks for database code in each whole file rather than in its diff, and
 has no BASE to find an import-only move or a changed test against, so
 every changed browser test file keeps its count, of the whole file.
 `--root DIR` reads the tree at DIR instead of the repository's top level.
+`--flake-ticket` prints the script's `--flake-ticket` on every
+`tools/pytest-under-load.sh` line, the repeats under load and the hand-off's
+browser lines, so a flake ticket's clean rerun after net::ERR_NETWORK_CHANGED
+keeps pytest's status (D122, D138; #506 review).
 `--source-checks` prints only the test files of tools/source-checks.sh that
 the changed files map to, one a line: the pre-push hook runs those alone for
 a push that changes only plan/owner-decisions.md (session retro 2026-11-24).
@@ -192,6 +199,18 @@ MEASURES = re.compile(
     r'bounding_box\(|getBoundingClientRect|getClientRects|scrollWidth|'
     r'scrollHeight|clientWidth|clientHeight|offsetWidth|offsetHeight|'
     r'fontSize|font-size|font_size')
+# D138: a hand-off's browser step runs through SCRIPT --no-load, which
+# reruns a file that failed only on net::ERR_NETWORK_CHANGED (#499's step
+# lost 19 files to it).
+SCRIPT = 'tools/pytest-under-load.sh'
+
+
+def script_of(plan):
+    """The load script with a flake ticket's flag, which keeps pytest's
+    status after a clean rerun (D122, D138)."""
+    return f'{SCRIPT} --flake-ticket' if plan.flake_ticket else SCRIPT
+
+
 # D133: the browser test files whose font repeats are one font under load.
 KIOSK_BROWSER_FILE = re.compile(r'ui/tests/browser/test_kiosk[^/]*\.py')
 DB_CODE = re.compile(
@@ -226,6 +245,7 @@ class Plan:
     everything: list = field(default_factory=list)
     postgres: list = field(default_factory=list)
     commands: list = field(default_factory=list)
+    flake_ticket: bool = False
     changed_browser_tests: list = field(default_factory=list)
     changed_tests: list = field(default_factory=list)
     changed_source: list = field(default_factory=list)
@@ -2448,7 +2468,7 @@ def text_hit(text, pattern):
     return None
 
 
-def load_repeats(rel, base, head, module_text, postgres=False):
+def load_repeats(rel, base, head, module_text, postgres=False, script=SCRIPT):
     """The "Repeats under load" lines for the changed browser test file
     `server/rel` from `base`, its text at BASE (None when it is new on the
     branch, NO_BASE under --stdin), to `head`: none for an import-only move
@@ -2491,7 +2511,7 @@ def load_repeats(rel, base, head, module_text, postgres=False):
             'the database it failed on (D101)')
         targets = ' '.join(f'{rel}::{key}' for key, _ in picked)
     pg = '--postgres ' if postgres else ''
-    run = f'tools/pytest-under-load.sh {pg}-m browser -n 4 --count {count} {targets}'
+    run = f'{script} {pg}-m browser -n 4 --count {count} {targets}'
     say(f'      {run}')
     if text_hit(head, MEASURES):
         if KIOSK_BROWSER_FILE.fullmatch(rel):
@@ -2501,7 +2521,7 @@ def load_repeats(rel, base, head, module_text, postgres=False):
             say('      D133: a kiosk file repeats under load in the default font '
                 'only. Its one DejaVu Sans run is the DERBYNET_BROWSER_FONT line '
                 'under "Run from server/" below, with no load and no --count, '
-                'under tools/hold-load-lock.sh.')
+                'on the load lock (D138).')
         else:
             say(f'      DERBYNET_BROWSER_FONT="DejaVu Sans" {run}')
     return out
@@ -2637,14 +2657,14 @@ def report(plan, tree):
             'or changes (D101); none for an import-only move (D97). A flake ticket '
             'keeps 25 of the whole file, on the database it failed on, whatever this '
             'prints (owner, 2026-11-11). A kiosk file takes the default font under '
-            'load and DejaVu Sans once under hold-load-lock.sh (D133):')
+            'load and DejaVu Sans once with no load (D133):')
         if not plan.from_git:
             say('  (--stdin has no BASE to compare with, so no file counts as an '
                 'import-only move, D97: each keeps its count, of the whole file, D101)')
         for r in plan.changed_browser_tests:
             base = base_text(plan, r) if plan.from_git else NO_BASE
             out += load_repeats(r, base, tree.text(r), lambda name: module_text(tree, name),
-                                plan.postgres)
+                                plan.postgres, script_of(plan))
     else:
         say('Repeats under load: no browser test file changed.')
     say('')
@@ -2677,20 +2697,21 @@ def report(plan, tree):
         say('')
 
     say('Run from server/ (start a run longer than a minute in the background):')
+    no_load = f'{script_of(plan)} --no-load'
     if plain:
         say(f'  uv run pytest -n auto {" ".join(plain)}')
     if browser:
-        say(f'  uv run pytest -n auto -m browser {" ".join(browser)}')
+        say(f'  {no_load} -n auto -m browser {" ".join(browser)}')
     if plan.postgres:
         if plain:
             say(f'  tools/pytest-postgres.sh -n auto {" ".join(plain)}')
         if browser:
-            say(f'  tools/pytest-postgres.sh -n auto -m browser {" ".join(browser)}')
+            say(f'  {no_load} --postgres -n auto -m browser {" ".join(browser)}')
     if not plain and not browser:
         say('  (no pytest target: CI\'s full run covers the diff, D85)' if plan.everything
             else '  (no pytest target: the checks below cover the diff)')
     if measured:
-        say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" uv run pytest -n auto -m browser '
+        say(f'  DERBYNET_BROWSER_FONT="DejaVu Sans" {no_load} -n auto -m browser '
             f'{" ".join(measured)}')
     for line in plan.commands:
         say(f'  {line}')
@@ -2727,6 +2748,9 @@ def main(argv):
     only_checks = '--source-checks' in args
     if only_checks:
         args.remove('--source-checks')
+    flake_ticket = '--flake-ticket' in args
+    if flake_ticket:
+        args.remove('--flake-ticket')
     if '--root' in args:
         i = args.index('--root')
         root = Path(args[i + 1]).resolve()
@@ -2741,7 +2765,7 @@ def main(argv):
         files = [ln.strip() for ln in sys.stdin if ln.strip()]
     else:
         files = None
-    plan = Plan(root=root, from_git=not from_stdin, base=base)
+    plan = Plan(root=root, from_git=not from_stdin, base=base, flake_ticket=flake_ticket)
     if files is None:
         files = changed_files(plan)
     tree = Tree(root)
