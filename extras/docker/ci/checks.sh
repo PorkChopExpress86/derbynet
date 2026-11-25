@@ -12,11 +12,16 @@
 #   PHOTOSTAND_IMAGE  the photo stand image (extras/docker/photostand.Dockerfile)
 # PREFIX (default pi-check) names every container, network, volume and
 # Compose project a check makes, and each check removes them when it ends.
-# LOGS (default a new folder under /tmp) keeps each container's log.
+# LOGS (default a new folder under /tmp) keeps each container's log, and the
+# timer check's derby-timer.log and timer-*.log.
 #
 # Checks:
 #   timer             the timer image's derby-timer.jar, with its simulated
-#                     timer, races every heat of a round on the server
+#                     timer, races every heat of a round on the server, with
+#                     testing/race-with-derby-timer.sh's bounds and thread
+#                     dumps.  It runs java in the image past
+#                     timer-entrypoint.sh, which timer-args and
+#                     timer-compose cover
 #   timer-serial      the jar with no simulated timer opens the serial port
 #                     passed in with --device through jssc's native library
 #   timer-compose     compose.timer.yaml, run from a folder with its .env as
@@ -75,7 +80,8 @@ cleanup() {
     for name in "$PREFIX-timer" "$PREFIX-photostand" "$SERVER"; do
         if docker container inspect "$name" >/dev/null 2>&1; then
             docker logs "$name" > "$LOGS/$name.log" 2>&1 || true
-            docker rm -f "$name" >/dev/null
+            # A --rm container already on its way out refuses the rm.
+            docker rm -f "$name" >/dev/null 2>&1 || true
         fi
     done
     docker network rm "$NET" >/dev/null 2>&1 || true
@@ -203,6 +209,8 @@ check_timer() {
     : "${TIMER_IMAGE:?set TIMER_IMAGE}"
     start_server
     local status=0
+    # A race that fails before it starts the jar writes no log of its own.
+    rm -f "$ROOT"/testing/derby-timer.log "$ROOT"/testing/timer-*.log
     PREFIX="$PREFIX" TIMER_IMAGE="$TIMER_IMAGE" JAVA="$ROOT/extras/docker/ci/timer-java" \
         bash "$ROOT/testing/race-with-derby-timer.sh" "$BASE" /usr/bin/derby-timer.jar || status=$?
     cp "$ROOT"/testing/derby-timer.log "$ROOT"/testing/timer-*.log "$LOGS/" 2>/dev/null || true

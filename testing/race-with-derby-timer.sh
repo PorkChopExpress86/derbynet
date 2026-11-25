@@ -7,7 +7,7 @@
 # Usage: race-with-derby-timer.sh <base_url> [<derby-timer.jar>]
 #
 # Build the jar first with `ant -noinput -buildfile timer/build.xml`.  Needs
-# java on the path.  Starts from an empty database.
+# java on the path, or the JAVA below.  Starts from an empty database.
 #
 # The jar's output goes to testing/derby-timer.log, and its own log, with a
 # millisecond time on every line and every heartbeat traced (-th), to
@@ -113,7 +113,22 @@ jar_alive() {
     [ "$(awk '/^PPid:/ { print $2 }' /proc/$JAR_PID/status 2>/dev/null)" = "$$" ] \
         && ! grep -q '^State:.*zombie' /proc/$JAR_PID/status 2>/dev/null
 }
-trap 'jar_alive && kill $JAR_PID 2>/dev/null || true' EXIT
+# On the way out the jar gets SIGTERM, and the script waits for it to end:
+# timer-java's `docker run` ends only once its container is gone, so the
+# caller's cleanup finds no container half removed (#518 review).  Up to
+# 10 s, 20 times the 0.5 s its container took to end and be removed after a
+# pass of checks.sh timer on amd64 (#518).
+stop_jar() {
+    jar_alive || return 0
+    echo "$(stamp) SIGTERM to pid $JAR_PID" >&2
+    kill $JAR_PID 2>/dev/null || true
+    for _ in $(seq 20); do
+        jar_alive || { echo "$(stamp) pid $JAR_PID ended" >&2; return 0; }
+        sleep 0.5  # 20 passes of 0.5 s make the 10 s above
+    done
+    echo "$(stamp) pid $JAR_PID still runs" >&2
+}
+trap stop_jar EXIT
 
 # SIGQUIT makes the JVM print every thread's stack to its stdout, the jar's
 # log, ending with a "JNI global refs" line.  Sent only to this script's own
@@ -136,7 +151,7 @@ thread_dump() {
             sleep 0.5
         done
     else
-        echo "$(stamp) no thread dump: pid $JAR_PID is not this script's java" >&2
+        echo "$(stamp) no thread dump: pid $JAR_PID is not this script's java or docker" >&2
     fi
 }
 

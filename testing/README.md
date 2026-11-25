@@ -258,7 +258,8 @@ there, and that each parses.
 
 `race-with-derby-timer.sh` races one round with the real `derby-timer.jar` and
 its simulated timer, as the `server` workflow does, and fails unless every heat
-gets a result.  It needs `java`, and the jar built first.  Start the Django
+gets a result.  It needs `java`, or a command in `JAVA` that runs java for
+it, and the jar built first.  Start the Django
 server as `server/README.md` ("Run the shell suites against Django") does, then
 from the repository's top folder:
 
@@ -271,6 +272,12 @@ the stand-ins in `timer-stand-in/` first on the PATH, and prints `ok` or
 five minutes and resets the database.  Name cases to run only those:
 
     bash testing/race-with-derby-timer-cases.sh http://127.0.0.1:8000 heat-result dump-on-pass
+
+Its `in-image` case runs the jar with the timer image's java, through
+`extras/docker/ci/timer-java`, as `extras/docker/ci/checks.sh timer` does.  It
+needs docker and the image's tag in `TIMER_IMAGE`, and is skipped without it:
+
+    TIMER_IMAGE=derbynet_timer bash testing/race-with-derby-timer-cases.sh http://127.0.0.1:8000 in-image
 
 ## Compare two runs
 
