@@ -12,7 +12,14 @@ from pathlib import Path
 import pytest
 
 from tests import outside_process
-from tools.mutate import counts, failed_in_helper, killed_by, main, stopped_on_error
+from tools.mutate import (
+    counts,
+    failed_in_helper,
+    killed_by,
+    main,
+    refusal,
+    stopped_on_error,
+)
 
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "mutate.py"
 MODULE = "def bound(a, b):\n    return a < b\n\n\ndef twice():\n    return 1 + 1\n"
@@ -359,6 +366,14 @@ def test_a_k_that_deselects_a_test_is_refused(project):
     assert run.returncode == 2
     assert run.stdout.splitlines()[-1].startswith("REFUSED")
     assert "deselected" in run.stdout.splitlines()[-1]
+
+
+def test_a_deselected_run_names_the_size_case():
+    """A browser test marked `sizes("desktop")` and named without its case
+    deselects the phone one: #509's round named test_replay.py's tests
+    bare, and the refusal named no fix it hadn't already made (#509 retro)."""
+    why = refusal({"passed": 1, "deselected": 1})
+    assert "path::test[desktop-chromium]" in why
 
 
 def test_a_k_that_matches_nothing_is_refused(project):
