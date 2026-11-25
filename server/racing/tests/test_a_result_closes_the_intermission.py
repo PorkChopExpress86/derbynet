@@ -7,11 +7,12 @@ import pytest
 from django.utils import timezone
 
 from racing.models import HAS_RESULT, HeatLane, PlaylistEntry
-from racing.services.heats import advance, reinstate, rerun, select_heat
+from racing.services.heats import advance, reinstate, rerun, select_heat, set_racing
 from racing.services.playlist import (
     Failure,
     PlaylistFailure,
     round_ended,
+    set_step_waits,
     skip_waiting_step,
     start_playlist,
     start_waiting_step,
@@ -57,12 +58,6 @@ def raced_heats(round):
     return sorted(set(lanes.values_list("heat", flat=True)))
 
 
-def assert_no_intermission(event):
-    now = state_of_event(event)
-    assert now.waiting_entry_id is None
-    assert now.ended_round_id is None
-
-
 def assert_skip_refused(event, finalists_for):
     with pytest.raises(PlaylistFailure) as caught:
         skip_waiting_step(event, finalists_for)
@@ -76,11 +71,14 @@ def test_a_manual_result_on_the_waiting_final_closes_the_intermission(waiting_fi
     recorded = record_manual_result(event, slow(final, 1), finalists_for=finalists_for)
     assert recorded.failure is None
     assert raced_heats(final) == [1]
-    assert_no_intermission(event)
+    now = state_of_event(event)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
 
     assert_skip_refused(event, finalists_for)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat) == (final.id, 1)
+    assert now.current_round_id == final.id
+    assert now.current_heat == 1
     assert raced_heats(final) == [1]
 
 
@@ -93,34 +91,69 @@ def test_a_timer_result_on_the_waiting_final_closes_the_intermission(waiting_fin
     now.save()
     record_timer_result(event, slow(final, 1), finalists_for=finalists_for)
     assert raced_heats(final) == [1]
-    assert_no_intermission(event)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 2, True)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == final.id
+    assert now.current_heat == 2
+    assert now.racing
+
+
+def select_last_heat_of(event, round1):
+    """Make the ended round's last heat current with the intermission open,
+    as the tests of D27 do: a `heat.select` would close it."""
+    heat = last_heat(round1)
+    now = state_of_event(event)
+    now.current_round_id, now.current_heat = round1.id, heat
+    now.save()
+    return heat
 
 
 def test_a_manual_result_on_the_ended_round_keeps_the_intermission_open(waiting_final):
     """D27's change to the round that ended is no result on the final."""
     event, round1, final, entry, finalists_for = waiting_final
-    heat = last_heat(round1)
-    now = state_of_event(event)
-    now.current_round_id, now.current_heat = round1.id, heat
-    now.save()
+    heat = select_last_heat_of(event, round1)
     record_manual_result(event, fast(round1, heat), finalists_for=finalists_for)
     now = state_of_event(event)
     assert now.waiting_entry_id == entry.id
     assert now.ended_round_id == round1.id
 
 
-@pytest.mark.parametrize("which", ["current", "last"])
-def test_a_rerun_closes_the_intermission(waiting_final, which):
+def test_a_step_switched_not_to_wait_keeps_its_intermission_until_a_result(
+    waiting_final,
+):
+    """D136 closes the intermission on a result on the final, not on the
+    step's "Wait for operator" switch. With the switch off and no result on
+    the final, a manual result on the ended round still rebuilds the final
+    (D27)."""
+    event, round1, final, entry, finalists_for = waiting_final
+    before = roster(final)
+    set_step_waits(event, entry.id, False)
+    heat = select_last_heat_of(event, round1)
+    record_manual_result(event, fast(round1, heat), finalists_for=finalists_for)
+    now = state_of_event(event)
+    assert now.waiting_entry_id == entry.id
+    assert now.ended_round_id == round1.id
+    assert roster(final) != before
+    assert roster(final) == sorted(r.pk for r in finalists_for(entry, final).racers)
+
+
+@pytest.mark.parametrize(
+    "which, in_final",
+    [("current", True), ("last", False)],
+)
+def test_a_rerun_closes_the_intermission(waiting_final, which, in_final):
     """`current` is the final's first heat, and `last` is round 1's last
     heat, which the timer wrote."""
     event, round1, final, entry, finalists_for = waiting_final
-    target = {"current": (final.id, 1), "last": (round1.id, last_heat(round1))}[which]
+    assert round1.number == 1
+    target = (final.id, 1) if in_final else (round1.id, last_heat(round1))
     assert rerun(event, which, finalists_for=finalists_for) is None
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (*target, True)
-    assert_no_intermission(event)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert (now.current_round_id, now.current_heat) == target
+    assert now.racing
 
 
 def race_first_final_heat(event, final, finalists_for):
@@ -140,15 +173,22 @@ def end_round_1_again(event, round1, finalists_for):
 
 
 def test_a_final_that_has_a_result_does_not_wait_again(waiting_final):
-    """Round 1 ends again after the final's first heat. The final is the
-    next step and races on as a normal round: its next heat is current and
-    no intermission opens for Skip to end."""
+    """Round 1 ends again after the final's first heat, with no result
+    written after it ends. The final is the next step and races on as a
+    normal round: its next heat is current, racing stays off as the step
+    before it does not say `continue_racing`, and no intermission opens for
+    Skip to end."""
     event, round1, final, entry, finalists_for = waiting_final
+    assert round1.number == 1
     race_first_final_heat(event, final, finalists_for)
-    end_round_1_again(event, round1, finalists_for)
-    assert_no_intermission(event)
+    assert set_racing(event, False) is None
+    round_ended(round1, finalists_for)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 2, False)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == final.id
+    assert now.current_heat == 2
+    assert not now.racing
     assert_skip_refused(event, finalists_for)
     assert raced_heats(final) == [1]
 
@@ -157,12 +197,16 @@ def test_next_from_the_ended_round_does_not_make_a_raced_final_wait(waiting_fina
     """Next on round 1's last heat finds the round complete and ends it
     again with no result written."""
     event, round1, final, entry, finalists_for = waiting_final
+    assert round1.number == 1
     race_first_final_heat(event, final, finalists_for)
     assert select_heat(event, round_id=round1.id, heat=last_heat(round1)) is None
     advance(event, "next", report=False, finalists_for=finalists_for)
-    assert_no_intermission(event)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 2, False)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == final.id
+    assert now.current_heat == 2
+    assert not now.racing
 
 
 def test_a_final_that_has_a_result_goes_on_racing_when_the_step_continues():
@@ -173,13 +217,17 @@ def test_a_final_that_has_a_result_goes_on_racing_when_the_step_continues():
     round1 = start_playlist(event, finalists_for)
     race(round1)
     round_ended(round1, finalists_for)
-    final = state_of_event(event).waiting_entry
-    final = final.group.rounds.get(number=2)
+    entry = state_of_event(event).waiting_entry
+    final = entry.group.rounds.get(number=2)
     race_first_final_heat(event, final, finalists_for)
+    assert set_racing(event, False) is None
     round_ended(round1, finalists_for)
-    assert_no_intermission(event)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 2, True)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == final.id
+    assert now.current_heat == 2
+    assert now.racing
 
 
 def test_a_reinstate_onto_the_waiting_final_closes_the_intermission(waiting_final):
@@ -187,6 +235,7 @@ def test_a_reinstate_onto_the_waiting_final_closes_the_intermission(waiting_fina
     again from its last heat's Next, so the final waits again with no
     result. The reinstate brings that heat's result back."""
     event, round1, final, entry, finalists_for = waiting_final
+    assert round1.number == 1
     race_first_final_heat(event, final, finalists_for)
     assert rerun(event, "last", finalists_for=finalists_for) is None
     assert raced_heats(final) == []
@@ -196,7 +245,9 @@ def test_a_reinstate_onto_the_waiting_final_closes_the_intermission(waiting_fina
 
     assert reinstate(event, finalists_for=finalists_for) is None
     assert raced_heats(final) == [1]
-    assert_no_intermission(event)
+    now = state_of_event(event)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
 
 
 def test_undoing_a_discard_on_the_waiting_final_closes_the_intermission(waiting_final):
@@ -216,13 +267,17 @@ def test_undoing_a_discard_on_the_waiting_final_closes_the_intermission(waiting_
         restore_results(event, final, 1, cleared, finalists_for=finalists_for) is None
     )
     assert raced_heats(final) == [1]
-    assert_no_intermission(event)
+    now = state_of_event(event)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
 
 
 def test_skip_does_not_stop_at_a_next_step_that_has_a_result():
-    """The step after a skipped final waits too, and its round has one heat
-    raced. It starts as a step that does not wait: its next heat is current
-    with racing on."""
+    """D136: "Skip never passes a final that has a result". The step after
+    a skipped final waits too, and its round has a heat raced. Were the
+    intermission to move to it, the next Skip would pass a round that has a
+    result. So it starts as a step that does not wait: its next heat is
+    current with racing on."""
     replay, _ = two_step_playlist(waits=True, continue_racing=False)
     event = replay.event
     PlaylistEntry.objects.filter(event=event, seq=3).update(waits_for_operator=True)
@@ -230,8 +285,8 @@ def test_skip_does_not_stop_at_a_next_step_that_has_a_result():
     scouts = start_playlist(event, finalists_for)
     race(scouts)
     round_ended(scouts, finalists_for)
-    outlaws = PlaylistEntry.objects.get(event=event, seq=3)
-    outlaws = outlaws.group.rounds.get(number=1)
+    next_step = PlaylistEntry.objects.get(event=event, seq=3)
+    outlaws = next_step.group.rounds.get(number=1)
     generate_schedule(outlaws, 1)
     HeatLane.objects.filter(round=outlaws, heat=1).update(
         finish_time=3.0, completed=timezone.now()
@@ -240,6 +295,9 @@ def test_skip_does_not_stop_at_a_next_step_that_has_a_result():
     assert raced_heats(outlaws) == [1]
 
     assert skip_waiting_step(event, finalists_for) == outlaws
-    assert_no_intermission(event)
     now = state_of_event(event)
-    assert (now.current_round_id, now.current_heat, now.racing) == (outlaws.id, 2, True)
+    assert now.waiting_entry_id is None
+    assert now.ended_round_id is None
+    assert now.current_round_id == outlaws.id
+    assert now.current_heat == 2
+    assert now.racing

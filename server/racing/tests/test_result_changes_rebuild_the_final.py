@@ -69,10 +69,11 @@ def test_a_rerun_and_its_new_timer_result_rebuild_the_final(intermission):
     now.last_heat = {"round_id": round1.id, "heat": heat, "results": None}
     now.save()
     assert rerun(event, "last") is None
-    assert roster(final) == before
     after_rerun = state_of_event(event)
     assert after_rerun.waiting_entry_id is None
-    assert (after_rerun.current_round_id, after_rerun.current_heat) == (round1.id, heat)
+    assert roster(final) == before
+    assert after_rerun.current_round_id == round1.id
+    assert after_rerun.current_heat == heat
     assert after_rerun.racing
 
     record_timer_result(event, fast(round1, heat))

@@ -349,7 +349,9 @@ def close_intermission_on_result(event) -> None:
     begun. The current heat and racing stay as they are."""
     with transaction.atomic():
         state = lock_race_state(event.id)
-        if state.waiting_entry_id is None or _waits(state.waiting_entry):
+        if state.waiting_entry_id is None:
+            return
+        if not _has_result(_round_of(state.waiting_entry)):
             return
         state.waiting_entry = None
         state.ended_round = None
