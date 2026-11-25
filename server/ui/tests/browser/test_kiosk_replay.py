@@ -12,33 +12,35 @@ from playwright.sync_api import expect
 from ui.tests.browser.helpers import pause_clock_at
 from ui.tests.race import race_round, race_setup, scheduled
 
-# The page logs `replay-started` with the list's glide offset at that
-# moment, and each results/rounds/ fetch with its time.
-RECORD = """window.__log = [];
-window.addEventListener('message', (e) => {
+# The page records the message the test posts, `replay-started`, with
+# the list's glide offset at that moment, and the time of each fetch.
+RECORD = """window.__fetches = [];
+window.addEventListener('message', () => {
   const rounds = document.querySelector('[data-rounds]');
-  window.__log.push({at: performance.now(), message: e.data,
-                     transform: rounds ? rounds.style.transform : null});
+  window.__started = {at: performance.now(), transform: rounds.style.transform};
 });
 const send = window.fetch;
-window.fetch = function (url, ...rest) {
-  if (String(url).includes('/results/rounds/')) {
-    window.__log.push({at: performance.now(), fetch: String(url)});
-  }
-  return send.call(this, url, ...rest);
+window.fetch = function (...args) {
+  window.__fetches.push(performance.now());
+  return send.apply(this, args);
 };"""
 
-# After the message: a results/rounds/ fetch, and the list moved.
-POLLED_AND_GLIDED = """() => {
-  const [started] = window.__log.filter((e) => e.message === 'replay-started');
-  if (!started) return false;
-  const fetched = window.__log.some((e) => e.fetch && e.at > started.at);
-  const now = document.querySelector('[data-rounds]').style.transform;
-  return fetched && now !== started.transform;
+# After the message: a poll's fetch.
+POLLED = """() => {
+  const started = window.__started;
+  return window.__fetches.some((at) => at > started.at);
 }"""
 
-# Within one poll's wait (1 s, kiosk-results.js) and its reply, and 25 of
-# the glide's 40 ms steps: slack 4000 ms less that reply.
+# After the message: the list moved.
+GLIDED = """() => {
+  const started = window.__started;
+  return document.querySelector('[data-rounds]').style.transform !== started.transform;
+}"""
+
+# After the message a poll goes out at most one poll's wait (1 s,
+# kiosk-results.js) after the reply of one still out, and the glide steps
+# every 40 ms: slack 4000 ms less that reply for POLLED, and 4960 ms for
+# GLIDED.
 RESULTS_WAIT_MS = 5000
 
 PAUSED_AT = datetime(2026, 11, 9, 12, 0, 0)
@@ -56,9 +58,9 @@ def raced(event):
 
 @pytest.mark.sizes("desktop", reason="the kiosk is a TV")
 def test_the_results_kiosk_polls_and_glides_through_a_replay(page, event, raced):
-    """After `replay-started`, results-by-racer still asks results/rounds/
-    and its list still glides (D140). The wait is `RESULTS_WAIT_MS`, with
-    its slack beside it."""
+    """After `replay-started`, results-by-racer still polls (results/rounds/
+    and the intermission, both every second) and its list still glides
+    (D140). Each wait is `RESULTS_WAIT_MS`, with its slack beside it."""
     page.add_init_script(RECORD)
     page.goto("/kiosk.php?page=kiosks/results-by-racer.kiosk")
     expect(page.locator("[data-result] [data-shown]").first).not_to_be_empty()
@@ -68,8 +70,15 @@ def test_the_results_kiosk_polls_and_glides_through_a_replay(page, event, raced)
         "(() => { const r = document.querySelector('[data-results]');"
         " return r.querySelector('[data-rounds]').scrollHeight > r.clientHeight; })()"
     ), "the results fit the screen; the test checks no glide"
-    page.evaluate("() => window.postMessage('replay-started', '*')")
-    page.wait_for_function(POLLED_AND_GLIDED, timeout=RESULTS_WAIT_MS)
+    # The evaluate resolves once the page has recorded the message.
+    page.evaluate(
+        """() => new Promise((done) => {
+          window.addEventListener('message', () => done());
+          window.postMessage('replay-started', '*');
+        })"""
+    )
+    page.wait_for_function(POLLED, timeout=RESULTS_WAIT_MS)
+    page.wait_for_function(GLIDED, timeout=RESULTS_WAIT_MS)
 
 
 def first_row(page):

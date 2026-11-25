@@ -618,6 +618,29 @@ def test_a_poll_reply_that_lands_during_a_replay_is_applied(login, event):
     assert titles[2]["at"] - ended >= REPLAY_LINGER_MS, (ended, titles[2])
 
 
+@pytest.mark.sizes("desktop", reason="the kiosk is a TV")
+def test_now_racing_stays_paused_through_another_message(login, event):
+    """A message other than `replay-ended` during a replay leaves now racing
+    paused, since PHP's on_message() resumes only on `replay-ended`
+    (now-racing.js:10). The test's own listener, added after the page's,
+    resolves once the page has handled the message."""
+    lions = scheduled(race_setup(event, groups=(("Lions", 4),))["Lions"], race=False)
+    page = login("RaceCoordinator")
+    post(page, action="heat.select", roundid=str(lions.pk), heat="1", now_racing="1")
+    page.goto("/kiosk.php?page=kiosks/now-racing.kiosk")
+    expect(page.locator("[data-banner-title]")).to_have_text("Heat 1 of 4")
+    page.evaluate("() => window.postMessage('replay-started', '*')")
+    page.wait_for_function("window.Kiosk.paused === true")
+    page.evaluate(
+        """() => new Promise((done) => {
+          window.addEventListener('message', () => done());
+          window.postMessage('another', '*');
+        })"""
+    )
+    # one read: the page has handled the message, and nothing else posts.
+    assert page.evaluate("window.Kiosk.paused") is True
+
+
 @pytest.mark.sizes("desktop", reason="the replay station is a laptop")
 @pytest.mark.parametrize("hold_ms", [0, 900], ids=["no_hold", "held_900ms"])
 def test_race_starts_times_out_and_the_late_replay_is_ignored(login, event, hold_ms):
