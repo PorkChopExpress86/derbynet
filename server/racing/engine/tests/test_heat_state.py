@@ -102,11 +102,20 @@ def test_racing_on_sends_start_and_applies_the_racing_scene():
     assert decision.effects == (start(7, 2), ApplyRacingScene())
 
 
-def test_racing_on_from_the_playlist_keeps_the_scene_and_the_intermission():
+def test_racing_on_from_the_playlist_keeps_the_scene_and_closes_the_intermission():
     state = State(round_id=7, heat=2, intermission=True)
     decision = decide(state, RacingOn(By.PLAYLIST), ROUND)
-    assert decision.state == State(round_id=7, heat=2, racing=True, intermission=True)
+    assert decision.state == State(round_id=7, heat=2, racing=True)
     assert decision.effects == (start(7, 2),)
+
+
+@pytest.mark.parametrize("by", list(By))
+def test_racing_on_closes_the_intermission_whoever_turns_it_on(by):
+    """Racing never runs with the intermission open (#514)."""
+    state = State(round_id=7, heat=2, intermission=True)
+    decision = decide(state, RacingOn(by), ROUND)
+    assert decision.state.racing
+    assert not decision.state.intermission
 
 
 def test_racing_on_for_a_rerun_resets_the_timer():
