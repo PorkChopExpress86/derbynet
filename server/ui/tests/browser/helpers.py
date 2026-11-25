@@ -109,3 +109,18 @@ def pause_clock_at(page, at):
     assert page.url == "about:blank", f"pause_clock_at on a loaded page: {page.url}"
     page.clock.install(time=at - timedelta(minutes=1))
     page.clock.pause_at(at)
+
+
+# Posts `message` to the page and resolves once the page's own listeners
+# have run: this listener is added after theirs, and listeners run in the
+# order they were added.
+POST_MESSAGE = """(message) => new Promise((done) => {
+  window.addEventListener('message', () => done(), {once: true});
+  window.postMessage(message, '*');
+})"""
+
+
+def post_message(page, message):
+    """Post `message` to `page`, as replay.js posts to its kiosk frame, and
+    return once the page has handled it."""
+    page.evaluate(POST_MESSAGE, message)
