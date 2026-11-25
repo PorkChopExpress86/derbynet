@@ -339,9 +339,12 @@ if [ -n "$pushed" ]; then
 fi
 # plan/bin reads server/ and .github/, so plan/tests run on every push.
 # source-checks.sh, below, runs them on a push it checks; #311's push ran
-# them twice, and the second run alone took 603 s (#311 retro).
+# them twice, and the second run alone took 603 s (#311 retro). The line says
+# why: #519's implementer started source-checks.sh by hand after an .agents/
+# push, then dropped it (#519 retro).
 if [ -z "$changed" ]; then
-  echo "pre-push: plan/tests" >&2
+  echo "pre-push: plan/tests alone, since the push changes no path" \
+       "tools/source-checks.sh reads" >&2
   if ! out="$(python3 -I -m unittest discover -s "$ROOT/plan/tests" 2>&1 </dev/null)"; then
     printf '%s\n' "$out" >&2
     exit 1

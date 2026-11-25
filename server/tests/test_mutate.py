@@ -768,6 +768,9 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
         "SKIPPED   notes.md: 2 not run, in no source file\n"
         "SKIPPED   test_mod.py: 2 not run, in a test file"
         " (name it with --file to mutate its helpers)\n"
+        # The round ends in its tally line, as the Implement step's hand-off
+        # reads it: #513's and #519's refusals printed none (#519 retro).
+        "0 listed: none for the diff, so the round is hand mutants\n"
     )
 
 

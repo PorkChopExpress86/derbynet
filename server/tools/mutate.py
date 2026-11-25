@@ -658,13 +658,18 @@ def listed(args) -> int:
     if not found:
         # #367's diff (PR #392) changed only tests/test_mutate.py, so it
         # listed no mutant, and its dropped marker write died only by a clock
-        # race (#367 retro).
+        # race (#367 retro). The tally line still ends the round: #513's and
+        # #519's refusals printed none, which the hand-off step reads for
+        # (#519 retro). #519's hand mutant of a helper other callers share
+        # errored in their fixtures, so the refusal names the call site.
         print(
             "mutate.py: refused: no mutant listed for the diff. Mutate each step"
             " the changed tests take by hand, one per call (--file, --old, --new),"
-            " and see each fail on the test's own assert, not on a bound",
+            " at the diff's own call site rather than in a helper other callers"
+            " share, and see each fail on the test's own assert, not on a bound",
             file=sys.stderr,
         )
+        print("0 listed: none for the diff, so the round is hand mutants")
         return REFUSED
     paths = list(dict.fromkeys(root / m.path for m in found))
     locks, saved = [], {}
