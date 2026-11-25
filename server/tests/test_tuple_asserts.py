@@ -13,7 +13,6 @@ import ast
 from pathlib import Path
 
 SERVER = Path(__file__).resolve().parent.parent
-SKIP = {".venv", "node_modules", "var", "__pycache__"}
 
 # Each test file whose tuple asserts predate this check, with how many it
 # holds; not reviewed against the rule. Lower a count or remove an entry
@@ -117,7 +116,7 @@ def tuple_asserts(source: str) -> list[int]:
 def counts() -> dict[str, list[int]]:
     found = {}
     for path in sorted(SERVER.rglob("test_*.py")):
-        if SKIP.intersection(path.relative_to(SERVER).parts):
+        if ".venv" in path.relative_to(SERVER).parts:
             continue
         if lines := tuple_asserts(path.read_text(encoding="utf-8")):
             found[path.relative_to(SERVER).as_posix()] = lines
@@ -144,12 +143,42 @@ def timed(heats):
     assert tuple_asserts(source) == [3, 4, 15]
 
 
-def test_no_test_file_adds_a_tuple_assert():
-    found = [
+def added(found: dict[str, list[int]], known: dict[str, int]) -> list[str]:
+    """Each file of `found` that holds more tuple asserts than `known` lets."""
+    return [
         f"{name}: lines {lines}"
-        for name, lines in counts().items()
-        if len(lines) > KNOWN.get(name, 0)
+        for name, lines in found.items()
+        if len(lines) > known.get(name, 0)
     ]
+
+
+def stale(found: dict[str, list[int]], known: dict[str, int]) -> dict:
+    """Each `known` file that now holds fewer: (known, held)."""
+    return {
+        name: (count, len(found.get(name, [])))
+        for name, count in known.items()
+        if len(found.get(name, [])) < count
+    }
+
+
+def test_a_new_file_or_a_raised_count_is_added_and_a_lowered_one_stale():
+    found = {"a.py": [3], "b.py": [4, 9], "c.py": [5]}
+    known = {"b.py": 1, "c.py": 1, "d.py": 2}
+    assert added(found, known) == ["a.py: lines [3]", "b.py: lines [4, 9]"]
+    assert stale(found, known) == {"d.py": (2, 0)}
+    assert stale({"d.py": [1], "d2.py": [1, 2]}, {"d.py": 2, "d2.py": 2}) == {
+        "d.py": (2, 1)
+    }
+
+
+def test_the_test_files_are_read():
+    found = counts()
+    assert "racing/tests/test_result_changes_rebuild_the_final.py" in found
+    assert not [name for name in found if name.startswith(".venv/")]
+
+
+def test_no_test_file_adds_a_tuple_assert():
+    found = added(counts(), KNOWN)
     assert found == [], (
         "write one assert per field, so a failure names the field "
         f"(tests/test_tuple_asserts.py): {found}"
@@ -159,12 +188,8 @@ def test_no_test_file_adds_a_tuple_assert():
 def test_the_known_tuple_asserts_only_shrink():
     """A KNOWN count that is higher than its file holds is lowered, so the
     list only shrinks."""
-    held = {name: len(lines) for name, lines in counts().items()}
-    stale = {
-        name: (count, held.get(name, 0))
-        for name, count in KNOWN.items()
-        if held.get(name, 0) < count
-    }
-    assert stale == {}, "lower each count to what its file holds (known, held)"
+    assert stale(counts(), KNOWN) == {}, (
+        "lower each count to what its file holds (known, held)"
+    )
     assert len(KNOWN) <= KNOWN_FILES
     assert sum(KNOWN.values()) <= KNOWN_ASSERTS

@@ -13,16 +13,16 @@ tree is frozen.
 Run: python3 -I -m unittest discover -s plan/tests
 """
 import re
-import subprocess
 import unittest
 from pathlib import Path
 
 import k_patterns  # noqa: F401  a -k that matches no test is refused
+from test_skill_sync_commits import git
 
 ROOT = Path(__file__).resolve().parents[2]
 # `heats.py:342`, `heats.py:342-358`, `heat_state.py line 717`, `x.tla, lines 3-4`.
 CITE = re.compile(
-    r'(?<![\w/.-])(?P<file>(?:[\w-]+/)*[\w.-]+\.(?:py|js|mjs|css|html|kiosk|tla|cfg|sh|md))'
+    r'(?:(?:[\w-]+/)*[\w.-]+\.(?:py|js|mjs|css|html|kiosk|tla|cfg|sh|md))'
     r'(?:`?:|`?,? lines? )\d+(?:-\d+)?')
 
 
@@ -33,19 +33,14 @@ def line_cites(text: str) -> list[tuple[int, str]]:
 
 
 def skill_files(root: Path) -> list[str]:
-    out = subprocess.run(['git', '-C', str(root), 'ls-files', '-z', '--', '.agents/skills'],
-                         capture_output=True, text=True, check=True).stdout
-    return out.split('\0')[:-1]
+    return git(root, 'ls-files', '-z', '--', '.agents/skills').stdout.split('\0')[:-1]
 
 
 class SkillLineCites(unittest.TestCase):
     def test_no_skill_cites_a_line_of_the_port(self):
         found = []
         for name in skill_files(ROOT):
-            try:
-                text = (ROOT / name).read_text()
-            except UnicodeDecodeError:
-                continue
+            text = (ROOT / name).read_text()
             found += [f'{name}:{n}: {cite}' for n, cite in line_cites(text)]
         self.assertEqual(found, [], 'name the function, or the TABLE row, instead of its '
                          'line: lines move with every commit, the sync commit only after a '
@@ -59,6 +54,16 @@ class SkillLineCites(unittest.TestCase):
             (1, 'heats.py:342-358'), (1, 'playlist.py:319-360'), (2, 'results.py:198'),
             (3, 'heat_state.py` line 717'), (3, 'HeatIntermission.tla`, lines 3-4')])
 
+    def test_each_kind_of_port_file_is_read(self):
+        text = ('server/racing/services/heats.py:12 view.mjs:3 a.js:1 b.css:2 c.html:4\n'
+                'd.kiosk:5 HeatIntermission.cfg:6 check.sh:7 SKILL.md:8\n')
+        self.assertEqual([cite for _, cite in line_cites(text)], [
+            'server/racing/services/heats.py:12', 'view.mjs:3', 'a.js:1', 'b.css:2', 'c.html:4',
+            'd.kiosk:5', 'HeatIntermission.cfg:6', 'check.sh:7', 'SKILL.md:8'])
+
+    def test_the_skills_files_are_read(self):
+        self.assertIn('.agents/skills/heat-intermission/HeatIntermission.tla', skill_files(ROOT))
+
     def test_a_function_a_php_line_and_a_sha_are_no_cite(self):
         text = ('select_heat in heats.py, the "select heat" row of TABLE\n'
                 'D135, where PHP keeps the roster (playlist.inc:85)\n'
@@ -67,6 +72,3 @@ class SkillLineCites(unittest.TestCase):
                 'heats.py:transition, and 4461173 states\n')
         self.assertEqual(line_cites(text), [])
 
-
-if __name__ == '__main__':
-    unittest.main()
