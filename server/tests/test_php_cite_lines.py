@@ -206,6 +206,7 @@ def test_a_cite_to_a_blank_line_a_brace_or_no_file_is_found():
     assert check("website/js/now-racing.js:6-7") == comment
     assert check("its TODO, now-racing.js:6-7") is None
     assert check("the header comment, `action.photo.rotate.inc:5`") is None
+    assert check("the echo is commented out, `website/vote.php:152`") is None
     # The word is near the cite, so it excuses no other cite on the line;
     # TODO is matched in capitals, so "mastodon" is no TODO (#512 review).
     far = "a comment at `action.photo.rotate.inc:5`, and code at "
