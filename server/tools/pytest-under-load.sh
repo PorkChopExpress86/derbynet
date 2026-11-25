@@ -221,37 +221,42 @@ trap stop_all EXIT
 trap 'trap "" TERM INT HUP; exit 143' TERM INT HUP
 
 # Under its holder, a --no-load step takes no lock, joins no line and
-# writes no holder lines: the holder's stay.
+# writes no holder lines: the holder's stay (LINE_STATE held).  The join's
+# verdict is read by a command of its own, outside the `if`: bash drops a
+# whole command on an arithmetic error, the `if` around a join included.
 KIND=load-run
 [ -n "$NO_LOAD" ] && KIND=hand-off
+trap 'line_fail "$BASH_COMMAND"' ERR
+LINE_STATE=
 if [ -n "$UNDER_HOLDER" ]; then
-  refuse_used_folder
+  LINE_STATE=held
 else
-  trap 'line_fail "$BASH_COMMAND"' ERR
   line_join "$KIND" "$(printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s' \
     "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS")"
-  if [ "$LINE_STATE" = queued ]; then
-    echo "Waiting for the load lock $LOCK, held by:"
-    # Empty from the holder's truncation until its one write lands.
-    { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
-    since=$(date +%s)
-    # It sleeps between its tries in the background, so a signal's trap runs
-    # during the wait: bash runs a trap only once a foreground command ends.
-    # The lock is on the file fd 9 opened, so it stays with this script once
-    # the try's flock exits.
-    line_wait_turn
-    echo "Got the load lock after $(( $(date +%s) - since )) s"
-  elif [ "$LINE_STATE" != took ]; then
-    line_fail "the join gave no place and no lock"
-  fi
-  trap - ERR
-  refuse_used_folder
-  # One write of the whole text.
+fi
+if [ "$LINE_STATE" = queued ]; then
+  echo "Waiting for the load lock $LOCK, held by:"
+  # Empty from the holder's truncation until its one write lands.
+  { [ -s "$LOCK" ] && sed 's/^/  /' "$LOCK"; } || echo "  (no details yet)"
+  since=$(date +%s)
+  # It sleeps between its tries in the background, so a signal's trap runs
+  # during the wait: bash runs a trap only once a foreground command ends.
+  # The lock is on the file fd 9 opened, so it stays with this script once
+  # the try's flock exits.
+  line_wait_turn
+  echo "Got the load lock after $(( $(date +%s) - since )) s"
+elif [ "$LINE_STATE" != took ] && [ "$LINE_STATE" != held ]; then
+  line_fail "the join gave no place and no lock"
+fi
+trap - ERR
+refuse_used_folder
+# One write of the whole text.
+if [ "$LINE_STATE" != held ]; then
   printf 'pid %s, since %s\ncwd %s\nhead %s\nargs %s\n' \
     "$$" "$(date '+%Y-%m-%d %H:%M:%S')" "$PWD" "$HEAD_SHA" "$ALL_ARGS" >"$LOCK"
-  # Out of the line, now that it holds the lock.
-  line_leave
 fi
+# Out of the line, now that it holds the lock.
+line_leave
 
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"

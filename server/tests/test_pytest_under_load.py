@@ -203,18 +203,9 @@ def test_holds():
 
 
 def start(
-    tmp_path,
-    name,
-    lock,
-    extra_env=None,
-    go=False,
-    loops=1,
-    under=(),
-    script=SCRIPT,
-    options=(),
+    tmp_path, name, lock, extra_env=None, go=False, loops=1, under=(), script=SCRIPT
 ):
-    """The script (or `script`, a copy of it), with `options` of its own, on
-    a stub of its own in
+    """The script (or `script`, a copy of it) on a stub of its own in
     `tmp_path/name`, in a session of its own so the test can kill all it
     started, with its output in `tmp_path/name.out` (a file, as
     run_in_background gives it). With `go` its stub passes at once; `under`
@@ -237,7 +228,6 @@ def start(
             *RESET_SIGNALS_ARGV,
             *under,
             str(script),
-            *options,
             "--loops",
             str(loops),
             "-p",
@@ -2496,10 +2486,23 @@ def test_a_clean_rerun_with_no_veth_count_keeps_pytest_s_status(
     ) in out
 
 
-# A stub test body that counts the busy loops the script runs beside it:
-# the children of its nearest ancestor that runs pytest-under-load.sh whose
-# command line is the loop's.
-COUNT_LOOPS = """\
+@pytest.mark.parametrize(
+    "loops, options, counted",
+    [
+        ("--loops 2", "", 2),
+        ("", "--no-load", 0),
+        ("--loops 2", "--no-load", 0),
+        ("", "--no-load --loops 2", 0),
+    ],
+    ids=["loops", "no-load", "loops-then-no-load", "no-load-then-loops"],
+)
+def test_no_load_runs_pytest_with_no_busy_loops(tmp_path, loops, options, counted):
+    """D138: a hand-off's browser step runs once with no load, whatever
+    --loops says; the control run counts its two loops."""
+    # The stub counts the busy loops the script runs beside it: the
+    # children of its nearest ancestor that runs pytest-under-load.sh
+    # whose command line is the loop's.
+    count_loops = """\
     import os
     from pathlib import Path
 
@@ -2519,23 +2522,8 @@ COUNT_LOOPS = """\
         except (OSError, ValueError):
             pass
     Path(__file__).with_name("loops").write_text(str(loops))
-"""
-
-
-@pytest.mark.parametrize(
-    "loops, options, counted",
-    [
-        ("--loops 2", "", 2),
-        ("", "--no-load", 0),
-        ("--loops 2", "--no-load", 0),
-        ("", "--no-load --loops 2", 0),
-    ],
-    ids=["loops", "no-load", "loops-then-no-load", "no-load-then-loops"],
-)
-def test_no_load_runs_pytest_with_no_busy_loops(tmp_path, loops, options, counted):
-    """D138: a hand-off's browser step runs once with no load, whatever
-    --loops says; the control run counts its two loops."""
-    code, out, _ = load_run_of(tmp_path, COUNT_LOOPS, loops=loops, options=options)
+    """
+    code, out, _ = load_run_of(tmp_path, count_loops, loops=loops, options=options)
     assert code == 0, out
     assert (tmp_path / "loops").read_text() == str(counted)
     assert ("No load (D138): " in out) == (counted == 0), out
@@ -2603,7 +2591,22 @@ def test_a_no_load_step_waits_in_the_line_as_a_hand_off(tmp_path):
     lock, held = held_lock(tmp_path)
     run = None
     try:
-        run = start(tmp_path, "step", lock, go=True, options=("--no-load",))
+        step = tmp_path / "step"
+        step.mkdir()
+        (step / "test_step.py").write_text(HOLD)
+        (step / "go").write_text("")
+        env = {**os.environ, "DERBYNET_LOAD_RUN_DIR": str(tmp_path / "step-run")}
+        env["DERBYNET_LOAD_LOCK"] = str(lock)
+        env.pop("DERBYNET_LOAD_LOCK_HELD", None)
+        with open(tmp_path / "step.out", "w") as out:
+            run = subprocess.Popen(
+                [str(SCRIPT), "--no-load", "-p", "no:cacheprovider", str(step)],
+                stdout=out,
+                stderr=subprocess.STDOUT,
+                cwd=tmp_path,
+                env=env,
+                start_new_session=True,
+            )
         wait_until(lambda: entries(lock), "its entry in the line", 30)
         [entry] = entries(lock)
         kind = Path(f"{os.path.realpath(lock)}.line/{entry}").read_text()

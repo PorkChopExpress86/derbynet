@@ -3222,8 +3222,8 @@ def dejavu_commands(out, naming=''):
 class FontUnderLoad(unittest.TestCase):
     """D133: a kiosk browser file repeats under load in the default font
     only, and the one DejaVu Sans run it gets is the hand-off's line, which
-    runs with no load on the load lock (D138); any other file that measures text keeps
-    both fonts under load."""
+    runs with no load on the load lock (D138); any other file that measures
+    text keeps both fonts under load."""
 
     KIOSK = 'ui/tests/browser/test_kiosk_sheet.py'
     DEJAVU = 'DERBYNET_BROWSER_FONT="DejaVu Sans"'
