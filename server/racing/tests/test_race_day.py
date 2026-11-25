@@ -408,6 +408,28 @@ def test_a_changed_result_leaves_a_waiting_round_of_another_group_alone():
     assert racers == 14 and heats
 
 
+def test_a_round_that_ends_again_leaves_a_waiting_round_of_another_group_alone():
+    """D135 rebuilds a final from the round that fed it. Outlaw round 1
+    waits after the Scouts final, and the final ending again keeps its
+    racers and chart."""
+    replay = race_day(4, 8)
+    finalists_for = playlist_finalists()
+    replay.ids.sync()
+    scouts = start_playlist(replay.event, finalists_for)
+    race(scouts)
+    round_ended(scouts, finalists_for)
+    final = start_waiting_step(replay.event)
+    race(final)
+    round_ended(final, finalists_for)
+    outlaws = Round.objects.get(group__name="Outlaw", number=1)
+    assert state(replay).waiting_entry.group == outlaws.group
+    racers, heats = outlaws.roster.count(), chart(replay, outlaws)
+    round_ended(final, finalists_for)
+    assert state(replay).waiting_entry.group == outlaws.group
+    assert (outlaws.roster.count(), chart(replay, outlaws)) == (racers, heats)
+    assert racers and heats
+
+
 def one_finalist(replay):
     one = [replay.racer(car=108)]
     return lambda entry, round: Entrants(tuple(one))

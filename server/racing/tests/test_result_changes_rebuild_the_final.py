@@ -1,15 +1,18 @@
 """D27 through the result services: a rerun, a reinstate, a manual result,
 a result delete, or the new timer result after a rerun, on the round that
 just ended, rebuilds the waiting final from the standings in the same
-transaction, until a heat of the final has a result (#20, "Race-day flow")."""
+transaction, until a heat of the final has a result (#20, "Race-day flow").
+
+D135: the round ending again rebuilds it too, so a rerun made while the
+intermission was closed does not leave the old finalists waiting (#500)."""
 
 import pytest
 from django.utils import timezone
 
 from core.models import RaceState
-from racing.models import HeatLane, RosterEntry, Round
-from racing.services.heats import reinstate, rerun
-from racing.services.playlist import round_ended, start_playlist
+from racing.models import HAS_RESULT, HeatLane, PlaylistEntry, RosterEntry, Round
+from racing.services.heats import reinstate, rerun, select_heat
+from racing.services.playlist import round_ended, start_playlist, start_waiting_step
 from racing.services.results import (
     delete_results,
     record_manual_result,
@@ -188,3 +191,134 @@ def test_a_reordered_cut_rebuilds_the_final_in_its_new_order(intermission):
         )
         == cut
     )
+
+
+# ----- the round ends again (D135) -----
+
+
+def slow(round, heat):
+    """Times that depend on the car, so no heat decides the cut alone."""
+    lanes = HeatLane.objects.filter(round=round, heat=heat).select_related("racer")
+    return fields(
+        "&".join(
+            f"lane{lane.lane}="
+            f"{(2000 + (lane.racer.car_number * 37 + lane.lane * 11) % 1000) / 1000}"
+            for lane in lanes.order_by("lane")
+        )
+    )
+
+
+def race_by_timer(event, round, finalists_for):
+    """Every heat of the current round from the timer, so its last result
+    ends the round as race day does."""
+    heats = HeatLane.objects.filter(round=round).values_list("heat", flat=True)
+    for heat in sorted(set(heats)):
+        assert state_of_event(event).current_heat == heat
+        record_timer_result(event, slow(round, heat), finalists_for=finalists_for)
+
+
+def timed(waits):
+    replay, finalists_for = two_step_playlist(waits=waits, continue_racing=False)
+    event = replay.event
+    round1 = start_playlist(event, finalists_for)
+    race_by_timer(event, round1, finalists_for)
+    final = Round.objects.get(group=round1.group, number=2)
+    now = state_of_event(event)
+    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 1, False)
+    entry = PlaylistEntry.objects.get(group=final.group, round_number=2)
+    return event, round1, final, entry, finalists_for
+
+
+@pytest.fixture
+def timed_intermission():
+    """Scouts round 1 raced through the timer, whose last result opens the
+    intermission before the final."""
+    made = timed(waits=True)
+    assert state_of_event(made[0]).waiting_entry_id == made[3].id
+    return made
+
+
+def chart_ids(round):
+    return sorted(HeatLane.objects.filter(round=round).values_list("id", flat=True))
+
+
+def test_a_rerun_made_while_the_intermission_was_closed_rebuilds_the_final(
+    timed_intermission,
+):
+    """#500: selecting the final closes the intermission, so the rerun and
+    its timer result change round 1 with no intermission open. The round
+    ends again, the intermission opens again, and the final holds the
+    racers the standings pick now."""
+    event, round1, final, entry, finalists_for = timed_intermission
+    before = roster(final)
+    assert select_heat(event, round_id=final.id, heat=1) is None
+    assert state_of_event(event).waiting_entry_id is None
+    assert rerun(event, "last", finalists_for=finalists_for) is None
+    heat = last_heat(round1)
+    now = state_of_event(event)
+    assert (now.current_round_id, now.current_heat, now.racing) == (
+        round1.id,
+        heat,
+        True,
+    )
+
+    record_timer_result(event, fast(round1, heat), finalists_for=finalists_for)
+    now = state_of_event(event)
+    assert now.waiting_entry_id == entry.id
+    assert (now.current_round_id, now.current_heat, now.racing) == (final.id, 1, False)
+    assert roster(final) == standings_say(final, entry, finalists_for) != before
+    assert set(
+        HeatLane.objects.filter(round=final).values_list("racer_id", flat=True)
+    ) == set(roster(final))
+
+
+def test_a_round_that_ends_again_with_the_same_finalists_keeps_the_final_chart(
+    timed_intermission,
+):
+    event, round1, final, entry, finalists_for = timed_intermission
+    before, chart = roster(final), chart_ids(final)
+    assert select_heat(event, round_id=final.id, heat=1) is None
+    assert rerun(event, "last", finalists_for=finalists_for) is None
+    record_timer_result(
+        event, slow(round1, last_heat(round1)), finalists_for=finalists_for
+    )
+    assert state_of_event(event).waiting_entry_id == entry.id
+    assert roster(final) == before == standings_say(final, entry, finalists_for)
+    assert chart_ids(final) == chart
+
+
+def test_a_round_that_ends_again_keeps_a_final_that_has_a_result(timed_intermission):
+    """The rebuild is for a final with no heat run. Round 1 ends again
+    after the final's first heat, and the final keeps its racers and that
+    heat's results."""
+    event, round1, final, entry, finalists_for = timed_intermission
+    before, chart = roster(final), chart_ids(final)
+    assert start_waiting_step(event) == final
+    record_timer_result(event, slow(final, 1), finalists_for=finalists_for)
+    raced = HeatLane.objects.filter(round=final).filter(HAS_RESULT)
+    unraced = HeatLane.objects.filter(round=final).exclude(HAS_RESULT)
+    assert raced.exists() and unraced.exists()
+    results = sorted(raced.values_list("id", "finish_time"))
+
+    heat = last_heat(round1)
+    assert select_heat(event, round_id=round1.id, heat=heat) is None
+    assert rerun(event, "current", finalists_for=finalists_for) is None
+    record_timer_result(event, fast(round1, heat), finalists_for=finalists_for)
+    assert standings_say(final, entry, finalists_for) != before
+    assert roster(final) == before
+    assert chart_ids(final) == chart
+    assert sorted(raced.values_list("id", "finish_time")) == results
+
+
+def test_a_final_that_does_not_wait_keeps_its_roster_as_php_does():
+    """D135 rebuilds a waiting final. A step that does not wait keeps the
+    roster it has, as PHP's playlist writes a roster only for a round with
+    none (`website/inc/playlist.inc:85`)."""
+    event, round1, final, entry, finalists_for = timed(waits=False)
+    assert state_of_event(event).waiting_entry_id is None
+    before = roster(final)
+    assert rerun(event, "last", finalists_for=finalists_for) is None
+    record_timer_result(
+        event, fast(round1, last_heat(round1)), finalists_for=finalists_for
+    )
+    assert roster(final) == before != standings_say(final, entry, finalists_for)

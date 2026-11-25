@@ -3,7 +3,7 @@ EXTENDS Naturals, Sequences
 
 (*
  * Formal model of DerbyNet's current-heat state machine, result services,
- * and playlist operator-gate intermission (owner decisions D27, D28, D32).
+ * and playlist operator-gate intermission (owner decisions D27, D28, D32, D135).
  *
  * Scope and bounds:
  *   - One group with a 2-step playlist:
@@ -62,7 +62,7 @@ R1Complete(r1Val) == r1Val[1] /= "none" /\ r1Val[2] /= "none"
 
 FinalHasResult(r2Val) == r2Val /= "none"
 
-(* Rebuild waiting final (D27): heats.py:342-358, playlist.py:314-342 *)
+(* Rebuild waiting final (D27): heats.py:342-358, playlist.py:319-360 *)
 RebuiltRoster(endedBefore, changedRnd, waitingAfter, r1After, r2After, rosterAfter) ==
     IF endedBefore /\ changedRnd = "R1" /\ waitingAfter /\ ~FinalHasResult(r2After)
     THEN r1After
@@ -86,7 +86,10 @@ Init ==
     /\ discardVal = "none"
     /\ nonCoordBreak = FALSE
 
-(* record_timer_result on R1: results.py:117-177, heat_state.py:644-684, playlist.py:170-211 *)
+(* record_timer_result on R1: results.py:117-177, heat_state.py:644-684, playlist.py:170-216.
+   The hook's _after_round rebuilds a built final that has no result from the
+   standings (D135), so the roster follows r1 whether or not the intermission
+   was open before the result. *)
 TimerFinishR1(val) ==
     /\ racing
     /\ curRound = "R1"
@@ -122,9 +125,7 @@ TimerFinishR1(val) ==
                       /\ curHeat' = 1
                       /\ racing' = FALSE
                       /\ waiting' = TRUE
-                      /\ finalRoster' =
-                           LET afterHook == IF finalBuilt THEN finalRoster ELSE r1New
-                           IN RebuiltRoster(endedBefore, "R1", TRUE, r1New, r2, afterHook)
+                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
           ELSE \* curHeat = 2
             IF R1Complete(r1New) THEN
                 \* no_target_after_round: OFF, PlaylistHook(R1)
@@ -141,9 +142,7 @@ TimerFinishR1(val) ==
                       /\ curHeat' = 1
                       /\ racing' = FALSE
                       /\ waiting' = TRUE
-                      /\ finalRoster' =
-                           LET afterHook == IF finalBuilt THEN finalRoster ELSE r1New
-                           IN RebuiltRoster(endedBefore, "R1", TRUE, r1New, r2, afterHook)
+                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
             ELSE
                 \* no_target: OFF
                 /\ curRound' = "R1"
@@ -210,9 +209,7 @@ ManualWriteR1(val, isCoord) ==
                       /\ curHeat' = 1
                       /\ racing' = FALSE
                       /\ waiting' = TRUE
-                      /\ finalRoster' =
-                           LET afterHook == IF finalBuilt THEN finalRoster ELSE r1New
-                           IN RebuiltRoster(endedBefore, "R1", TRUE, r1New, r2, afterHook)
+                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
           ELSE \* racing /\ curHeat = 2
             IF R1Complete(r1New) THEN
                 /\ IF FinalHasResult(r2) THEN
@@ -228,9 +225,7 @@ ManualWriteR1(val, isCoord) ==
                       /\ curHeat' = 1
                       /\ racing' = FALSE
                       /\ waiting' = TRUE
-                      /\ finalRoster' =
-                           LET afterHook == IF finalBuilt THEN finalRoster ELSE r1New
-                           IN RebuiltRoster(endedBefore, "R1", TRUE, r1New, r2, afterHook)
+                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
             ELSE
                 /\ curRound' = "R1"
                 /\ curHeat' = 2
@@ -378,7 +373,7 @@ RestoreResults(isCoord) ==
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal>>
 
-(* start_waiting_step: playlist.py:214-243 *)
+(* start_waiting_step: playlist.py:219-248 *)
 StartWaitingStep ==
     /\ waiting
     /\ finalBuilt
@@ -395,7 +390,7 @@ StartWaitingStep ==
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
-(* skip_waiting_step: playlist.py:261-291 *)
+(* skip_waiting_step: playlist.py:266-296 *)
 SkipWaitingStep ==
     /\ waiting
     /\ waiting' = FALSE
