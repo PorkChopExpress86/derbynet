@@ -185,7 +185,8 @@ def round_ended(round: Round, finalists_for: FinalistsFor) -> None:
     the intermission, and a final it already holds with no heat run is made
     again when the ended round now picks other finalists (D135); otherwise
     the step runs at once and racing turns back on if the ended step says
-    `continue_racing`. A step whose round has a result does not wait (D136).
+    `continue_racing`, which closes an intermission still open (#514). A step
+    whose round has a result does not wait (D136).
     A finish scene still shows while a step waits.
     """
     with transaction.atomic():

@@ -8,7 +8,11 @@ EXTENDS Naturals, Sequences
  * Scope and bounds:
  *   - One group with a 2-step playlist:
  *       Step 1: Round 1 ("R1") with 2 heats (1, 2), feeder round.
- *       Step 2: Round 2 ("R2") with 1 heat (1), waiting final (waits_for_operator = TRUE).
+ *       Step 2: Round 2 ("R2") with 1 heat (1), the final, which waits for the
+ *       operator until set_step_waits switches that off.
+ *   - The cut picks 2 racers or more, or one (D28), and changes at any time.
+ *     A cut that picks none is left out: _activate writes an empty roster
+ *     again, where RoundOneEnded has a step that does not wait keep its roster.
  *   - Each service call runs under lock_race_state(event.id) as one atomic step.
  *   - R1 heat results are abstracted to {"none", "v1", "v2"} so any result change
  *     that alters the finalist cut ("v1" <-> "v2" or "none") is observable.
@@ -28,6 +32,9 @@ VARIABLES
     r1,             \* [1..2 -> {"none", "v1", "v2"}] (HeatLane results for R1)
     r2,             \* {"none", "done"} (HeatLane result for Final R2 heat 1)
     finalBuilt,     \* BOOLEAN (Final has RosterEntry + HeatLane rows)
+    finalShort,     \* BOOLEAN (Final has a roster of one racer and no chart, D28)
+    stepWaits,      \* BOOLEAN (the final step's waits_for_operator)
+    cutShort,       \* BOOLEAN (the cut picks one racer now, too few for a final, D28)
     finalRoster,    \* <<r1[1], r1[2]>> snapshot from which Final's roster was built
     lastHeatRound,  \* "none", "R1", "R2" (RaceState.last_heat["round_id"])
     lastHeatNum,    \* 0, 1, 2 (RaceState.last_heat["heat"])
@@ -39,7 +46,7 @@ VARIABLES
 
 vars == <<
     curRound, curHeat, racing, waiting,
-    r1, r2, finalBuilt, finalRoster,
+    r1, r2, finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
     lastHeatRound, lastHeatNum, lastHeatSaved,
     discardRound, discardNum, discardVal,
     nonCoordBreak
@@ -62,17 +69,83 @@ R1Complete(r1Val) == r1Val[1] /= "none" /\ r1Val[2] /= "none"
 
 FinalHasResult(r2Val) == r2Val /= "none"
 
-(* close_intermission_on_result (D136), which rebuild_waiting_final calls
-   after every result change: the intermission stays open only while the
-   final has no result. *)
-StillWaiting(waitingBefore, r2After) == waitingBefore /\ ~FinalHasResult(r2After)
+(* The part of the race state the playlist changes: the current heat,
+   racing, the intermission, and the final's chart and roster. *)
+Now == [cr |-> curRound, ch |-> curHeat, rc |-> racing, w |-> waiting,
+        fb |-> finalBuilt, fs |-> finalShort, fr |-> finalRoster]
 
-(* Rebuild waiting final (D27): rebuild_waiting_final in heats.py,
-   rebuild_waiting_round in playlist.py *)
-RebuiltRoster(endedBefore, changedRnd, waitingAfter, r1After, r2After, rosterAfter) ==
-    IF endedBefore /\ changedRnd = "R1" /\ waitingAfter /\ ~FinalHasResult(r2After)
-    THEN r1After
-    ELSE rosterAfter
+Becomes(s) ==
+    /\ curRound' = s.cr
+    /\ curHeat' = s.ch
+    /\ racing' = s.rc
+    /\ waiting' = s.w
+    /\ finalBuilt' = s.fb
+    /\ finalShort' = s.fs
+    /\ finalRoster' = s.fr
+
+(* rebuild_waiting_final in heats.py, which every result change calls.
+   close_intermission_on_result (D136): the intermission stays open only
+   while the final has no result. Then rebuild_waiting_round (D27), when
+   Round 1 changed with the intermission open: the final is made again from
+   the standings and the cut as they are now. A cut of one racer leaves it
+   a roster and no chart (D28). unschedule cancels the final when
+   it is the current round, and _activate selects its first heat again when
+   it has one; a current heat in Round 1 stays. Where the cut picks the same
+   racers the code keeps the chart and the model makes it again, which
+   differs only with racing on, and NoRacingDuringIntermission has racing
+   off here. *)
+Rebuilt(s, endedBefore, changedR1, r1After, r2After) ==
+    LET open == s.w /\ ~FinalHasResult(r2After)
+        t == [s EXCEPT !.w = open]
+        u == [t EXCEPT !.fr = r1After, !.fb = ~cutShort, !.fs = cutShort]
+    IN
+    IF ~(endedBefore /\ changedR1 /\ open) THEN t
+    ELSE IF s.cr = "R1" THEN u
+    ELSE IF cutShort THEN [u EXCEPT !.cr = "none", !.ch = 0, !.rc = FALSE]
+    ELSE [u EXCEPT !.cr = "R2", !.ch = 1, !.rc = FALSE]
+
+(* round_ended and _after_round in playlist.py, for Round 1. The Advance
+   row has turned racing off and the current heat is Round 1's last.
+   A final that has a result is passed (_is_raced). Otherwise a step that
+   waits has its final made again from the standings (D135), and one that
+   does not wait keeps the roster it has (_activate). A final with a chart
+   gets its first heat selected (_select). A step that waits opens the
+   intermission (_waits). One that does not leaves the intermission as it
+   was, and with continue_racing (cont) on Round 1's step the playlist turns
+   racing on (_racing_on), where _RACING_ON_EXTRAS[By.PLAYLIST] closes the
+   intermission (#514). The racing-on rows of TABLE refuse a current heat
+   that has a result, as Round 1's last heat does when the final has no
+   chart. *)
+RoundOneEnded(s, r1Now, cont) ==
+    IF FinalHasResult(r2) THEN s
+    ELSE
+    LET remade == stepWaits \/ ~(s.fb \/ s.fs)
+        short == IF remade THEN cutShort ELSE s.fs
+        t == [s EXCEPT !.fb = ~short, !.fs = short,
+                       !.fr = IF remade THEN r1Now ELSE s.fr]
+        u == IF short THEN t ELSE [t EXCEPT !.cr = "R2", !.ch = 1]
+    IN
+    IF stepWaits THEN [u EXCEPT !.w = TRUE]
+    ELSE IF cont /\ ~short THEN [u EXCEPT !.rc = TRUE, !.w = FALSE]
+    ELSE u
+
+(* The Advance("next") rows of TABLE in heat_state.py, from the heat s
+   names. Only Round 1's end runs a playlist step: the final is the last
+   step, so round_ended for it finds no next step. *)
+NextHeat(s, r1Now, cont) ==
+    IF s.cr = "R1" /\ s.ch = 1 THEN
+        IF s.rc /\ r1Now[2] /= "none" THEN
+            \* target_refused_after_round, or target_refused
+            IF R1Complete(r1Now)
+            THEN RoundOneEnded([s EXCEPT !.ch = 2, !.rc = FALSE], r1Now, cont)
+            ELSE [s EXCEPT !.ch = 2, !.rc = FALSE]
+        ELSE [s EXCEPT !.ch = 2]
+    ELSE IF s.cr = "R1" THEN
+        \* no_target_after_round, or no_target
+        IF R1Complete(r1Now)
+        THEN RoundOneEnded([s EXCEPT !.rc = FALSE], r1Now, cont)
+        ELSE [s EXCEPT !.rc = FALSE]
+    ELSE [s EXCEPT !.rc = FALSE]
 
 (* Initial state: start_playlist activated R1 heat 1 with racing on *)
 Init ==
@@ -83,7 +156,10 @@ Init ==
     /\ r1 = <<"none", "none">>
     /\ r2 = "none"
     /\ finalBuilt = FALSE
+    /\ finalShort = FALSE
     /\ finalRoster = <<"none", "none">>
+    /\ stepWaits = TRUE
+    /\ cutShort = FALSE
     /\ lastHeatRound = "none"
     /\ lastHeatNum = 0
     /\ lastHeatSaved = "none"
@@ -93,73 +169,20 @@ Init ==
     /\ nonCoordBreak = FALSE
 
 (* record_timer_result on R1: results.py, the TimerResult rows of TABLE in
-   heat_state.py, round_ended and _after_round in playlist.py.
-   The hook's _after_round rebuilds a built final that has no result from the
-   standings (D135), so the roster follows r1 whether or not the intermission
-   was open before the result. A final that has a result does not wait
-   (_is_raced, and _waits for D136). *)
-TimerFinishR1(val) ==
+   heat_state.py, then rebuild_waiting_final. *)
+TimerFinishR1(val, cont) ==
     /\ racing
     /\ curRound = "R1"
     /\ val \in {"v1", "v2"}
     /\ LET r1New == [r1 EXCEPT ![curHeat] = val]
-           endedBefore == waiting
        IN
        /\ r1' = r1New
-       /\ r2' = r2
-       /\ lastHeatRound' = "R1"
-       /\ lastHeatNum' = curHeat
-       /\ lastHeatSaved' = "none"
-       /\ IF curHeat = 1 THEN
-            IF r1New[2] = "none" THEN
-                /\ curRound' = "R1"
-                /\ curHeat' = 2
-                /\ racing' = TRUE
-                /\ waiting' = StillWaiting(waiting, r2)
-                /\ finalBuilt' = finalBuilt
-                /\ finalRoster' = RebuiltRoster(endedBefore, "R1", waiting, r1New, r2, finalRoster)
-            ELSE
-                \* target_refused_after_round: Move(R1, 2), OFF, PlaylistHook(R1)
-                /\ IF FinalHasResult(r2) THEN
-                      /\ curRound' = "R1"
-                      /\ curHeat' = 2
-                      /\ racing' = FALSE
-                      /\ waiting' = StillWaiting(waiting, r2)
-                      /\ finalBuilt' = finalBuilt
-                      /\ finalRoster' = finalRoster
-                   ELSE
-                      /\ finalBuilt' = TRUE
-                      /\ curRound' = "R2"
-                      /\ curHeat' = 1
-                      /\ racing' = FALSE
-                      /\ waiting' = TRUE
-                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
-          ELSE \* curHeat = 2
-            IF R1Complete(r1New) THEN
-                \* no_target_after_round: OFF, PlaylistHook(R1)
-                /\ IF FinalHasResult(r2) THEN
-                      /\ curRound' = "R1"
-                      /\ curHeat' = 2
-                      /\ racing' = FALSE
-                      /\ waiting' = StillWaiting(waiting, r2)
-                      /\ finalBuilt' = finalBuilt
-                      /\ finalRoster' = finalRoster
-                   ELSE
-                      /\ finalBuilt' = TRUE
-                      /\ curRound' = "R2"
-                      /\ curHeat' = 1
-                      /\ racing' = FALSE
-                      /\ waiting' = TRUE
-                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
-            ELSE
-                \* no_target: OFF
-                /\ curRound' = "R1"
-                /\ curHeat' = 2
-                /\ racing' = FALSE
-                /\ waiting' = StillWaiting(waiting, r2)
-                /\ finalBuilt' = finalBuilt
-                /\ finalRoster' = RebuiltRoster(endedBefore, "R1", waiting, r1New, r2, finalRoster)
-       /\ UNCHANGED <<discardRound, discardNum, discardVal, nonCoordBreak>>
+       /\ Becomes(Rebuilt(NextHeat(Now, r1New, cont), waiting, TRUE, r1New, r2))
+    /\ r2' = r2
+    /\ lastHeatRound' = "R1"
+    /\ lastHeatNum' = curHeat
+    /\ lastHeatSaved' = "none"
+    /\ UNCHANGED <<stepWaits, cutShort, discardRound, discardNum, discardVal, nonCoordBreak>>
 
 (* record_timer_result on R2: results.py, the "timer result" row of TABLE *)
 TimerFinishR2 ==
@@ -170,79 +193,28 @@ TimerFinishR2 ==
     /\ lastHeatRound' = "R2"
     /\ lastHeatNum' = 1
     /\ lastHeatSaved' = "none"
-    /\ waiting' = StillWaiting(waiting, "done")  \* D136
-    /\ UNCHANGED <<curRound, curHeat, r1, finalBuilt, finalRoster,
-                   discardRound, discardNum, discardVal, nonCoordBreak>>
+    /\ waiting' = FALSE  \* close_intermission_on_result (D136)
+    /\ UNCHANGED <<curRound, curHeat, r1, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort, discardRound, discardNum, discardVal, nonCoordBreak>>
 
-(* record_manual_result on R1: results.py, the ManualResult rows of TABLE *)
-ManualWriteR1(val, isCoord) ==
+(* record_manual_result on R1: results.py, the ManualResult rows of TABLE,
+   then rebuild_waiting_final. A manual result with racing off does not
+   advance. *)
+ManualWriteR1(val, isCoord, cont) ==
     /\ curRound = "R1"
     /\ val \in {"v1", "v2"}
     /\ (isCoord \/ ~FinalHasResult(r2))  \* locked_failure in record_manual_result
     /\ LET r1New == [r1 EXCEPT ![curHeat] = val]
-           endedBefore == waiting
+           moved == IF racing THEN NextHeat(Now, r1New, cont) ELSE Now
        IN
        /\ r1' = r1New
-       /\ r2' = r2
-       /\ lastHeatRound' = "R1"
-       /\ lastHeatNum' = curHeat
-       /\ lastHeatSaved' = "none"
-       /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ FinalHasResult(r2)))
-       /\ IF ~racing THEN
-            \* the "manual result" row: ManualResult while paused does not advance
-            /\ curRound' = curRound
-            /\ curHeat' = curHeat
-            /\ racing' = FALSE
-            /\ waiting' = StillWaiting(waiting, r2)
-            /\ finalBuilt' = finalBuilt
-            /\ finalRoster' = RebuiltRoster(endedBefore, "R1", waiting, r1New, r2, finalRoster)
-          ELSE IF curHeat = 1 THEN
-            IF r1New[2] = "none" THEN
-                /\ curRound' = "R1"
-                /\ curHeat' = 2
-                /\ racing' = TRUE
-                /\ waiting' = StillWaiting(waiting, r2)
-                /\ finalBuilt' = finalBuilt
-                /\ finalRoster' = RebuiltRoster(endedBefore, "R1", waiting, r1New, r2, finalRoster)
-            ELSE
-                /\ IF FinalHasResult(r2) THEN
-                      /\ curRound' = "R1"
-                      /\ curHeat' = 2
-                      /\ racing' = FALSE
-                      /\ waiting' = StillWaiting(waiting, r2)
-                      /\ finalBuilt' = finalBuilt
-                      /\ finalRoster' = finalRoster
-                   ELSE
-                      /\ finalBuilt' = TRUE
-                      /\ curRound' = "R2"
-                      /\ curHeat' = 1
-                      /\ racing' = FALSE
-                      /\ waiting' = TRUE
-                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
-          ELSE \* racing /\ curHeat = 2
-            IF R1Complete(r1New) THEN
-                /\ IF FinalHasResult(r2) THEN
-                      /\ curRound' = "R1"
-                      /\ curHeat' = 2
-                      /\ racing' = FALSE
-                      /\ waiting' = StillWaiting(waiting, r2)
-                      /\ finalBuilt' = finalBuilt
-                      /\ finalRoster' = finalRoster
-                   ELSE
-                      /\ finalBuilt' = TRUE
-                      /\ curRound' = "R2"
-                      /\ curHeat' = 1
-                      /\ racing' = FALSE
-                      /\ waiting' = TRUE
-                      /\ finalRoster' = r1New  \* round_ended builds or rebuilds the unraced final (D135)
-            ELSE
-                /\ curRound' = "R1"
-                /\ curHeat' = 2
-                /\ racing' = FALSE
-                /\ waiting' = StillWaiting(waiting, r2)
-                /\ finalBuilt' = finalBuilt
-                /\ finalRoster' = RebuiltRoster(endedBefore, "R1", waiting, r1New, r2, finalRoster)
-       /\ UNCHANGED <<discardRound, discardNum, discardVal>>
+       /\ Becomes(Rebuilt(moved, waiting, TRUE, r1New, r2))
+    /\ r2' = r2
+    /\ lastHeatRound' = "R1"
+    /\ lastHeatNum' = curHeat
+    /\ lastHeatSaved' = "none"
+    /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ FinalHasResult(r2)))
+    /\ UNCHANGED <<stepWaits, cutShort, discardRound, discardNum, discardVal>>
 
 (* record_manual_result on R2: results.py, the "manual result" rows of TABLE *)
 ManualWriteR2 ==
@@ -252,9 +224,9 @@ ManualWriteR2 ==
     /\ lastHeatRound' = "R2"
     /\ lastHeatNum' = 1
     /\ lastHeatSaved' = "none"
-    /\ waiting' = StillWaiting(waiting, "done")  \* D136
-    /\ UNCHANGED <<curRound, curHeat, r1, finalBuilt, finalRoster,
-                   discardRound, discardNum, discardVal, nonCoordBreak>>
+    /\ waiting' = FALSE  \* close_intermission_on_result (D136)
+    /\ UNCHANGED <<curRound, curHeat, r1, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort, discardRound, discardNum, discardVal, nonCoordBreak>>
 
 (* select_heat: heats.py, the "select heat" row of TABLE *)
 SelectHeat(rnd, h) ==
@@ -264,7 +236,7 @@ SelectHeat(rnd, h) ==
     /\ curHeat' = h
     /\ racing' = FALSE
     /\ waiting' = FALSE  \* CloseIntermission()
-    /\ UNCHANGED <<r1, r2, finalBuilt, finalRoster,
+    /\ UNCHANGED <<r1, r2, finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
@@ -275,7 +247,8 @@ SetRacingOn ==
     /\ ~HeatHasResult(curRound, curHeat)
     /\ racing' = TRUE
     /\ waiting' = FALSE  \* By.MANAGER emits CloseIntermission()
-    /\ UNCHANGED <<curRound, curHeat, r1, r2, finalBuilt, finalRoster,
+    /\ UNCHANGED <<curRound, curHeat, r1, r2, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
@@ -283,7 +256,8 @@ SetRacingOn ==
 SetRacingOff ==
     /\ racing
     /\ racing' = FALSE
-    /\ UNCHANGED <<curRound, curHeat, waiting, r1, r2, finalBuilt, finalRoster,
+    /\ UNCHANGED <<curRound, curHeat, waiting, r1, r2, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
@@ -307,39 +281,42 @@ Rerun(which, isCoord) ==
             IN
             /\ r1' = r1New
             /\ r2' = r2
-            /\ finalRoster' = RebuiltRoster(waiting, "R1", FALSE, r1New, r2, finalRoster)
           ELSE
             /\ r1' = r1
             /\ r2' = "none"
-            /\ finalRoster' = finalRoster
        /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ tgtRnd = "R1" /\ FinalHasResult(r2)))
-       /\ UNCHANGED <<finalBuilt, discardRound, discardNum, discardVal>>
+       \* the intermission closes before rebuild_waiting_final, so the final stays
+       /\ UNCHANGED <<finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
+                      discardRound, discardNum, discardVal>>
 
-(* reinstate: heats.py, the Reinstate rows of TABLE *)
+(* reinstate: heats.py, the Reinstate rows of TABLE, then
+   rebuild_waiting_final *)
 Reinstate(isCoord) ==
     /\ lastHeatRound /= "none"
     /\ lastHeatSaved /= "none"
     /\ (isCoord \/ lastHeatRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in reinstate
-    /\ racing' = FALSE
     /\ lastHeatRound' = "none"
     /\ lastHeatNum' = 0
     /\ lastHeatSaved' = "none"
-    /\ IF lastHeatRound = "R1" THEN
+    /\ LET off == [Now EXCEPT !.rc = FALSE]
+       IN
+       IF lastHeatRound = "R1" THEN
          LET r1New == [r1 EXCEPT ![lastHeatNum] = lastHeatSaved]
          IN
          /\ r1' = r1New
          /\ r2' = r2
-         /\ waiting' = StillWaiting(waiting, r2)
-         /\ finalRoster' = RebuiltRoster(waiting, "R1", StillWaiting(waiting, r2), r1New, r2, finalRoster)
+         /\ Becomes(Rebuilt(off, waiting, TRUE, r1New, r2))
        ELSE
+         \* a final made again with no chart has no lane to write back to
+         LET r2New == IF finalBuilt THEN lastHeatSaved ELSE r2
+         IN
          /\ r1' = r1
-         /\ r2' = lastHeatSaved
-         /\ waiting' = StillWaiting(waiting, lastHeatSaved)  \* D136
-         /\ finalRoster' = finalRoster
+         /\ r2' = r2New
+         /\ Becomes(Rebuilt(off, waiting, FALSE, r1, r2New))  \* D136
     /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ lastHeatRound = "R1" /\ FinalHasResult(r2)))
-    /\ UNCHANGED <<curRound, curHeat, finalBuilt, discardRound, discardNum, discardVal>>
+    /\ UNCHANGED <<stepWaits, cutShort, discardRound, discardNum, discardVal>>
 
-(* discard_heat: results.py *)
+(* discard_heat: results.py, then rebuild_waiting_final *)
 DiscardHeat(rnd, h, isCoord) ==
     /\ HeatExists(rnd, h)
     /\ HeatHasResult(rnd, h)
@@ -352,38 +329,37 @@ DiscardHeat(rnd, h, isCoord) ==
          IN
          /\ r1' = r1New
          /\ r2' = r2
-         /\ waiting' = StillWaiting(waiting, r2)
-         /\ finalRoster' = RebuiltRoster(waiting, "R1", StillWaiting(waiting, r2), r1New, r2, finalRoster)
+         /\ Becomes(Rebuilt(Now, waiting, TRUE, r1New, r2))
        ELSE
          /\ r1' = r1
          /\ r2' = "none"
-         /\ waiting' = waiting
-         /\ finalRoster' = finalRoster
+         /\ Becomes(Rebuilt(Now, waiting, FALSE, r1, "none"))
     /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ rnd = "R1" /\ FinalHasResult(r2)))
-    /\ UNCHANGED <<curRound, curHeat, racing, finalBuilt,
-                   lastHeatRound, lastHeatNum, lastHeatSaved>>
+    /\ UNCHANGED <<stepWaits, cutShort, lastHeatRound, lastHeatNum, lastHeatSaved>>
 
-(* restore_results: results.py. Racing goes off when the restored
-   heat is the current heat (#499), as reinstate turns it off. *)
+(* restore_results: results.py, then rebuild_waiting_final. Racing goes off
+   when the restored heat is the current heat (#499), as reinstate turns it
+   off. *)
 RestoreResults(isCoord) ==
     /\ discardRound /= "none"
+    /\ HeatExists(discardRound, discardNum)  \* with no lane to write, nothing changes
     /\ ~HeatHasResult(discardRound, discardNum)
     /\ (isCoord \/ discardRound /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in restore_results
-    /\ IF discardRound = "R1" THEN
+    /\ LET off == IF discardRound = curRound /\ discardNum = curHeat
+                  THEN [Now EXCEPT !.rc = FALSE] ELSE Now
+       IN
+       IF discardRound = "R1" THEN
          LET r1New == [r1 EXCEPT ![discardNum] = discardVal]
          IN
          /\ r1' = r1New
          /\ r2' = r2
-         /\ waiting' = StillWaiting(waiting, r2)
-         /\ finalRoster' = RebuiltRoster(waiting, "R1", StillWaiting(waiting, r2), r1New, r2, finalRoster)
+         /\ Becomes(Rebuilt(off, waiting, TRUE, r1New, r2))
        ELSE
          /\ r1' = r1
          /\ r2' = discardVal
-         /\ waiting' = StillWaiting(waiting, discardVal)  \* D136
-         /\ finalRoster' = finalRoster
-    /\ racing' = IF discardRound = curRound /\ discardNum = curHeat THEN FALSE ELSE racing
+         /\ Becomes(Rebuilt(off, waiting, FALSE, r1, discardVal))  \* D136
     /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ discardRound = "R1" /\ FinalHasResult(r2)))
-    /\ UNCHANGED <<curRound, curHeat, finalBuilt,
+    /\ UNCHANGED <<stepWaits, cutShort,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal>>
 
@@ -400,7 +376,7 @@ StartWaitingStep ==
          /\ curRound' = curRound
          /\ curHeat' = curHeat
          /\ racing' = FALSE
-    /\ UNCHANGED <<r1, r2, finalBuilt, finalRoster,
+    /\ UNCHANGED <<r1, r2, finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
@@ -409,14 +385,47 @@ SkipWaitingStep ==
     /\ waiting
     /\ waiting' = FALSE
     /\ racing' = FALSE
-    /\ UNCHANGED <<curRound, curHeat, r1, r2, finalBuilt, finalRoster,
+    /\ UNCHANGED <<curRound, curHeat, r1, r2, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort,
+                   lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak>>
+
+(* Next with no result written. select_heat with heat "next" (heats.py),
+   which the dashboard's Next and heat.select call: the "select heat" row of
+   TABLE closes the intermission and turns racing off before its
+   Advance("next"). advance (heats.py), which only tests call, decides
+   Advance("next") alone, so it ends Round 1 with the intermission as it
+   was. *)
+NextNoResult(bySelect, cont) ==
+    /\ LET from == IF bySelect THEN [Now EXCEPT !.w = FALSE, !.rc = FALSE] ELSE Now
+       IN Becomes(NextHeat(from, r1, cont))
+    /\ UNCHANGED <<r1, r2, stepWaits, cutShort,
+                   lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak>>
+
+(* set_step_waits: playlist.py, the "Wait for operator" switch on the final's
+   step. It changes the step alone. *)
+SetStepWaits ==
+    /\ stepWaits' = ~stepWaits
+    /\ UNCHANGED <<curRound, curHeat, racing, waiting,
+                   r1, r2, finalBuilt, finalShort, finalRoster, cutShort,
+                   lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak>>
+
+(* The cut starts or stops picking one racer (D28). Nothing is
+   rebuilt until a Round 1 result changes or Round 1 ends again. *)
+ChangeCut ==
+    /\ cutShort' = ~cutShort
+    /\ UNCHANGED <<curRound, curHeat, racing, waiting,
+                   r1, r2, finalBuilt, finalShort, finalRoster, stepWaits,
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak>>
 
 Next ==
-    \/ \E val \in {"v1", "v2"} : TimerFinishR1(val)
+    \/ \E val \in {"v1", "v2"}, cont \in BOOLEAN : TimerFinishR1(val, cont)
     \/ TimerFinishR2
-    \/ \E val \in {"v1", "v2"}, isCoord \in BOOLEAN : ManualWriteR1(val, isCoord)
+    \/ \E val \in {"v1", "v2"}, isCoord \in BOOLEAN, cont \in BOOLEAN :
+          ManualWriteR1(val, isCoord, cont)
     \/ ManualWriteR2
     \/ \E h \in {1, 2} : SelectHeat("R1", h)
     \/ SelectHeat("R2", 1)
@@ -429,6 +438,9 @@ Next ==
     \/ \E isCoord \in BOOLEAN : RestoreResults(isCoord)
     \/ StartWaitingStep
     \/ SkipWaitingStep
+    \/ \E bySelect \in BOOLEAN, cont \in BOOLEAN : NextNoResult(bySelect, cont)
+    \/ SetStepWaits
+    \/ ChangeCut
 
 Spec == Init /\ [][Next]_vars
 
@@ -439,9 +451,10 @@ RacingHeatAllowed ==
     racing => (curRound /= "none" /\ HeatExists(curRound, curHeat) /\ ~HeatHasResult(curRound, curHeat))
 
 \* 2. While the intermission is open and the final has not raced, the waiting
-\*    final's roster matches Round 1's current standings (D27, D135).
+\*    final's roster matches Round 1's current standings (D27, D135). It has a
+\*    chart, or a roster of one racer and none (D28).
 WaitingFinalMatchesStandings ==
-    (waiting /\ ~FinalHasResult(r2)) => (finalBuilt /\ finalRoster = r1)
+    (waiting /\ ~FinalHasResult(r2)) => ((finalBuilt \/ finalShort) /\ finalRoster = r1)
 
 \* 3. Once any heat of the final has a result, the intermission for that final
 \*    is closed (D136).
@@ -451,5 +464,10 @@ NoIntermissionAfterFinalRaces ==
 \* 4. Once the final has a result, a non-CONTROL_RACE caller never alters Round 1 (D32).
 LockedFeederProtected ==
     ~nonCoordBreak
+
+\* 5. Racing never runs with the intermission open (#514). The timer test,
+\*    which the model leaves out, still turns racing on with it open (#515).
+NoRacingDuringIntermission ==
+    racing => ~waiting
 
 ====
