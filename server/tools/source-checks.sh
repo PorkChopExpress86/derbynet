@@ -110,6 +110,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_lead_rulings.py \
   tests/test_docstring_position.py \
   tests/test_listing_order.py \
+  tests/test_tuple_asserts.py \
   tests/test_plan_source_checks.py \
   tests/test_role_pages_fixture.py \
   transfer/tests/test_id_readers.py \
