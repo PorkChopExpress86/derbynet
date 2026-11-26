@@ -364,15 +364,15 @@ When a check fails, the report names the likely limiting resource from the sampl
 
 When no rule matches, the report says nothing stood out. Without `--pid` it also asks for one.
 
-### The race-day run on a Raspberry Pi
+### The race-day run on the desktop server
 
-`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses a fresh SQLite database under `var/` and refuses to run unless SQLite is in WAL mode. It serves the database with gunicorn from the `serve` dependency group, which `uv.lock` pins, with `DEBUG` off. It starts 4 sync workers, the Docker image's `GUNICORN_WORKERS` default (`server/docker/README.md`) until this run sets it, and `DERBYNET_LOAD_WORKERS` changes it. On the Pi, after `uv sync`, run:
+`tools/load-run.sh` serves Django as production will (ADR-08), then runs the load script against it. It uses a fresh SQLite database under `var/` and refuses to run unless SQLite is in WAL mode. It serves the database with gunicorn from the `serve` dependency group, which `uv.lock` pins, with `DEBUG` off. It starts 4 sync workers, the Docker image's `GUNICORN_WORKERS` default (`server/docker/README.md`) until this run sets it, and `DERBYNET_LOAD_WORKERS` changes it. On the desktop server that serves the race (D63), after `uv sync`, run:
 
 ```sh
 server/tools/load-run.sh 30
 ```
 
-It runs for 30 minutes at the #37 thresholds, p95 300 ms and p99 1 s. It writes `server/var/load-report-<time>/load-report.md`, ready to paste into #37, with `load-report.json` and gunicorn's log next to it. A second argument sets the report folder. The first run downloads gunicorn. The load script runs on the Pi beside the server, as the report notes, so its CPU counts in the host CPU row.
+It runs for 30 minutes at the #37 thresholds, p95 300 ms and p99 1 s. It writes `server/var/load-report-<time>/load-report.md`, ready to paste into #37, with `load-report.json` and gunicorn's log next to it. A second argument sets the report folder. The first run downloads gunicorn. The load script runs on the same machine as the server, as the report notes, so its CPU counts in the host CPU row.
 
 ## Legacy handlers
 

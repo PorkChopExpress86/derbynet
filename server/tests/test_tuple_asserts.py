@@ -101,7 +101,6 @@ KNOWN = {
     "tests/test_opens_oracle.py": 1,
     "tests/test_operand_mutants.py": 1,
     "tests/test_parity_gate.py": 2,
-    "tests/test_pi_images.py": 3,
     "tests/test_pytest_under_load.py": 4,
     "tests/test_settings.py": 2,
     "tests/test_source_checks.py": 1,

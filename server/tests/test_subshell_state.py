@@ -2,7 +2,7 @@
 inside `$(...)`, backquotes or a pipeline.
 
 The subshell gets a copy of the script's variables and traps, and its
-changes end with it. #59's round-1 `extras/docker/ci/checks.sh` ran
+changes end with it. #59's round-1 Pi image checks.sh (D139 deleted it) ran
 `id="$(compose_up ...)"`, and compose_up's `COMPOSE_DOWN+=(...)` went with
 the subshell, so `cleanup` took no Compose project down and a
 `t59-timer-compose` container was left (#59 review, retro).
@@ -13,7 +13,7 @@ sets a trap, assigns a global that some code, itself included, reads
 before setting it, or calls a function that does. A function that prints
 its result for `$(...)` takes its state from its caller instead, or the
 caller runs it bare and reads the global it sets, as checks.sh's compose_up
-now does.
+did from #59's merge until D139 deleted the script.
 
 The rule reads the script's text, not a bash parse: a function read across
 files is found only through a `source` or `.` line naming a .sh file by its
@@ -302,9 +302,11 @@ def test_no_function_that_records_state_runs_in_a_subshell():
     )
 
 
-# #59's round-1 extras/docker/ci/checks.sh at ff00bbc6 (on the PR's branch
-# only; the PR merged squashed): lines 58, 63-71, 148-156, 234, 246, 357
-# and 372 as they were, each function closed after the lines taken from it.
+# #59's round-1 Pi image checks.sh at ff00bbc6 (on the PR's branch only;
+# the PR merged squashed): lines 58, 63-71, 148-156, 234, 246, 357 and 372
+# as they were, each function closed after the lines taken from it.  D139
+# deleted the Pi images, so timer.yaml and stand.yaml stand in for the
+# names of their Compose files.
 ROUND_1 = """\
 COMPOSE_DOWN=()
 cleanup() {
@@ -327,12 +329,12 @@ compose_up() {
     printf '%s\\n' "$id"
 }
 check_timer_compose() {
-    id="$(compose_up "$folder" compose.timer.yaml "$PREFIX-timer-compose")"
+    id="$(compose_up "$folder" timer.yaml "$PREFIX-timer-compose")"
 }
 check_photostand_compose() {
-    STAND="$(compose_up "$folder" compose.photostand.yaml "$PREFIX-photostand-compose")"
+    STAND="$(compose_up "$folder" stand.yaml "$PREFIX-photostand-compose")"
 }
-"""  # noqa: E501 (the lines as they were)
+"""  # noqa: E501 (the lines as they were, but for the stand-in names)
 
 
 def test_round_1_checks_sh_is_found():
@@ -346,7 +348,7 @@ def test_round_1_checks_sh_is_found():
 
 
 def test_compose_up_called_bare_passes():
-    """As master's checks.sh calls it: `compose_up ...` then `$CONTAINER`."""
+    """As #59's merged checks.sh called it: `compose_up ...` then `$CONTAINER`."""
     text = (
         ROUND_1.replace('id="$(compose_up ', "compose_up ")
         .replace('STAND="$(compose_up ', "compose_up ")

@@ -3,7 +3,7 @@
 # rejected on commit <sha>: a run that ended in failure with no job.  GitHub
 # makes such a run when it cannot read a workflow file, and since the run has
 # no job, no check of it shows on the PR, so `gh pr checks` lists nothing to
-# fail on.  #59's pi-images.yml put `${{ runner.temp }}` in a job's env;
+# fail on.  #59's Pi image workflow (D139 deleted it) put `${{ runner.temp }}` in a job's env;
 # run 44236545824 on ff00bbc6 failed in 0 s with no job, and pr-wait exited 0
 # on that head with every listed check passed (#59 retro).
 #

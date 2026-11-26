@@ -121,6 +121,11 @@ ALLOWED_MISSING = {
     'docs/upgrading-from-php.md': 'created by cutover',
     'sql/odbc/schema.inc': 'named as missing by php-defects C39',
     'testing/query.sh': 'named as missing by php-defects C45',
+    'docs/pi-setup.md': 'deleted by D139',
+    'docs/photo-stand.md': 'deleted by D139',
+    '.github/workflows/pi-images.yml': 'deleted by D139',
+    'extras/docker/ci/checks.sh': 'deleted by D139',
+    'extras/docker/ci/checks.sh timer': 'deleted by D139',
 }
 REVERSE = re.compile(r'depends? on this|depend on this|^- (Related to|Works best|Feeds|Uses|Consumed by)'
                      r'|run-time needs|not build blockers', re.I)

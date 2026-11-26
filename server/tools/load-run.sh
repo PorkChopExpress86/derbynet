@@ -1,7 +1,7 @@
 #! /bin/bash
 #
 # Serves Django the way production will and runs the race-day load script
-# against it (#37), for the Raspberry Pi report.  server/README.md, "Race-day
+# against it (#37), for the desktop server's report (D63).  server/README.md, "Race-day
 # load test", describes the clients, the thresholds and the report.
 #
 # Usage: server/tools/load-run.sh [minutes] [report dir]

@@ -3,15 +3,16 @@
 A Django dev server runs as `.github/workflows/server.yml` starts it, on a
 fresh SQLite database of its own. It pins SQLite even on the Postgres CI
 leg, because the load question #37 asks is the race-day one: SQLite in WAL
-mode on a Raspberry Pi, where the timer's writes and the polls share one
-file. The script sets the event up with one group of three racers, so the
-timer races its four heats and the schedule restarts at least once, and
-every client type runs at its real rate. The tests check each client made
-about the requests its pacing allows, that nothing failed, and that the
-server recorded every heat the timer finished. Two more check the logins
-the script uses: kiosks poll anonymously, and the dashboard and replay
-polls need a role with PRESENT_AWARDS and CONTROL_RACE, which
-RaceCoordinator has and Timer has not.
+mode on the race-day server (D63's desktop computer), where the timer's
+writes and the polls share one file. The script sets the event up with one
+group of three racers, so the timer races its four heats and the schedule
+restarts at least once, and every client type runs at its real rate. The
+tests check each client made about the requests its pacing allows, that
+nothing failed, and that the server recorded every heat the timer
+finished. Two more check the logins the script uses: kiosks poll
+anonymously, and the dashboard and replay polls need a role with
+PRESENT_AWARDS and CONTROL_RACE, which RaceCoordinator has and Timer has
+not.
 """
 
 import http.cookiejar

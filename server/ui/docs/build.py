@@ -48,8 +48,6 @@ GUIDES: tuple[str, ...] = (
     "roles-and-passwords",
     "database",
     "live-streaming",
-    "photo-stand",
-    "pi-setup",
     "dev-timer-protocol",
     "dev-replay-protocol",
     "developer-guide",
@@ -145,8 +143,8 @@ def fence_slips(text: str, html: str):
     block is a slip unless `html`, the rendered page, shows it in a code
     block, as an indented code block does. Text after a closing fence left
     install-docker.md's PowerShell restore open over the Upgrade section,
-    and fences indented under list items in dev-timer-protocol.md and
-    photo-stand.md became inline code (#61 retro)."""
+    and fences indented under list items in dev-timer-protocol.md and the
+    photo stand guide (D139 deleted it) became inline code (#61 retro)."""
     text = normalize(text)
     shown = [unescape(code) for code in PRE.findall(html)]
     taken = []
