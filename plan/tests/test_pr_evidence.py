@@ -463,7 +463,7 @@ class Placeholders(unittest.TestCase):
         # From the #399 drafts, and each word of SUFFIXES.
         tokens = ('PROBE-PENDING', 'PUSH-RESULT', 'CASES-OUTPUT', 'X-RESULTS',
                   'HANDOFF-RUNS', 'MUTANT-TABLE', 'HANDOFF-TODO', 'NOTES-TBD',
-                  'LOAD-RUN-PENDING')
+                  'LOAD-RUN-PENDING', 'CLAIMS-PLACEHOLDER')
         self.assertEqual({t.rsplit('-', 1)[1] for t in tokens}, set(TOOL.SUFFIXES))
         for token in tokens:
             with self.subTest(token=token):
@@ -499,12 +499,13 @@ class Placeholders(unittest.TestCase):
         self.assertEqual(TOOL.placeholders(body), ['line 1: HANDOFF_RUNS'])
 
     def test_each_joined_placeholder_from_the_drafts_is_found(self):
-        # Tokens from #399's, #407's and retro-65's drafts, one or more for
-        # each word of SUFFIXES.
+        # Tokens from #399's, #407's, retro-65's and #511's drafts, one or
+        # more for each word of SUFFIXES.
         tokens = ('HANDOFF_RUNS', 'HANDOFF_RESULTS', 'CLAIMS_TABLE', 'HEAD_PENDING',
                   'LISTED_RESULT', 'LOAD_RUN_PENDING', 'LOAD_RUN_RESULT', 'MUTANT_TABLE',
                   'MUTATIONS_PENDING', 'MUTATION_RESULT', 'PROBE_PENDING', 'NOTES_TBD',
-                  'X_OUTPUT', 'HANDOFF_TODO')
+                  'X_OUTPUT', 'HANDOFF_TODO', 'HANDOFF_PLACEHOLDER',
+                  'PHP_PROBE_PLACEHOLDER', 'CLAIMS_PLACEHOLDER')
         self.assertEqual({t.rsplit('_', 1)[1] for t in tokens}, set(TOOL.SUFFIXES))
         for token in tokens:
             for text in (f'| R13 | none | ({token}). |', f'**{token}**', f'{token}:'):
