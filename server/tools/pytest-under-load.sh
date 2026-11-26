@@ -140,11 +140,17 @@ fi
 # so a browser path with no `-m` selects nothing: #531's kickoff gave
 # `--flake-ticket -n 4 --count 25 ui/tests/browser/test_harness.py`, copied
 # from #529's form for a file that is no browser test (#531 retro).
+# An option and its value name no test to run: `--ignore ui/tests/browser`
+# drops the browser tests (#546 review).
 marked=
 browser_path=
+skip=
 for arg in "$@"; do
+  if [ -n "$skip" ]; then skip=; continue; fi
   case "$arg" in
     -m*) marked=1 ;;
+    --ignore|--ignore-glob|--deselect) skip=1 ;;
+    -*) ;;
     *) [[ "$arg" =~ (^|/)ui/tests/browser(/|$) ]] && browser_path=${browser_path:-$arg} ;;
   esac
 done

@@ -592,18 +592,24 @@ WHERE = re.compile(r"\s*\|\s*([\w.-]+\.py):(\d+)\s+`(\w+)`\s*\|\s*([^|]+?)\s*\|"
 
 def moved_rows(body: str, found: list[tuple[Path, Claim, list[int]]]):
     """Each row outside fenced code in the table's own shape whose claim
-    this head has on another line: its body line, cited `file:line`, and
-    the head's line. #543's body kept #540's line numbers on 13 rows after
-    the code above them grew, and the check, matching text and scope,
-    passed it (#531 retro)."""
-    at = {(f.name, c.scope, t): c.line for f, c, _ in found for t in forms(c)}
+    this head has on no line it cites: its body line, cited `file:line`,
+    and the head's lines. #543's body kept #540's line numbers on 13 rows
+    after the code above them grew, and the check, matching text and
+    scope, passed it (#531 retro). A row names its file by name alone, so
+    a claim of two files of one name counts on either's line (#546
+    review)."""
+    at: dict[tuple[str, str, str], set[int]] = {}
+    for f, c, _ in found:
+        for t in forms(c):
+            at.setdefault((f.name, c.scope, t), set()).add(c.line)
     out = []
     for n, line in unfenced(body):
         if row := WHERE.match(line):
             name, cited, scope, text = row.groups()
-            line_now = at.get((name, scope, re.sub(r"\s+", " ", text)))
-            if line_now is not None and line_now != int(cited):
-                out.append((n, f"{name}:{cited}", line_now))
+            lines = at.get((name, scope, re.sub(r"\s+", " ", text)), set())
+            if lines and int(cited) not in lines:
+                now = " or ".join(str(x) for x in sorted(lines))
+                out.append((n, f"{name}:{cited}", now))
     return out
 
 
