@@ -586,6 +586,11 @@ def test_an_imported_line_on_a_round_no_step_feeds_from_keeps_the_final(
     no step. The import makes the round."""
     event, round1, final, entry, finalists_for = closed_intermission
     before, chart = roster(final), chart_ids(final)
+    steps = PlaylistEntry.objects.filter(event=event, group__name="Outlaw")
+    last = PlaylistEntry.objects.filter(event=event).order_by("seq").last()
+    assert last.group.name == "Outlaw"
+    assert last.round_number == 2
+    assert not steps.filter(round_number=3).exists()
     racer = Racer.objects.filter(group__name="Outlaw").first()
     line = {
         **faster_line(round1, racer),
