@@ -25,7 +25,8 @@ TABLE = ('| `RacingHeatAllowed` | ... | **PASS** ({n} distinct states checked) |
 
 
 class CheckCountsStates(unittest.TestCase):
-    def run_check(self, skill_md: str, found: int = 328096, passes: bool = True):
+    def run_check(self, skill_md: str, found: str = '328096', passes: bool = True,
+                  final: str = '9 states generated, {} distinct states found, 0 states left'):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             shutil.copy(SKILL / 'check.sh', tmp / 'check.sh')
@@ -33,9 +34,12 @@ class CheckCountsStates(unittest.TestCase):
             (tmp / 'SKILL.md').write_text(skill_md)
             (tmp / 'tla2tools.jar').write_text('')
             java = tmp / 'java'
+            # Real TLC prints progress lines with commas before its last
+            # line's total, which has none.
             java.write_text('#!/bin/sh\n'
-                            f'echo "9 states generated, {found} distinct states found, '
-                            '0 states left on queue."\n'
+                            'echo "Progress(9): 5,000 states generated, 302,505 distinct '
+                            'states found, 7 states left on queue."\n'
+                            f'echo "{final.format(found)}"\n'
                             f'exit {0 if passes else 12}\n')
             java.chmod(0o755)
             env = {**os.environ, 'JAVA': str(java), 'TLA2TOOLS': str(tmp / 'tla2tools.jar')}
@@ -53,12 +57,28 @@ class CheckCountsStates(unittest.TestCase):
         stale = [line for line in run.stdout.splitlines() if line.startswith('STALE')]
         self.assertEqual(len(stale), 2, run.stdout)
         self.assertIn('SKILL.md:2 says 190,080 distinct states', stale[0])
-        self.assertIn('SKILL.md:4 says 190,080 states', stale[1])
+        self.assertIn('SKILL.md:4 says all 190,080 states', stale[1])
+
+    def test_the_last_count_with_its_commas_is_the_run_s(self):
+        run = self.run_check(TABLE.format(n='328,096', m='328,096', k='328,096'),
+                             found='328,096')
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+    def test_a_pass_with_no_count_is_refused(self):
+        run = self.run_check(TABLE.format(n='328,096', m='328,096', k='328,096'), final='')
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("NOCOUNT  RacingHeatAllowed: TLC printed no 'distinct states found'",
+                      run.stdout)
+
+    def test_a_count_in_prose_is_no_figure(self):
+        run = self.run_check(TABLE.format(n='328,096', m='328,096', k='328,096')
+                             + 'Round 1 has 12 states in the chart.\n')
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
 
     def test_a_failing_invariant_reads_no_figure(self):
         # TLC stops at a violation, so the count it prints is no baseline.
         run = self.run_check(TABLE.format(n='328,096', m='328,096', k='328,096'),
-                             found=12, passes=False)
+                             found='12', passes=False)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
         self.assertIn('FAIL  RacingHeatAllowed', run.stdout)
         self.assertNotIn('STALE', run.stdout)

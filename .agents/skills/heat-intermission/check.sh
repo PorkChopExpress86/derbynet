@@ -50,7 +50,16 @@ for inv in "${INVARIANTS[@]}"; do
       HeatIntermission.tla) > "$out" 2>&1; then
     states="$(grep -E 'distinct states found' "$out" | tail -n 1 || true)"
     echo "PASS  ${inv}  (${states})"
-    counts+=("$(grep -oE '[0-9]+ distinct states found' "$out" | tail -n 1 | cut -d' ' -f1)")
+    # The total is TLC's one count outside its Progress(...) lines, which
+    # print counts with commas before the run ends.
+    total="$(grep -v '^Progress(' "$out" | grep -oE '[0-9][0-9,]* distinct states found' || true)"
+    total="${total%% *}"
+    if [ -z "$total" ]; then
+      echo "NOCOUNT  ${inv}: TLC printed no 'distinct states found' line, so SKILL.md's counts go unchecked."
+      status=1
+    else
+      counts+=("${total//,/}")
+    fi
   else
     echo "FAIL  ${inv}"
     grep -E 'Error:|State [0-9]+:|distinct states found' "$out" | sed -n '1,30p'
@@ -60,13 +69,14 @@ done
 
 for found in $(printf '%s\n' "${counts[@]}" | sort -u); do
   while IFS=: read -r line figure; do
-    said="${figure%% *}"
+    said="${figure#all }"
+    said="${said%% *}"
     if [ "${said//,/}" != "$found" ]; then
       echo "STALE  SKILL.md:${line} says ${figure}; TLC found ${found} distinct states." \
            "Update the baseline table (step 4 of Updating the model)."
       status=1
     fi
-  done < <(grep -noE '[0-9][0-9,]* (distinct )?states' "$DIR/SKILL.md" || true)
+  done < <(grep -noE '[0-9][0-9,]* distinct states|all [0-9][0-9,]* states' "$DIR/SKILL.md" || true)
 done
 
 exit "$status"

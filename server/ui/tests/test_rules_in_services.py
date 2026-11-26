@@ -625,7 +625,8 @@ def timer_test_copies(source: str, filename: str = "state.py") -> list[str]:
         if any(i != j for i in tests for j in racing):
             found.append(
                 f"{filename}:{node.lineno} {ast.unparse(node)}: "
-                "use heats.timer_test_live or heats.timer_may_race (D145)"
+                "use heats.timer_test_live or heats.timer_may_race, or in the "
+                "engine heat_state.test_live or timer_may_race (D145)"
             )
     return found
 
@@ -643,8 +644,9 @@ def test_a_running_timer_test_is_read_from_heats():
         "running = race.timer_test and race.racing",
         "live = current_id == TIMER_TEST_ROUND and current['now_racing']",
         "idle = not state.racing or not state.timer_test",
+        "live = timer_test(ctx) and racing(ctx)",
     ],
-    ids=["timer-state-515", "presenter-515", "negated-or"],
+    ids=["timer-state-515", "presenter-515", "negated-or", "engine-515"],
 )
 def test_a_copied_timer_test_rule_is_flagged(source):
     assert len(timer_test_copies(source)) == 1
@@ -656,8 +658,9 @@ def test_a_copied_timer_test_rule_is_flagged(source):
         "running = heats.timer_test_live(race)",
         "if state.timer_test or state.current_round_id is None: pass",
         "on = race.racing and race.current_round_id is not None",
+        "ok = shown(race.timer_test, race.racing) and ready",
     ],
-    ids=["from-heats", "test-alone", "racing-alone"],
+    ids=["from-heats", "test-alone", "racing-alone", "both-in-one-operand"],
 )
 def test_a_timer_test_or_racing_read_alone_passes(source):
     assert timer_test_copies(source) == []
