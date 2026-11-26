@@ -723,11 +723,9 @@ def test_no_guide_example_names_the_image_from_before_caddy():
     )
 
 
-# ----- an option given as a check names the source checks (#530 retro) -----
-
-
 def run_checks(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
-    """checks.sh with a docker that does nothing, so its cleanup runs here."""
+    """checks.sh with a docker that does nothing, so its cleanup runs here
+    (#530 retro)."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     (bin_dir / "docker").write_text("#!/bin/sh\nexit 0\n")
