@@ -19,6 +19,8 @@
 # docs/guide-commands.tsv (#414), a number a tool script reads with no
 # check that it is one (#417 retro), a plan tool that credits a ruling to
 # the lead and a docstring after a function's first statement (#470 retro),
+# the heat chart's rows, each with its case (0.3 s; #515's first hand-off
+# ran --quick, and its new row's missing case failed CI: #515 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
@@ -142,6 +144,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   ui/tests/test_htmx.py::test_no_control_queues_behind_a_poll \
   media/tests/test_repository_paths.py \
   racing/engine/tests/test_no_django.py \
+  racing/engine/tests/test_heat_state.py \
   legacy_api/tests/test_testing_scripts.py \
   "$@" || status=$?
 exit "$status"

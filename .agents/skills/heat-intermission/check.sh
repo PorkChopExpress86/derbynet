@@ -3,6 +3,10 @@
 # Usage:
 #   ./.agents/skills/heat-intermission/check.sh [INVARIANT ...]
 # Set TLA2TOOLS to override the jar path, or let this script cache v1.7.4 under ~/.local/share/tla2tools/.
+# Each invariant that passes is checked against every "N distinct states" and
+# "all N states" figure in SKILL.md, and a figure TLC did not find fails the run:
+# #515's body and log gave 328,096 while SKILL.md still said 190,080 in six
+# places (#515 retro).
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -34,6 +38,7 @@ trap 'rm -rf "$WORK"' EXIT
 cp "$DIR/HeatIntermission.tla" "$WORK/HeatIntermission.tla"
 
 status=0
+counts=()
 for inv in "${INVARIANTS[@]}"; do
   cfg="${inv}.cfg"
   printf "SPECIFICATION Spec\nINVARIANT %s\n" "$inv" > "$WORK/$cfg"
@@ -45,11 +50,23 @@ for inv in "${INVARIANTS[@]}"; do
       HeatIntermission.tla) > "$out" 2>&1; then
     states="$(grep -E 'distinct states found' "$out" | tail -n 1 || true)"
     echo "PASS  ${inv}  (${states})"
+    counts+=("$(grep -oE '[0-9]+ distinct states found' "$out" | tail -n 1 | cut -d' ' -f1)")
   else
     echo "FAIL  ${inv}"
     grep -E 'Error:|State [0-9]+:|distinct states found' "$out" | sed -n '1,30p'
     status=1
   fi
+done
+
+for found in $(printf '%s\n' "${counts[@]}" | sort -u); do
+  while IFS=: read -r line figure; do
+    said="${figure%% *}"
+    if [ "${said//,/}" != "$found" ]; then
+      echo "STALE  SKILL.md:${line} says ${figure}; TLC found ${found} distinct states." \
+           "Update the baseline table (step 4 of Updating the model)."
+      status=1
+    fi
+  done < <(grep -noE '[0-9][0-9,]* (distinct )?states' "$DIR/SKILL.md" || true)
 done
 
 exit "$status"
