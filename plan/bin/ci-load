@@ -182,7 +182,8 @@ def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
             f'head ({len(skipped)} skipped), so CI load has nothing to run. Repeats a ticket '
             'asks of a test file affected-tests gives none, such as a flake ticket on a '
             f'file that is no browser test, run locally: {SCRIPT}{flag} -n 4 '
-            '--count N FILE, with the log pasted in the PR')
+            '--count N FILE, adding --postgres when it failed on Postgres, with the log '
+            'pasted in the PR')
     if len(shards) > MAX_SHARDS:
         raise ValueError(f'{len(shards)} shards, more than the {MAX_SHARDS} jobs a '
                          'GitHub matrix takes: raise per_shard')

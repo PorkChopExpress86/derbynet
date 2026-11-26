@@ -690,7 +690,10 @@ class LocalPaths(IssueStandIn, unittest.TestCase):
                      'server/var/load-runs/20261126-120000-1/pytest.log',
                      '/mnt/x/derbynet-wt-9/server/var/load-runs/a/junit.xml',
                      '/tmp/claude-1000/-mnt-x/abc/scratchpad/probe.py',
-                     'retro-529/backtest.txt in ~/.cache/derbynet-drafts/9/bodies/b1.md'):
+                     'retro-529/backtest.txt in ~/.cache/derbynet-drafts/9/bodies/b1.md',
+                     '~/.cache/derbynet-drafts/9/RUN.LOG',
+                     '~/.cache/derbynet-drafts/9/clip.mp4',
+                     '~/.cache/derbynet-drafts/DESIGN/x.log'):
             with self.subTest(path=path):
                 self.assertTrue(TOOL.local_paths(f'Run: see {path}.\n'), path)
 
@@ -699,8 +702,22 @@ class LocalPaths(IssueStandIn, unittest.TestCase):
                 'Logs go under `~/.cache/derbynet-drafts/N/`, and `~/.cache/derbynet-drafts/**`.\n'
                 '`assert PosixPath(\'.\') == PosixPath(\'/tmp/pytest-of-u/pytest-1/tmp3\')`\n'
                 'The lock is `~/.cache/derbynet/load-run.lock`; see `server/tools/mutate.py`.\n'
-                '    indented: ~/.cache/derbynet-drafts/9/x.log\n')
+                '    indented: ~/.cache/derbynet-drafts/9/x.log\n'
+                'A release folder `~/.cache/derbynet-drafts/v1.2/` and `~/derbynet-draftsy/x.log`.\n')
         self.assertEqual(TOOL.local_paths(body), [])
+
+    def test_rule_text_a_quote_and_a_comment_pass(self):
+        """Review of PR #541: a glob or placeholder path is rule text, a
+        blockquote quotes output, and a comment is not drawn."""
+        body = ('Logs go under `~/.cache/derbynet-drafts/N/push.log`, '
+                '`~/.cache/derbynet-drafts/*.log`, `~/.cache/derbynet-drafts/<N>/push.log`, '
+                '`~/.cache/derbynet-drafts/.../push.log` and `/tmp/claude-1000/x/?.txt`.\n'
+                '> FileNotFoundError: ~/.cache/derbynet-drafts/9/x.log\n'
+                'Text <!-- ~/.cache/derbynet-drafts/9/x.log --> here.\n'
+                'Text <!-- ~/.cache/derbynet-drafts/9/y.log\nstill the comment -->\n')
+        self.assertEqual(TOOL.local_paths(body), [])
+        self.assertEqual(TOOL.local_paths('See <!-- a --> ~/.cache/derbynet-drafts/9/N.log.\n'),
+                         ['line 1: ~/.cache/derbynet-drafts/9/N.log'])
 
 
 # The lines of #444's body that named #434, which its merge left open (#434

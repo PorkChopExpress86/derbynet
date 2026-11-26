@@ -160,7 +160,7 @@ class Plan(unittest.TestCase):
         the run planned nothing and its summary job failed on a missing plan.json."""
         text = 'Repeats under load: no browser test file changed.\n'
         local = ('run locally: tools/pytest-under-load.sh{} -n 4 --count N '
-                 'FILE, with the log pasted in the PR')
+                 'FILE, adding --postgres when it failed on Postgres, with the log pasted in the PR')
         with self.assertRaisesRegex(ValueError, r'\(0 skipped\), so CI load has nothing') as caught:
             TOOL.plan(text)
         self.assertIn(local.format(''), str(caught.exception))
