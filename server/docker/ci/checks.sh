@@ -207,7 +207,7 @@ check_tls() {
 
     start tls1 "$PREFIX-tls-a"
     say "plain HTTP is served, with no redirect to HTTPS"
-    code="$(docker exec "$PREFIX-tls1" curl -m 120 -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
+    code="$(docker exec "$PREFIX-tls1" curl -m 120 -sS -o /dev/null -w '%{http_code} %{redirect_url}' 'http://localhost/action.php?query=role.list')"
     echo "$code"
     # With no event yet, Django answers 302 to setup.php over the same scheme.
     case "$code" in *https:*) fail "plain HTTP redirects to HTTPS: $code" ;; [23]??*) ;; *) fail "plain HTTP answered $code" ;; esac
@@ -1411,10 +1411,10 @@ check_allowed_hosts() {
     [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ] \
         || fail "the container is not healthy with DERBYNET_ALLOWED_HOSTS set"
     say "the named host answers, and another host is refused"
-    code="$(docker exec "$name" curl -m 120 -s -o /dev/null -w '%{http_code}' -H 'Host: derby.example.org' http://127.0.0.1/index.php)"
+    code="$(docker exec "$name" curl -m 120 -sS -o /dev/null -w '%{http_code}' -H 'Host: derby.example.org' http://127.0.0.1/index.php)"
     echo "derby.example.org: $code"
     case "$code" in 2??|3??) ;; *) fail "the named host answered $code" ;; esac
-    code="$(docker exec "$name" curl -m 120 -s -o /dev/null -w '%{http_code}' -H 'Host: other.example.org' http://127.0.0.1/index.php)"
+    code="$(docker exec "$name" curl -m 120 -sS -o /dev/null -w '%{http_code}' -H 'Host: other.example.org' http://127.0.0.1/index.php)"
     echo "other.example.org: $code"
     [ "$code" = 400 ] || fail "another host answered $code"
     stop hosts

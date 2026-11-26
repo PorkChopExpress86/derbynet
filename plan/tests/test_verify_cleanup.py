@@ -49,11 +49,14 @@ class CleanupWaitsForThePort(unittest.TestCase):
         self.addCleanup(server.kill)
         port = server.stdout.readline().strip()
         (state / 'runserver.pid').write_text(f'{server.pid}\n')
+        (state / 'data').mkdir()
         env = {**os.environ, 'VERIFY_SERVER': 'django', 'VERIFY_RUN': 't',
                'VERIFY_PORT': port}
         started = time.monotonic()
-        run = subprocess.run([str(tmp / '.claude' / 'skills' / 'verify' / 'bin' / 'cleanup')],
-                             capture_output=True, text=True, env=env, timeout=30)
+        self.again = lambda: subprocess.run(
+            [str(tmp / '.claude' / 'skills' / 'verify' / 'bin' / 'cleanup')],
+            capture_output=True, text=True, env=env, timeout=30)
+        run = self.again()
         return run, server, port, state, time.monotonic() - started
 
     def test_the_port_is_free_when_cleanup_returns(self):
@@ -65,12 +68,22 @@ class CleanupWaitsForThePort(unittest.TestCase):
         self.assertGreaterEqual(took, 1)
         self.assertFalse(state.exists())
 
-    def test_a_port_still_taken_fails_once_the_rest_is_cleaned(self):
-        """After 10 s it names the port, removes the state all the same, and
-        exits 1."""
+    def test_a_port_still_taken_keeps_the_pid_until_the_server_is_gone(self):
+        """After 10 s it names the port and the pid, removes all but the
+        pidfile, and exits 1.  A second cleanup fails the same way; once the
+        server is killed, cleanup removes the rest."""
         run, server, port, state, took = self.cleanup('signal.SIG_IGN')
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
         self.assertIn(f'port {port} is still taken 10 s after its server was stopped',
                       run.stderr)
+        self.assertIn(f'kill -9 {server.pid}', run.stderr)
         self.assertGreaterEqual(took, 10)
+        self.assertEqual([p.name for p in state.iterdir()], ['runserver.pid'])
+        again = self.again()
+        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
+        self.assertIn(f'kill -9 {server.pid}', again.stderr)
+        server.kill()
+        server.wait()
+        last = self.again()
+        self.assertEqual(last.returncode, 0, last.stdout + last.stderr)
         self.assertFalse(state.exists())

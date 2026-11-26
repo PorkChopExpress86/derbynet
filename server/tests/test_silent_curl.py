@@ -12,9 +12,12 @@ Either form names the failure:
     reply="$(curl -sS "$url")"                      # -S prints curl's error
     reply="$(curl -s "$url")" || fail "no answer"   # or the script says it
 
-`-v` prints it too. A substitution with a pipe in it counts only under
-pipefail, since otherwise its status is its last command's. A workflow's
-`run:` step is left: its log prints the command and its exit code.
+`-v` prints it too, and a curl behind `docker exec`, `timeout` or `command`
+counts as one at the start. A curl after a `(` inside the substitution, as in
+a nested `$(...)` or `sh -c "(curl ...)"`, is left. A substitution with a pipe
+in it counts only under pipefail, since otherwise its status is its last
+command's. A workflow's `run:` step is left: its log prints the command and
+its exit code.
 """
 
 import re
@@ -27,8 +30,10 @@ from tests.test_pipefail_pipes import logical_lines
 ROOT = Path(__file__).resolve().parents[2]
 SET_E = re.compile(r"^\s*set\s+(?:-\w+\s+)*-[a-zA-Z]*e", re.M)
 PIPEFAIL = re.compile(r"^\s*set\s+(?:-\w+\s+)*-\w*o\s+pipefail\b", re.M)
-# `name=$(curl` or `name="$(curl`, anywhere on the line, and what follows.
-CAPTURE = re.compile(r"""(?:^|[\s;&|!(])\w+=["']?\$\(\s*curl\s(?P<rest>.*)""")
+# `name=$(curl` or `name="$(docker exec "$c" curl`, anywhere on the line, and
+# what follows curl.  A curl after a `(` inside the substitution is left, as in
+# a nested `$(...)`, whose status is lost.
+CAPTURE = re.compile(r"""(?:^|[\s;&|!(])\w+=["']?\$\([^()]*?\bcurl\s(?P<rest>.*)""")
 SILENT = re.compile(r"(?:^|\s)(?:-[a-zA-Z]*s[a-zA-Z]*|--silent)(?=\s|$)")
 SHOWS = re.compile(
     r"(?:^|\s)(?:-[a-zA-Z]*[Sv][a-zA-Z]*|--show-error|--verbose)(?=\s|$)"
@@ -99,6 +104,16 @@ local page; page="$(curl --silent "$url")"
     assert [n for n, _ in silent_captures(text)] == [2, 3, 5, 6, 7]
 
 
+def test_the_check_finds_a_curl_behind_a_wrapper():
+    """docker exec, timeout and command pass curl's status and stderr on."""
+    text = """set -e
+code="$(docker exec "$name" curl -m 120 -s -o /dev/null "$url")"
+reply=$(timeout 5 curl -s "$url")
+reply=$(command curl --silent "$url")
+"""
+    assert [n for n, _ in silent_captures(text)] == [2, 3, 4]
+
+
 def test_the_check_leaves_the_safe_forms():
     text = """set -euo pipefail
 REPLY=$(curl -sS "$@") || fail "$what: no answer"
@@ -109,6 +124,9 @@ page="$(curl -sv "$url")"
 page="$(curl -m 5 "$url")"
 grep -q success <<<"$(curl -sf "$url")"
 echo "racers $(curl -s "$url" | jq length)"
+code="$(docker exec "$name" curl -m 120 -sS "$url")"
+bin=$(command -v curl)
+page=$(jq -r .x <<<"$(curl -s "$url")")
 """
     assert silent_captures(text) == []
 
