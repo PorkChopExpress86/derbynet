@@ -94,6 +94,61 @@ def test_a_case_s_node_id_under_count_is_refused_before_the_lock(tmp_path, count
     assert not (tmp_path / "load.lock").exists()
 
 
+@pytest.mark.parametrize("before", ["--flake-ticket -n 4 --count 25", "--ignore ui"])
+def test_a_browser_path_with_no_mark_is_refused_before_the_lock(tmp_path, before):
+    """The addopts deselect a browser test unless `-m` is given, and #531's
+    kickoff gave its repeats with none (#531 retro). The first command is
+    the kickoff's; in the second the path follows an option's value."""
+    path = "ui/tests/browser/test_harness.py"
+    command = f"'{SCRIPT}' {before} {path} >/dev/null"
+    result = run(command, out=str(tmp_path / "run"), lock=str(tmp_path / "load.lock"))
+    assert result.returncode == 2
+    assert f"{path} is a browser test" in result.stderr
+    assert "Add -m browser." in result.stderr
+    assert not (tmp_path / "load.lock").exists()
+
+
+@pytest.mark.parametrize("mark", ["-m browser", "-mbrowser", "-m 'browser and not x'"])
+def test_a_browser_path_with_a_mark_passes_the_refusal(tmp_path, mark):
+    """With `-m` the browser path gets past the refusal, to the next one:
+    an output folder that holds files."""
+    out = tmp_path / "run"
+    out.mkdir()
+    (out / "junit.xml").write_text("")
+    result = run(
+        f"'{SCRIPT}' {mark} -n 4 ui/tests/browser/test_harness.py >/dev/null",
+        out=str(out),
+        lock=str(tmp_path / "load.lock"),
+    )
+    assert result.returncode == 2
+    assert "already holds files" in result.stderr
+    assert "is a browser test" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        "ui --ignore ui/tests/browser",
+        "ui --deselect ui/tests/browser/test_harness.py::test_x",
+        "ui --ignore=./ui/tests/browser",
+    ],
+)
+def test_an_option_s_browser_path_passes_the_refusal(tmp_path, args):
+    """A browser path that is an option's value names no test to run
+    (#546 review)."""
+    out = tmp_path / "run"
+    out.mkdir()
+    (out / "junit.xml").write_text("")
+    result = run(
+        f"'{SCRIPT}' -n 4 {args} >/dev/null",
+        out=str(out),
+        lock=str(tmp_path / "load.lock"),
+    )
+    assert result.returncode == 2
+    assert "already holds files" in result.stderr
+    assert "is a browser test" not in result.stderr
+
+
 @pytest.mark.parametrize(
     "count, node, ran",
     [

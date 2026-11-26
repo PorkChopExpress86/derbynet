@@ -31,6 +31,13 @@ the line above it; any other row that names none lists for none. A module
 claim counts on any line, since its row may name the constant a comment
 sits above, or the test that reads it.
 
+`--check` also names each row outside fenced code in the table's own
+shape, such as `| conftest.py:746 `module` | 390x844 |`, whose claim the
+file now has on another line, to print the table again: #543's body kept
+#540's line numbers on 13 rows after the code above them moved, and the
+check passed it (#531 retro). The `L294` cites of the assert column are
+free text and go unread.
+
 A line of fenced code lists nothing and names no scope: #367's `<details>`
 of pasted junit and traceback named the test and held `timed out after
 3 s`, which passed a "3 s" no assert read (#367 retro). A fence opens on a
@@ -386,16 +393,21 @@ def rows(blocks: list[str], names: set[str]) -> list[tuple[set[str], str]]:
     return out
 
 
+def forms(claim: Claim) -> list[str]:
+    """The claim as written, and a number word as its digits ("four
+    landscape" as "4 landscape")."""
+    first, _, rest = claim.text.partition(" ")
+    if first.lower() in WORDS[:12] and rest:
+        return [claim.text, f"{WORDS.index(first.lower()) + 1} {rest}"]
+    return [claim.text]
+
+
 def listed_in(claim: Claim, file: Path, listed: list[tuple[set[str], str]]) -> bool:
     """The claim as written, or a number word as its digits ("four
     landscape" as "4 landscape"), as a whole token on a line that lists its
     scope's claims (`rows()`). #324's 2 passed for a 2 in another test's
     row (#324 retro). A module claim counts on any line."""
-    forms = [claim.text]
-    first, _, rest = claim.text.partition(" ")
-    if first.lower() in WORDS[:12] and rest:
-        forms.append(f"{WORDS.index(first.lower()) + 1} {rest}")
-    pattern = re.compile("|".join(word(f).pattern for f in forms))
+    pattern = re.compile("|".join(word(f).pattern for f in forms(claim)))
     if claim.scope == "module":
         # A module claim's row may name the constant a comment sits above,
         # and a test that reads it (#333's `STUB` comment row).
@@ -574,6 +586,33 @@ def unfenced(body: str) -> list[tuple[int, str]]:
     return kept
 
 
+# A row in the table's own shape: `| conftest.py:746 `module` | 390x844 |`.
+WHERE = re.compile(r"\s*\|\s*([\w.-]+\.py):(\d+)\s+`(\w+)`\s*\|\s*([^|]+?)\s*\|")
+
+
+def moved_rows(body: str, found: list[tuple[Path, Claim, list[int]]]):
+    """Each row outside fenced code in the table's own shape whose claim
+    this head has on no line it cites: its body line, cited `file:line`,
+    and the head's lines. #543's body kept #540's line numbers on 13 rows
+    after the code above them grew, and the check, matching text and
+    scope, passed it (#531 retro). A row names its file by name alone, so
+    a claim of two files of one name counts on either's line (#546
+    review)."""
+    at: dict[tuple[str, str, str], set[int]] = {}
+    for f, c, _ in found:
+        for t in forms(c):
+            at.setdefault((f.name, c.scope, t), set()).add(c.line)
+    out = []
+    for n, line in unfenced(body):
+        if row := WHERE.match(line):
+            name, cited, scope, text = row.groups()
+            lines = at.get((name, scope, re.sub(r"\s+", " ", text)), set())
+            if lines and int(cited) not in lines:
+                now = " or ".join(str(x) for x in sorted(lines))
+                out.append((n, f"{name}:{cited}", now))
+    return out
+
+
 def lead_cites(body: str) -> list[tuple[int, str]]:
     """Each sentence outside fenced code that credits a ruling to the lead
     and cites no decision, question or ticket, with its line, as the module
@@ -692,6 +731,13 @@ def main(argv: list[str] | None = None) -> int:
                 scoped[f] = names
                 if names is None:
                     print(f"{f}: every claim counts (D123): {why}")
+        for n, cited, line_now in moved_rows(args.check.read_text(), found):
+            failed = True
+            print(
+                f"{args.check}:{n}: the row cites {cited}, and this head has"
+                f" its claim on line {line_now}: print the table again"
+                " (#531 retro)"
+            )
         missing = [
             (f, c)
             for f, c, _ in found

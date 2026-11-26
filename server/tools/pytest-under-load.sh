@@ -136,6 +136,30 @@ if [[ "$count" =~ ^[1-9][0-9]*$ ]] && [ "$count" -gt 1 ]; then
     fi
   done
 fi
+# pyproject.toml's addopts deselect the browser tests unless `-m` is given,
+# so a browser path with no `-m` selects nothing: #531's kickoff gave
+# `--flake-ticket -n 4 --count 25 ui/tests/browser/test_harness.py`, copied
+# from #529's form for a file that is no browser test (#531 retro).
+# An option and its value name no test to run: `--ignore ui/tests/browser`
+# drops the browser tests (#546 review).
+marked=
+browser_path=
+skip=
+for arg in "$@"; do
+  if [ -n "$skip" ]; then skip=; continue; fi
+  case "$arg" in
+    -m*) marked=1 ;;
+    --ignore|--ignore-glob|--deselect) skip=1 ;;
+    -*) ;;
+    *) [[ "$arg" =~ (^|/)ui/tests/browser(/|$) ]] && browser_path=${browser_path:-$arg} ;;
+  esac
+done
+if [ -n "$browser_path" ] && [ -z "$marked" ]; then
+  echo "pytest-under-load.sh: $browser_path is a browser test, which" \
+       "pyproject.toml's addopts deselect unless -m is given, so it selects" \
+       "no test. Add -m browser." >&2
+  exit 2
+fi
 # The lock needs util-linux's flock(1), which macOS lacks (#354 review).
 if ! command -v flock >/dev/null; then
   echo "pytest-under-load.sh: it needs flock(1), for the lock that keeps one" \

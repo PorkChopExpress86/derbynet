@@ -72,6 +72,54 @@ def test_check_refuses_a_body_that_leaves_a_claim_out(tmp_path, capsys):
     )
 
 
+def test_a_row_that_cites_a_moved_claim_is_named(tmp_path, capsys):
+    """#543's body kept #540's line numbers on rows whose code had moved,
+    and `--check` passed them (#531 retro). A number word's row in digits
+    is read too, and a row in another shape, or of a file not given, is left
+    to its writer."""
+    path = tmp_path / "test_sample.py"
+    path.write_text("\n\n" + SAMPLE)
+    rows = [
+        "| test_sample.py:3 `module` | 390x844 |",
+        '| test_sample.py:5 `module` | "Lions, Round 1, Heat 14" |',
+        "| test_sample.py:8 `module` | 15vw |",
+        "| test_sample.py:11 `test_labels` | 2 lines |",
+        '| test_sample.py:13 `test_labels` | "Heat 100" |',
+        "| `test_labels` at L12 | 58.3 px |",
+        "| other.py:3 `module` | 390x844 |",
+    ]
+    body = tmp_path / "body.md"
+    body.write_text("<details>\n" + "\n".join(rows) + "\n</details>\n")
+    assert dc.main(["--check", str(body), str(path)]) == 1
+    assert capsys.readouterr().out.splitlines() == [
+        f"{body}:5: the row cites test_sample.py:11, and this head has its"
+        " claim on line 13: print the table again (#531 retro)",
+    ]
+    body.write_text(body.read_text().replace("py:11 `", "py:13 `"))
+    assert dc.main(["--check", str(body), str(path)]) == 0
+
+
+def test_the_printed_table_of_two_files_of_one_name_passes(tmp_path, capsys):
+    """Given `a/conftest.py` and `b/conftest.py`, each with the claim on
+    its own line, a row's `conftest.py:N` names either, and the printed
+    table passes its own `--check` (#546 review)."""
+    one, two = tmp_path / "a" / "conftest.py", tmp_path / "b" / "conftest.py"
+    one.parent.mkdir()
+    two.parent.mkdir()
+    one.write_text('"""At 390x844."""\n')
+    two.write_text('\n\n\n\n"""At 390x844."""\n')
+    assert dc.main([str(one), str(two)]) == 0
+    body = tmp_path / "body.md"
+    body.write_text(f"<details>\n{capsys.readouterr().out}</details>\n")
+    assert dc.main(["--check", str(body), str(one), str(two)]) == 0
+    body.write_text(body.read_text().replace("py:5 `", "py:3 `"))
+    assert dc.main(["--check", str(body), str(one), str(two)]) == 1
+    assert capsys.readouterr().out.splitlines() == [
+        f"{body}:5: the row cites conftest.py:3, and this head has its"
+        " claim on line 1 or 5: print the table again (#531 retro)",
+    ]
+
+
 def test_a_claim_counts_only_on_a_line_that_names_its_test(tmp_path, capsys):
     """#324's body listed "2" for no test, and `--check` passed
     `test_lane_two_off_leaves_it_out_of_heat_ready`'s 2 because a 2 stood
