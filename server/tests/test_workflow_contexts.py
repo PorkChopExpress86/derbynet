@@ -5,7 +5,7 @@ GitHub's context availability table allows `github`, `inputs`, `secrets`
 and `vars` in a workflow's `env`, and adds `matrix`, `needs` and `strategy`
 in a job's `env`; `runner`, `env`, `job` and `steps` are not available
 there. Such a workflow fails before any job starts, and its check never
-appears on the pull request: #59's pi-images.yml set
+appears on the pull request: #59's Pi image workflow (D139 deleted it) set
 `LOGS: ${{ runner.temp }}/logs` in its checks job's env, and its run failed
 as a workflow file issue (#59 review).
 """

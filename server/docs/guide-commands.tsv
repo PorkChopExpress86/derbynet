@@ -79,38 +79,6 @@ install-docker.md	HTTPS after an upgrade from an older image	2	docker compose up
 install-docker.md	HTTPS after an upgrade from an older image	1	docker compose exec server rm -r /var/lib/derbynet/tls	stage https-upgrade
 install-docker.md	HTTPS after an upgrade from an older image	1	docker compose restart caddy	stage https-upgrade
 live-streaming.md	Take events from derby-timer.jar	1	java -jar derby-timer.jar -obs-uri ws://192.168.0.12:4444 -obs-password secret -obs-finish OBS_KEY_NUM2	reason needs OBS Studio with its WebSocket server at the address named, and a timer
-photo-stand.md	Set up a new photo stand	1	git clone https://github.com/PorkChopExpress86/derbynet.git	reason installs the older, non-container photo stand on a Raspberry Pi or Debian computer: git clone into the home folder of the stand
-photo-stand.md	Set up a new photo stand	1	cd derbynet/extras	reason the older photo stand's install, on a stand computer
-photo-stand.md	Set up a new photo stand	1	sudo mkdir -p /usr/share/derbynet	reason root on the stand computer: the older photo stand's install into /usr/share
-photo-stand.md	Set up a new photo stand	1	sudo cp -r autostart conf scripts sounds tools /usr/share/derbynet/	reason root on the stand computer: the older photo stand's install into /usr/share
-photo-stand.md	Set up a new photo stand	1	sudo cp derbynet.conf /etc/derbynet.conf	reason root on the stand computer: the older photo stand's install into /etc
-photo-stand.md	Set up a new photo stand	1	mkdir -p ~/.config/autostart	reason needs the stand computer's desktop session, which reads ~/.config/autostart
-photo-stand.md	Set up a new photo stand	1	cp /usr/share/derbynet/autostart/photostand.desktop ~/.config/autostart/	reason needs the stand computer's desktop session, which reads ~/.config/autostart
-photo-stand.md	Point it at the server	1	unset prepare_camera_before_shot	reason text for /etc/derbynet.conf, which photostand.sh sources on the stand computer; no check reads this block
-photo-stand.md	Point it at the server	1	prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}	reason text for /etc/derbynet.conf, which photostand.sh sources on the stand computer; no check reads this block
-pi-setup.md	Install Docker on the Pi	1	curl -fsSL https://get.docker.com | sudo sh	reason root on a Raspberry Pi: the install script is not run by any check (#59's probe ran it once, by hand, in a Debian arm64 container)
-pi-setup.md	Install Docker on the Pi	1	sudo usermod -aG docker $USER	reason root on a Raspberry Pi: no check adds a user to the docker group
-pi-setup.md	Set up the timer	1	mkdir -p ~/derbynet-timer && cd ~/derbynet-timer	stage pi-timer-folder
-pi-setup.md	Set up the timer	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.timer.yaml	stage pi-timer-folder
-pi-setup.md	Set up the timer	1	ls -l /dev/serial/by-id/	reason needs the timer's USB serial cable plugged into the Pi
-pi-setup.md	Set up the timer	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-timer-env
-pi-setup.md	Set up the timer	1	DERBYNET_TIMER_DEVICE='/dev/ttyUSB0'	stage pi-timer-env
-pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml up -d	stage pi-timer
-pi-setup.md	Set up the timer	1	docker compose -f compose.timer.yaml logs -f	reason follows the log until Ctrl-C; stage pi-timer reads the same log with `docker compose logs`
-pi-setup.md	Set up the photo stand	1	mkdir -p ~/derbynet-photostand && cd ~/derbynet-photostand	stage pi-photostand-folder
-pi-setup.md	Set up the photo stand	1	curl -fsSLO https://raw.githubusercontent.com/PorkChopExpress86/derbynet/master/extras/docker/compose.photostand.yaml	stage pi-photostand-folder
-pi-setup.md	Set up the photo stand	1	ls /dev/input/by-id/	reason needs the barcode scanner plugged into the Pi
-pi-setup.md	Set up the photo stand	1	DERBYNET_SERVER='http://192.168.1.20'	stage pi-photostand-env
-pi-setup.md	Set up the photo stand	1	PHOTO_CAPTURE='gphoto2'	stage pi-photostand-env
-pi-setup.md	Set up the photo stand	1	PHOTO_REPO='head'	stage pi-photostand-env
-pi-setup.md	Set up the photo stand	1	PHOTO_CHECKIN='1'	stage pi-photostand-env
-pi-setup.md	Set up the photo stand	1	BARCODE_SCANNER_DEVS='usb-Your_Scanner_Name-event-kbd'	stage pi-photostand-env
-pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml up -d	stage pi-photostand
-pi-setup.md	Set up the photo stand	1	docker compose -f compose.photostand.yaml logs -f	reason follows the log until Ctrl-C; stage pi-photostand reads the same log with `docker compose -f compose.photostand.yaml logs`
-pi-setup.md	Cameras	1	systemctl --user stop gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
-pi-setup.md	Cameras	1	systemctl --user mask gvfs-daemon	reason needs the Pi desktop's user session, whose gvfs-daemon holds the camera
-pi-setup.md	Update	1	docker compose -f compose.timer.yaml pull	stage pi-timer-update
-pi-setup.md	Update	1	docker compose -f compose.timer.yaml up -d	stage pi-timer-update
-timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x http://localhost/	reason needs derby-timer.jar and a timer on a serial port; the jar is built by the timer image (extras/docker/timer.Dockerfile), whose checks run it with -simulate-timer
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x http://localhost/	reason needs derby-timer.jar and a timer on a serial port; server.yml's race step builds the jar and runs it with -simulate-timer
 timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -n /dev/ttyUSB0 -d FastTrackPSeries http://localhost/	reason needs derby-timer.jar and a timer on /dev/ttyUSB0
-timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -simulate-timer -lanes 4 http://localhost/	reason needs derby-timer.jar, built by the timer image (extras/docker/timer.Dockerfile); in its place pi-images.yml's checks (arm64) job runs `extras/docker/ci/checks.sh timer`, the image's jar with `-t -r -simulate-timer -lanes 4 -pace 1` against a server
+timer-operation.md	derby-timer.jar	1	java -jar derby-timer.jar -x -simulate-timer -lanes 4 http://localhost/	reason needs derby-timer.jar, built from timer/build.xml; in its place server.yml's race step runs `bash testing/race-with-derby-timer.sh`, the jar with `-simulate-timer -lanes 4 -pace 1` against the Django server

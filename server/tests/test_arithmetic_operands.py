@@ -46,7 +46,6 @@ SCOPE = (
     "server/tools/",
     "server/docker/",
     "testing/docker/",
-    "extras/docker/ci/",
 )
 # (file, what it reads as a number): why it is one.
 KNOWN = {
