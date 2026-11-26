@@ -782,6 +782,7 @@ KIND_READERS = (
     KindReader('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'sources'),
     KindReader('tests/test_php_cite_lines.py', 'tests/test_php_cite_lines.py', 'php_files'),
     KindReader('tests/test_pipefail_pipes.py', 'tests/file_kinds.py', 'shell_files'),
+    KindReader('tests/test_silent_curl.py', 'tests/file_kinds.py', 'shell_files'),
     KindReader('tests/test_subshell_state.py', 'tests/file_kinds.py', 'shell_files'),
     KindReader('tests/test_transcript_diff_live.py', 'tests/file_kinds.py', 'top_of_testing'),
 )

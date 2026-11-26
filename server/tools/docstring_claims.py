@@ -9,6 +9,11 @@ examples in the module docstring that no test asserted (#283 retro).
     uv run python tools/docstring_claims.py --check BODY.md ui/tests/...
     uv run python tools/docstring_claims.py --check BODY.md --base origin/master ...
 
+`--check` takes no test file when the diff changes none: it then checks
+the body's lead credits and fences, and with `--base` the tests the diff
+deletes. #537's implementer passed an empty .py for want of one (#537
+retro).
+
 The first prints a Markdown table: where each claim is (the module, a
 `#` comment above a constant, or the function), the claim, and the lines
 of that scope's code where its literal appears, or `?` where none does.
@@ -458,9 +463,10 @@ def git(cwd: Path, *argv: str) -> str:
 
 
 def alive(path: Path) -> Path:
-    """`path`'s nearest folder that still exists: a deleted file's own may
-    be gone too."""
-    return next(p for p in path.resolve().parents if p.is_dir())
+    """`path`, or its nearest folder, that still exists as a folder: a
+    deleted file's own may be gone too."""
+    path = path.resolve()
+    return next(p for p in (path, *path.parents) if p.is_dir())
 
 
 def base_text(file: Path, rev: str) -> str | None:
@@ -636,10 +642,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", metavar="BODY.md", type=Path)
     parser.add_argument("--base", metavar="REV", help="with --check: see above")
-    parser.add_argument("files", nargs="+", type=Path)
+    parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args(argv)
     if args.base and not args.check:
         parser.error("--base goes with --check")
+    if not args.files and not args.check:
+        parser.error("name a test file, or give --check BODY.md")
     present = [f for f in args.files if f.exists()]
     absent = [f for f in args.files if not f.exists()]
     if absent and not args.base:
@@ -667,7 +675,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.base:
             text = "\n".join(line for _, line in unfenced(args.check.read_text()))
-            removed = deleted_tests(args.files[0], args.base)
+            removed = deleted_tests(next(iter(args.files), Path.cwd()), args.base)
             for f, name in gone([*args.files, *removed], args.base):
                 if not word(name.split("::")[-1]).search(text):
                     failed = True
