@@ -1567,6 +1567,8 @@ for check in "$@"; do
         acme) check_acme ;;
         docs) check_docs ;;
         timer) check_timer ;;
+        -*) fail "no check named $check: checks.sh takes check names, not options;" \
+            "the source checks' quick run is server/tools/source-checks.sh --quick" ;;
         *) fail "no check named $check" ;;
     esac
     cleanup
