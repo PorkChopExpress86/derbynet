@@ -21,6 +21,7 @@ from ui.tests.browser.conftest import (
     BLOCKED,
     InFlight,
     _settle,
+    block_sending,
     check_harness,
     close_tab,
     font_config,
@@ -436,6 +437,31 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
     assert page.in_flight.closed_with == []
     # one read: the tab is closed, so no later message can join the list.
     assert navigated == ["navigates"]
+
+
+def test_the_block_fails_no_fetch_of_a_document_on_the_page(page, event):
+    """A document that commits as `block_sending` adds its init script
+    misses that script's STOP_SENDING: under load, the reload of
+    `test_close_tab_closes_a_tab_whose_reply_navigates` reached the server
+    before the stop and committed then, and its fetch loop spun on the
+    block's failures until the tab closed (#531). `block_sending` stops
+    the documents already on the page as well, so the block fails none of
+    their fetches. Here the document's loop is still sending, as that
+    reload's was, when `block_sending` starts."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    failed = []
+    tab.on("requestfailed", failed.append)
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
+    ) as server:
+        keep_sending(tab, "fetch")
+        block_sending(tab)
+        tab.wait_for_timeout(HOLD_S * 1000 * 3)
+        assert server.after_close(page) == (0, 0)
+    assert [r.failure for r in failed] == []
+    close_tab_in_time(page, tab)
 
 
 def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):

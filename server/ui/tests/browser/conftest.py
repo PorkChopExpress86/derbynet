@@ -695,8 +695,17 @@ def block_sending(page):
     STOP_SENDING first: a fetch of theirs never fails into a handler that
     would send again. A page that loads an image again on its error would
     spin, the block failing each load at once; no script under
-    `ui/static/ui/` sets an image's `onerror`."""
+    `ui/static/ui/` sets an image's `onerror`.
+
+    A document that commits as the init script is added misses it: a
+    reload in `close_tab`, sent before the block and committed then, kept
+    its own fetch, whose loop spun on the block's failures until the tab
+    closed, and the server got one more of its fetches
+    (`test_the_block_fails_no_fetch_of_a_document_on_the_page`, #531). So
+    STOP_SENDING also runs in every frame on the page before the block
+    starts."""
     page.add_init_script(f"({STOP_SENDING})(null)")
+    stop_sending(page)
     blocker = page.context.new_cdp_session(page)
     # Before the first send: Playwright hands the page's events over while
     # a send waits, so a failure the block causes then must find the page
