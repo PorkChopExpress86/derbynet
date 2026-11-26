@@ -4,7 +4,7 @@ EXTENDS Naturals, Sequences
 (*
  * Formal model of DerbyNet's current-heat state machine, result services,
  * and playlist operator-gate intermission (owner decisions D27, D28, D32, D135, D136,
- * D141, D143).
+ * D141, D143, D144).
  *
  * Scope and bounds:
  *   - One group with a 2-step playlist:
@@ -46,9 +46,8 @@ VARIABLES
     discardVal,     \* "none", "v1", "v2", "done"
     nonCoordBreak,  \* BOOLEAN: TRUE if a non-CONTROL_RACE caller altered R1 after R2 raced
     kept            \* BOOLEAN: a Round 1 change left the final's roster as it was, for
-                    \* a final with a result (D136), a step that does not wait (PHP's
-                    \* playlist.inc:85), or a rerun whose new result ends Round 1 again
-                    \* (D135); the final made again clears it
+                    \* a final with a result (D136) or a step that does not wait (PHP's
+                    \* playlist.inc:85); the final made again clears it
 
 vars == <<
     curRound, curHeat, racing, waiting,
@@ -94,12 +93,12 @@ Becomes(s) ==
    it behind the standings. *)
 Kept(s, r1After) == s.kp \/ ((s.fb \/ s.fs) /\ s.fr /= r1After)
 
-(* rebuild_waiting_final in heats.py, which every result change but a
-   rerun calls. close_intermission_on_result (D136): the intermission stays
+(* rebuild_waiting_final in heats.py, which every result change calls,
+   a rerun included (D144). close_intermission_on_result (D136): the intermission stays
    open only while the final has no result. Then, when Round 1 changed, the
    final is made again from the standings and the cut as they are now: by
    rebuild_waiting_round with the intermission open before the change (D27),
-   or by rebuild_fed_finals with it closed, once the final is made for a
+   and by rebuild_fed_finals with it closed, once the final is made for a
    step that waits and while it has no result (D141). A cut of one racer
    leaves it a roster and no chart (D28). Where the cut picks the racers the
    final has, with a chart, nothing changes (_same_finalists). Otherwise
@@ -296,35 +295,27 @@ SetRacingOff ==
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak, kept>>
 
-(* rerun: heats.py, the Rerun rows of TABLE and _RACING_ON_EXTRAS[By.RERUN] *)
+(* rerun: heats.py, the Rerun rows of TABLE and _RACING_ON_EXTRAS[By.RERUN],
+   then rebuild_waiting_final with the intermission it closed (D141, D144) *)
 Rerun(which, isCoord) ==
     /\ which \in {"current", "last"}
     /\ LET tgtRnd == IF which = "current" THEN curRound ELSE lastHeatRound
            tgtNum == IF which = "current" THEN curHeat ELSE lastHeatNum
+           r1New == IF tgtRnd = "R1" THEN [r1 EXCEPT ![tgtNum] = "none"] ELSE r1
+           r2New == IF tgtRnd = "R1" THEN r2 ELSE "none"
+           \* By.RERUN emits CloseIntermission() (D136)
+           moved == [Now EXCEPT !.cr = tgtRnd, !.ch = tgtNum, !.rc = TRUE, !.w = FALSE]
        IN
        /\ HeatExists(tgtRnd, tgtNum)
        /\ (isCoord \/ tgtRnd /= "R1" \/ ~FinalHasResult(r2))  \* locked_failure in rerun
-       /\ curRound' = tgtRnd
-       /\ curHeat' = tgtNum
-       /\ racing' = TRUE
-       /\ waiting' = FALSE  \* By.RERUN emits CloseIntermission() (D136)
        /\ lastHeatRound' = tgtRnd
        /\ lastHeatNum' = tgtNum
        /\ lastHeatSaved' = HeatResult(tgtRnd, tgtNum)
-       /\ IF tgtRnd = "R1" THEN
-            LET r1New == [r1 EXCEPT ![tgtNum] = "none"]
-            IN
-            /\ r1' = r1New
-            /\ r2' = r2
-            /\ kept' = Kept(Now, r1New)
-          ELSE
-            /\ r1' = r1
-            /\ r2' = "none"
-            /\ kept' = kept
+       /\ r1' = r1New
+       /\ r2' = r2New
+       /\ Becomes(Rebuilt(moved, FALSE, tgtRnd = "R1", r1New, r2New))
        /\ nonCoordBreak' = (nonCoordBreak \/ (~isCoord /\ tgtRnd = "R1" /\ FinalHasResult(r2)))
-       \* a rerun calls no rebuild_waiting_final, so the final stays
-       /\ UNCHANGED <<finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
-                      discardRound, discardNum, discardVal>>
+       /\ UNCHANGED <<stepWaits, cutShort, discardRound, discardNum, discardVal>>
 
 (* reinstate: heats.py, the Reinstate rows of TABLE, then
    rebuild_waiting_final *)

@@ -131,7 +131,7 @@ def import_result(event: Event, fields: dict) -> ImportFailure | None:
                 completed=completed,
             )
             RosterEntry.objects.get_or_create(event=event, round=round, racer=racer)
-            heats.rebuild_waiting_final(event, [round.id], ended, None)
+            heats.rebuild_waiting_final(event, [round.id], ended, finalists_for=None)
     except ImportFailure as failure:
         return failure
     except IntegrityError, DatabaseError, groups.GroupFailure:
