@@ -62,7 +62,8 @@ each made true and made false, is what "each condition is mutated" means
 (#336 retro). It prints a row per mutant as it runs (`KILLED` with
 pytest's short summary lines, the test and the error that killed it,
 `SURVIVED`, or `REFUSED` or `ERROR` with pytest's last lines), then the
-count of each,
+count of each in its tally line (`0 listed: none for the diff, so the round
+is hand mutants` when none is listed, #519 retro),
 and exits 0 when every one is KILLED, 1 when one survived, and 2 when one
 was refused or errored, or none is listed. It mutates `.py`, `.js` and
 `.css` files and Python scripts, and names each other file whose mutants
