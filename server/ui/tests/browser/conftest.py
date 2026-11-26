@@ -422,8 +422,19 @@ class InFlight:
     after a click, #188, for a thumbnail left loading by a link, #47, and
     for the timer's scripts when the Web Serial guard leaves `/timer.php`,
     #50). So when a frame
-    navigates, those requests leave the set: their replies can no longer
-    reach the page. The new document sends none before it commits."""
+    navigates to a new document, those requests leave the set: their
+    replies can no longer reach the page. The new document sends none
+    before it commits.
+
+    Where a route is set, Playwright reports a request only once Chromium
+    pauses it, and the pause can come after the next document commits: the
+    navigation's drop then ran before the old document's request joined the
+    set, and it stayed there with no end (#530: a timer status image after
+    the Web Serial guard left `/timer.php`). So a request of those types
+    whose Referer names the document its frame left at its last navigation
+    to a new document, and not the one it is on, never joins the set. One
+    with no Referer, or after a reload to the same URL, does: it could be
+    the new page's own."""
 
     TIMEOUT_MS = 10_000
     ORPHANED = ("xhr", "fetch", "image", "script", "stylesheet")
@@ -432,13 +443,18 @@ class InFlight:
         self.requests = set()
         # Requests a tab still had out when it closed, as "METHOD URL".
         self.closed_with = []
-        context.on("request", lambda r: self.requests.add(r))
+        # The document URL each frame was on before its last navigation to
+        # a new document, and the URL it is on.
+        self.left = {}
+        self._urls = {}
+        context.on("request", self.sent)
         context.on("requestfinished", lambda r: self.requests.discard(r))
         context.on("requestfailed", lambda r: self.requests.discard(r))
         context.on("page", self.watch)
 
     def watch(self, page):
-        page.on("framenavigated", lambda frame: self.navigated(frame))
+        self.attached(page.main_frame)
+        page.on("frameattached", self.attached)
         page.on("close", lambda closed: self.page_closed(closed))
 
     def of(self, tab) -> set:
@@ -454,12 +470,41 @@ class InFlight:
         self.requests -= left
         self.closed_with += sorted(f"{r.method} {r.url}" for r in left)
 
-    def navigated(self, frame):
-        self.requests -= {
-            r
-            for r in self.requests
-            if _frame_of(r) == frame and r.resource_type in self.ORPHANED
-        }
+    def attached(self, frame):
+        """Follow the document `frame` is on. Playwright's `framenavigated`
+        also fires for a fragment, `history.pushState` or `replaceState`,
+        which keep the document and its requests (vote.js's `sorted()`
+        replaces its URL), so the drop and `left` act only on a navigation
+        to a new document: the frame's private `navigated` event carries
+        `newDocument` only then
+        (`test_only_a_new_document_moves_the_page_left`)."""
+        frame._impl_obj._event_emitter.on(
+            "navigated", lambda event: self.moved(frame, event)
+        )
+
+    def moved(self, frame, event):
+        if "error" in event:
+            return
+        if "newDocument" in event:
+            self.left[frame] = _document_url(self._urls.get(frame, "about:blank"))
+            self.requests -= {
+                r
+                for r in self.requests
+                if _frame_of(r) == frame and r.resource_type in self.ORPHANED
+            }
+        self._urls[frame] = event["url"]
+
+    def sent(self, request):
+        frame = _frame_of(request)
+        referer = request.headers.get("referer")
+        if (
+            request.resource_type in self.ORPHANED
+            and referer is not None
+            and referer == self.left.get(frame)
+            and referer != _document_url(frame.url)
+        ):
+            return
+        self.requests.add(request)
 
     def drain(self, page) -> list[str]:
         """Wait until nothing is in flight; return what still is after the
@@ -470,6 +515,11 @@ class InFlight:
             page.wait_for_timeout(50)
             waited += 50
         return sorted(f"{r.method} {r.url}" for r in self.requests)
+
+
+def _document_url(url):
+    """`url` as a Referer names its document: without its fragment."""
+    return url.split("#", 1)[0]
 
 
 def _frame_of(request):
