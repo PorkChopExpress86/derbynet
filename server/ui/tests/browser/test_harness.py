@@ -88,6 +88,97 @@ def test_a_navigation_drops_a_request_still_loading(page, page_errors, event, ki
     assert not [r for r in page.in_flight.requests if "held-request" in r.url]
 
 
+# A page that leaves as it loads, as the timer's Web Serial guard does,
+# with many images out, since the race needs one reported after the commit:
+# the guard page's two status images met it about 1 run in 180 under load,
+# and 20 images here met it on 3 runs in 8 (#530).
+LEAVES = "<script>location.replace('/login/')</script>" + "".join(
+    f'<img src="/static/timer/img/derbynet.png?{n}">' for n in range(300)
+)
+
+
+@pytest.mark.parametrize(
+    "images",
+    [lambda route: route.continue_(), lambda route: route.abort()],
+    ids=["loaded", "refused"],
+)
+def test_a_request_reported_after_its_page_left_is_not_in_flight(
+    page, page_errors, images
+):
+    """A route makes Playwright report a request only once Chromium pauses
+    it, which can be after the next document commits. The old page's
+    images then joined the set after the navigation's drop and stayed with
+    no end, whether they went on to the server or a route refused them
+    (#530). Before the fix, each case failed on 19 runs in 20."""
+    page.route(
+        "**/leaves/",
+        lambda route: route.fulfill(content_type="text/html", body=LEAVES),
+    )
+    page.route("**/derbynet.png*", images)
+    page_errors.allow(r"request failed: \S*/derbynet.png\S* net::ERR_FAILED$")
+    page_errors.allow(r"^console: Failed to load resource: net::ERR_FAILED$")
+    page.goto("/leaves/")
+    page.wait_for_url("**/login/")
+    assert page.in_flight.drain(page) == []
+
+
+class _Fake:
+    """A frame or request by its attributes, hashed by identity, as
+    Playwright's are."""
+
+    def __init__(self, **attributes):
+        self.__dict__.update(attributes)
+
+
+def _joins(*urls, kind="image", referer=None):
+    """Whether a request of `kind` with `referer`, reported after its frame
+    went through `urls`, joins the set of the requests in flight."""
+    in_flight = InFlight(SimpleNamespace(on=lambda event, handler: None))
+    frame = _Fake(url="about:blank")
+    for url in urls:
+        frame.url = url
+        in_flight.navigated(frame)
+    request = _Fake(resource_type=kind, headers={"referer": referer}, frame=frame)
+    in_flight.sent(request)
+    return request in in_flight.requests
+
+
+A, B = "http://derbynet.test/a/", "http://derbynet.test/b/"
+
+
+@pytest.mark.parametrize(
+    "joins, urls, kind, referer",
+    [
+        (False, (A, B), "image", A),
+        (False, (A, B + "#x"), "script", A),
+        (True, (A, B), "image", B),
+        (True, (A, B + "#x"), "image", B),
+        (True, (A, A), "image", A),
+        (True, (A, B), "image", None),
+        (True, (), "image", None),
+        (True, (A, B), "image", "http://derbynet.test/c/"),
+        (True, (A, B), "ping", A),
+    ],
+    ids=[
+        "left-image",
+        "left-script-then-a-fragment",
+        "the-new-page",
+        "the-new-page-with-a-fragment",
+        "after-a-reload",
+        "no-referer",
+        "no-referer-before-any-navigation",
+        "a-third-page",
+        "a-ping-from-the-left-page",
+    ],
+)
+def test_only_a_late_request_of_the_page_left_is_kept_out(joins, urls, kind, referer):
+    """`InFlight.sent` keeps out only a request of a type the navigation
+    ends whose Referer names the page its frame left, not the page it is
+    on (#530). A ping, such as a beacon, is no such type: it outlives its
+    page. Any request that could be the new page's own stays in too."""
+    assert _joins(*urls, kind=kind, referer=referer) is joins
+
+
 def test_every_type_the_harness_drops_has_a_held_request():
     assert sorted(HELD) == sorted(InFlight.ORPHANED)
 

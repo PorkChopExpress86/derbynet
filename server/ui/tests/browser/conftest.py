@@ -423,7 +423,18 @@ class InFlight:
     for the timer's scripts when the Web Serial guard leaves `/timer.php`,
     #50). So when a frame
     navigates, those requests leave the set: their replies can no longer
-    reach the page. The new document sends none before it commits."""
+    reach the page. The new document sends none before it commits.
+
+    Where a route is set, Playwright reports a request only once Chromium
+    pauses it, and the pause can come after the next document commits: the
+    navigation's drop then ran before the old document's request joined the
+    set, and it stayed there with no end (#530: a timer status image after
+    the Web Serial guard left `/timer.php`). So a request of those types
+    whose Referer names the document its frame was on before its last
+    navigation, and not the one it is on, never joins the set. One with no
+    Referer, or after a reload to the same URL, does: it could be the new
+    page's own. After a `history.pushState`, the old URL's late requests
+    are dropped too, as the navigation's drop above drops the ones it saw."""
 
     TIMEOUT_MS = 10_000
     ORPHANED = ("xhr", "fetch", "image", "script", "stylesheet")
@@ -432,7 +443,11 @@ class InFlight:
         self.requests = set()
         # Requests a tab still had out when it closed, as "METHOD URL".
         self.closed_with = []
-        context.on("request", lambda r: self.requests.add(r))
+        # The document each frame was on before its last navigation, and
+        # the one it is on.
+        self.left = {}
+        self._urls = {}
+        context.on("request", self.sent)
         context.on("requestfinished", lambda r: self.requests.discard(r))
         context.on("requestfailed", lambda r: self.requests.discard(r))
         context.on("page", self.watch)
@@ -454,7 +469,21 @@ class InFlight:
         self.requests -= left
         self.closed_with += sorted(f"{r.method} {r.url}" for r in left)
 
+    def sent(self, request):
+        frame = _frame_of(request)
+        referer = request.headers.get("referer")
+        if (
+            request.resource_type in self.ORPHANED
+            and referer is not None
+            and referer == self.left.get(frame)
+            and referer != _document_url(frame.url)
+        ):
+            return
+        self.requests.add(request)
+
     def navigated(self, frame):
+        self.left[frame] = _document_url(self._urls.get(frame, "about:blank"))
+        self._urls[frame] = frame.url
         self.requests -= {
             r
             for r in self.requests
@@ -470,6 +499,11 @@ class InFlight:
             page.wait_for_timeout(50)
             waited += 50
         return sorted(f"{r.method} {r.url}" for r in self.requests)
+
+
+def _document_url(url):
+    """`url` as a Referer names its document: without its fragment."""
+    return url.split("#", 1)[0]
 
 
 def _frame_of(request):
