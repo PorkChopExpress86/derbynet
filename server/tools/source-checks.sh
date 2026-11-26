@@ -118,6 +118,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   ui/tests/test_read_then_act.py \
   ui/tests/test_browser_tab_close.py \
   ui/tests/test_browser_one_shot_reads.py \
+  ui/tests/test_browser_stop_sending.py \
   ui/tests/test_browser_empty_fulfill.py \
   ui/tests/test_browser_missing_allowance.py \
   ui/tests/test_browser_clock_pause.py \
