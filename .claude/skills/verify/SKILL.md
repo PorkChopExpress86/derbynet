@@ -28,6 +28,8 @@ The Django server keeps the code and templates it started with. After each edit 
 
 Baseline after `seed`: event `Verify`, 4 lanes, racers `Ava`..`Hal Verify` in dens `Lions` (cars 101-104) and `Tigers` (201-204), all checked in. Role passwords: RaceCoordinator `doyourbest`, RaceCrew `murphy`, Photo `flashbulb`.
 
+`seed --intermission` then races Lions Round 1 through a two-step playlist whose final waits, so the Django run opens a heat intermission; PHP has none and races the same round ([features/timer.md](features/timer.md)).
+
 Never drive `derbynet-local` on port 8080: that is the owner's own instance.
 
 ## Real phone
