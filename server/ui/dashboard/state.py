@@ -24,7 +24,7 @@ from core.models import Event, RaceSettings, RaceState
 from kiosks.models import ReplayStatus
 from racing.engine.phpcompat import php_time
 from racing.models import HeatLane, Round, TimerStatus
-from racing.services import finals, lanes, master, playlist, polls, timer
+from racing.services import finals, heats, lanes, master, playlist, polls, timer
 from roster.models import Racer
 from roster.services.racers import HEADSHOTS
 from ui.dashboard.presenter import Extras, Held, present, strip_seconds
@@ -277,6 +277,7 @@ def build(request, event: Event, shown: Shown) -> Live:
         award_settings=award_settings,
         emptied={(rid, heat) for _, rid, heat, _ in master.held_emptied_heats(event)},
         intermission=_intermission(event, state),
+        test_live=heats.timer_test_live(state),
         master_heats=_master_heats(event) if settings.use_master_sched else [],
         warn_no_timer=settings.warn_no_timer,
         use_subgroups=settings.use_subgroups,

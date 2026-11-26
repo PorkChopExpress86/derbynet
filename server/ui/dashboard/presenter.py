@@ -84,6 +84,8 @@ class Extras:
     emptied: set[tuple[int, int]] = field(default_factory=set)
     # The playlist intermission (D12), or None.
     intermission: dict | None = None
+    # A timer test the timer races (heats.timer_test_live, D145).
+    test_live: bool = False
     # Upcoming heats under the master schedule: (master heat, round name, heat).
     master_heats: list[tuple[int, str, int]] = field(default_factory=list)
     warn_no_timer: bool = True
@@ -404,8 +406,7 @@ def present(payload: dict, extras: Extras | None = None) -> dict:
     emptied = in_round and not extras.held and not payload["racers"]
     rounds = payload["rounds"]
     done = completed_rounds(rounds, payload["classes"])
-    # D145: the banner shows for a timer test whatever racing says.
-    timer_test_running = current_id == TIMER_TEST_ROUND
+    timer_test_running = extras.test_live
     not_added = []
     for r in rounds:
         if r["heats_scheduled"] <= r["heats_run"]:

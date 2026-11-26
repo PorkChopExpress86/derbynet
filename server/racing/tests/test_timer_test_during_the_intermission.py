@@ -15,6 +15,8 @@ from core.tests.factories import EventFactory
 from racing.models import PlaylistEntry
 from racing.services import heats, polls, replay, timer
 from racing.services.playlist import skip_waiting_step
+from racing.services.results import record_manual_result
+from racing.services.tests.race import fields
 from racing.tests.test_result_changes_rebuild_the_final import (
     state_of_event,
     timed,
@@ -180,3 +182,18 @@ def test_a_test_with_racing_on_sends_the_replay_start_for_its_next_heat():
     assert first == replay.replay(settings)
     assert second == replay.CANCEL
     assert rest == [replay.start("Timer Test", 1, heat + 1)]
+
+
+def test_a_manual_result_in_the_test_moves_to_the_next_test_heat(intermission):
+    """The test works during the intermission as outside it (D145): a result
+    written by hand moves the test on, as the `manual result in a timer
+    test, racing` row does with racing on."""
+    event, round1, final, entry = intermission
+    timer.set_test_mode(event, True)
+    heat = state_of_event(event).current_heat
+    record_manual_result(event, fields("lane1=2.5&lane2=2.4"))
+    now = state_of_event(event)
+    assert now.timer_test
+    assert now.current_heat == heat + 1
+    assert not now.racing
+    assert polls.timer_test(event)["heat"] == heat
