@@ -97,8 +97,8 @@ read.
 path with an extension under `derbynet-drafts/`, `var/load-runs/` or a
 session scratchpad (`/tmp/claude-N/`), which no reviewer can open. #538's
 body cited `~/.cache/derbynet-drafts/529/logs/repro-before.log` for its
-reproduction, and 29 of 80 merged bodies before it cited such a file (#529
-retro). Paste what the file holds, in a fence (a `<details>` block for long
+reproduction, and 29 of the 80 merged bodies up to it, its own among them,
+cited such a file (#529 retro). Paste what the file holds, in a fence (a `<details>` block for long
 output), or link the PR comment that holds it; a fence's lines are not read,
 since pasted output names its own log. The limits left: a folder (a path
 with no extension, such as `~/.cache/derbynet-drafts/N/`) passes, as rule
