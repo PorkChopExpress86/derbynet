@@ -9,7 +9,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 
 ## Coverage & sync commit
 
-- **Last verified commit:** `751cfa59a3b16ba37a7e9d4e005883640e1f5cb5`
+- **Last verified commit:** `bf5804647ddf340d8f173ce49a8320852cf46979`
 - **Covered files and functions:**
   - `server/racing/engine/heat_state.py`: `State`, `Chart.allowed`, `Chart.round_complete`, `TABLE`, `decide`, `_RACING_ON_EXTRAS`, `timer_may_race`, `test_live`
   - `server/racing/services/heats.py`: `transition`, `select_heat`, `set_racing`, `rerun`, `reinstate`, `advance`, `rebuild_waiting_final`, `results_locked`, `locked_failure`, `timer_may_race`, `timer_test_live`
@@ -21,7 +21,7 @@ Checks every reachable interleaving of DerbyNet's heat transitions, result write
 Before trusting a pass, check whether covered code changed since the sync commit:
 
 ```sh
-git diff --stat 751cfa59a3b16ba37a7e9d4e005883640e1f5cb5 -- \
+git diff --stat bf5804647ddf340d8f173ce49a8320852cf46979 -- \
   server/racing/engine/heat_state.py \
   server/racing/services/heats.py \
   server/racing/services/results.py \
@@ -90,7 +90,7 @@ When TLC reports a counterexample:
 1. Update the affected action(s) in `.agents/skills/heat-intermission/HeatIntermission.tla` so each action still matches the exact guards, state writes, and `rebuild_waiting_final` / `locked_failure` calls in the covered Python files.
 2. Run `./.agents/skills/heat-intermission/check.sh` and inspect with `/statechart`.
 3. Confirm every newly passing invariant is still able to fail by temporarily reverting the guard/fix in the model and verifying TLC catches it.
-4. Update the baseline table once the model matches the code. Leave **Last verified commit** and the `.tla` header's sync commit as they are until the PR merges, then name its squash commit in both, and in the `git diff --stat` above, in a follow-up PR.
+4. Update the baseline table once the model matches the code: `check.sh` fails each state count in this file that its run did not find (#515 retro). Leave **Last verified commit** and the `.tla` header's sync commit as they are until the PR merges, then name its squash commit in both, and in the `git diff --stat` above, in a follow-up PR.
 
 ## Scope & what is NOT covered
 

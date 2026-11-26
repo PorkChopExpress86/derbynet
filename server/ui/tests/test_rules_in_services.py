@@ -582,3 +582,85 @@ def never_heard(event):
 
 def test_whole_seconds_and_legacy_numbers_pass():
     assert contact_arithmetic(WHOLE_SECONDS_USED) == []
+
+
+# A running timer test (D145). Whether a timer test runs that the timer
+# races is `heats.timer_test_live`, and whether the timer races at all is
+# `heats.timer_may_race`: during the intermission a test runs with racing
+# off. #515 moved the rule there and left `race.timer_test and race.racing`
+# in ui/timer/state.py twice, which review found; the reader sweep was piped
+# to `head` (#515 retro). The scan flags an `and` or `or` that reads a timer
+# test (`.timer_test`, `TIMER_TEST_ROUND`) in one operand and racing
+# (`.racing`, `["now_racing"]`) in another, in every module the contact scan
+# reads. At 44a2208f, before #515's fix, it finds four: the two above, the
+# dashboard presenter's `current_id == TIMER_TEST_ROUND and
+# current["now_racing"]` and the engine's `timer_test(ctx) and racing(ctx)`.
+# A test and racing read in two statements stay review's.
+TEST_NAMES = frozenset({"timer_test", "TIMER_TEST_ROUND"})
+RACING_NAMES = frozenset({"racing", "now_racing"})
+
+
+def _reads(node: ast.expr, names: frozenset[str]) -> bool:
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Attribute) and sub.attr in names:
+            return True
+        if isinstance(sub, ast.Name) and sub.id in names:
+            return True
+        if (
+            isinstance(sub, ast.Subscript)
+            and isinstance(sub.slice, ast.Constant)
+            and sub.slice.value in names
+        ):
+            return True
+    return False
+
+
+def timer_test_copies(source: str, filename: str = "state.py") -> list[str]:
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.BoolOp):
+            continue
+        tests = [i for i, v in enumerate(node.values) if _reads(v, TEST_NAMES)]
+        racing = [i for i, v in enumerate(node.values) if _reads(v, RACING_NAMES)]
+        if any(i != j for i in tests for j in racing):
+            found.append(
+                f"{filename}:{node.lineno} {ast.unparse(node)}: "
+                "use heats.timer_test_live or heats.timer_may_race, or in the "
+                "engine heat_state.test_live or timer_may_race (D145)"
+            )
+    return found
+
+
+def test_a_running_timer_test_is_read_from_heats():
+    found = []
+    for path in _contact_modules():
+        found += timer_test_copies(path.read_text(), str(path.relative_to(SERVER)))
+    assert found == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "running = race.timer_test and race.racing",
+        "live = current_id == TIMER_TEST_ROUND and current['now_racing']",
+        "idle = not state.racing or not state.timer_test",
+        "live = timer_test(ctx) and racing(ctx)",
+    ],
+    ids=["timer-state-515", "presenter-515", "negated-or", "engine-515"],
+)
+def test_a_copied_timer_test_rule_is_flagged(source):
+    assert len(timer_test_copies(source)) == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "running = heats.timer_test_live(race)",
+        "if state.timer_test or state.current_round_id is None: pass",
+        "on = race.racing and race.current_round_id is not None",
+        "ok = shown(race.timer_test, race.racing) and ready",
+    ],
+    ids=["from-heats", "test-alone", "racing-alone", "both-in-one-operand"],
+)
+def test_a_timer_test_or_racing_read_alone_passes(source):
+    assert timer_test_copies(source) == []
