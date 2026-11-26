@@ -643,34 +643,21 @@ def test_each_stage_a_reason_names_is_an_arm_of_the_script():
     assert sorted(names - set(arms())) == []
 
 
-CHECKS_SH_CHECK = re.compile(r"((?:server/docker/ci/)?)checks\.sh ([a-z][a-z-]*)")
-
-
-def test_the_checks_sh_check_a_reason_names_is_found():
-    """timer-operation.md's reasons named the timer image's checks.sh until
-    D139 deleted it; no reason names a check now, so the pattern is held here."""
-    reason = "in its place image.yml runs `server/docker/ci/checks.sh upload`"
-    assert CHECKS_SH_CHECK.findall(reason) == [("server/docker/ci/", "upload")]
-    assert CHECKS_SH_CHECK.findall("runs `checks.sh upload`") == [("", "upload")]
+# The only checks.sh left for a reason to name: D139 deleted the Pi images' one.
+CHECKS_SH = "server/docker/ci/checks.sh"
+CHECKS_SH_CHECK = re.compile(r"(?:server/docker/ci/)?checks\.sh ([a-z][a-z-]*)")
 
 
 def checks_missing(registry: str, root: Path = ROOT) -> list[str]:
-    """Each `checks.sh <check>` a reason of `registry` names that the
-    checks.sh it names has no arm for."""
-    named = [
-        (where or "server/docker/ci/", check)
+    """Each `checks.sh <check>` a reason of `registry` names that
+    server/docker/ci/checks.sh has no arm for."""
+    script = (root / CHECKS_SH).read_text()
+    return [
+        f"{CHECKS_SH} has no check {check}"
         for e in gc.parse_registry(registry)
         if e.kind == "reason"
-        for where, check in CHECKS_SH_CHECK.findall(e.detail)
-    ]
-    return [
-        f"{where}checks.sh has no check {check}"
-        for where, check in named
-        if not re.search(
-            rf"^ +{re.escape(check)}\) check_\w+ ;;$",
-            (root / where / "checks.sh").read_text(),
-            re.M,
-        )
+        for check in CHECKS_SH_CHECK.findall(e.detail)
+        if not re.search(rf"^ +{re.escape(check)}\) check_\w+ ;;$", script, re.M)
     ]
 
 
