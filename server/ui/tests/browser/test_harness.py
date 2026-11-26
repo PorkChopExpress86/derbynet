@@ -203,8 +203,10 @@ def test_only_a_late_request_of_the_page_left_is_kept_out(
 
 def test_only_a_new_document_moves_the_page_left(page):
     """A fetch sent just before `history.replaceState`, as vote.js's
-    `sorted()` calls it, and reported after it, is still out, so it stays
-    in the set (#530 review). And Playwright's private `navigated` event,
+    `sorted()` calls it, is still out, so it stays in the set whether
+    Playwright reports it before the navigation or after it (#530 review:
+    the drop on any navigation lost it before, the `left` rule after). And
+    Playwright's private `navigated` event,
     which `InFlight.attached` reads, still names a new document: a page's
     `left` follows its `goto`."""
     page.route("**/held-request", lambda route: None)

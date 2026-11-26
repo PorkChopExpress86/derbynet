@@ -422,8 +422,9 @@ class InFlight:
     after a click, #188, for a thumbnail left loading by a link, #47, and
     for the timer's scripts when the Web Serial guard leaves `/timer.php`,
     #50). So when a frame
-    navigates, those requests leave the set: their replies can no longer
-    reach the page. The new document sends none before it commits.
+    navigates to a new document, those requests leave the set: their
+    replies can no longer reach the page. The new document sends none
+    before it commits.
 
     Where a route is set, Playwright reports a request only once Chromium
     pauses it, and the pause can come after the next document commits: the
@@ -454,7 +455,6 @@ class InFlight:
     def watch(self, page):
         self.attached(page.main_frame)
         page.on("frameattached", self.attached)
-        page.on("framenavigated", lambda frame: self.navigated(frame))
         page.on("close", lambda closed: self.page_closed(closed))
 
     def of(self, tab) -> set:
@@ -474,8 +474,8 @@ class InFlight:
         """Follow the document `frame` is on. Playwright's `framenavigated`
         also fires for a fragment, `history.pushState` or `replaceState`,
         which keep the document and its requests (vote.js's `sorted()`
-        replaces its URL), so `left` changes only on a navigation to a new
-        document: the frame's private `navigated` event carries
+        replaces its URL), so the drop and `left` act only on a navigation
+        to a new document: the frame's private `navigated` event carries
         `newDocument` only then
         (`test_only_a_new_document_moves_the_page_left`)."""
         frame._impl_obj._event_emitter.on(
@@ -487,6 +487,11 @@ class InFlight:
             return
         if "newDocument" in event:
             self.left[frame] = _document_url(self._urls.get(frame, "about:blank"))
+            self.requests -= {
+                r
+                for r in self.requests
+                if _frame_of(r) == frame and r.resource_type in self.ORPHANED
+            }
         self._urls[frame] = event["url"]
 
     def sent(self, request):
@@ -500,13 +505,6 @@ class InFlight:
         ):
             return
         self.requests.add(request)
-
-    def navigated(self, frame):
-        self.requests -= {
-            r
-            for r in self.requests
-            if _frame_of(r) == frame and r.resource_type in self.ORPHANED
-        }
 
     def drain(self, page) -> list[str]:
         """Wait until nothing is in flight; return what still is after the
