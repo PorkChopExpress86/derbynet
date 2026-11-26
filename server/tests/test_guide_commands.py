@@ -103,8 +103,15 @@ def test_the_bash_check_leaves_out_a_powershell_block(tmp_path, language):
     assert shell_commands(tmp_path) == [("g.md", 5, "ls")]
 
 
-def test_the_function_in_photo_stand_md_is_one_command():
-    texts = [c.text for c in gc.guide_commands() if c.guide == "photo-stand.md"]
+def test_a_function_over_several_lines_is_one_command():
+    """The CHDK zoom block of the photo stand guide that D139 deleted."""
+    guide = "# Point it at the server\n\n" + fence(
+        "sh",
+        "unset prepare_camera_before_shot\n"
+        'prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}',
+    )
+    texts = [c.text for c in gc.commands("g.md", guide)]
+    assert texts[0] == "unset prepare_camera_before_shot"
     assert (
         'prepare_camera_before_shot() {\n  chdkptp -c -e"rec" -e"luar set_zoom(40)"\n}'
         in texts
@@ -636,30 +643,49 @@ def test_each_stage_a_reason_names_is_an_arm_of_the_script():
     assert sorted(names - set(arms())) == []
 
 
-def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
-    named = [
-        (where or "extras/docker/ci/", check)
-        for e in gc.parse_registry(gc.REGISTRY.read_text())
+# The only checks.sh left for a reason to name: D139 deleted the Pi images' one.
+CHECKS_SH = "server/docker/ci/checks.sh"
+CHECKS_SH_CHECK = re.compile(r"(?:server/docker/ci/)?checks\.sh ([a-z][a-z-]*)")
+
+
+def checks_missing(registry: str, root: Path = ROOT) -> list[str]:
+    """Each `checks.sh <check>` a reason of `registry` names that
+    server/docker/ci/checks.sh has no arm for."""
+    script = (root / CHECKS_SH).read_text()
+    return [
+        f"{CHECKS_SH} has no check {check}"
+        for e in gc.parse_registry(registry)
         if e.kind == "reason"
-        for where, check in re.findall(
-            r"((?:extras|server)/docker/ci/)?checks\.sh ([a-z][a-z-]*)", e.detail
-        )
+        for check in CHECKS_SH_CHECK.findall(e.detail)
+        if not re.search(rf"^ +{re.escape(check)}\) check_\w+ ;;$", script, re.M)
     ]
-    assert named
-    for where, check in named:
-        assert re.search(
-            rf"^ +{re.escape(check)}\) check_\w+ ;;$",
-            (ROOT / where / "checks.sh").read_text(),
-            re.M,
-        ), f"{where}checks.sh has no check {check}"
+
+
+def test_each_checks_sh_check_a_reason_names_is_a_check_of_that_script():
+    assert checks_missing(gc.REGISTRY.read_text()) == []
+
+
+@pytest.mark.parametrize(
+    "named, missing",
+    [
+        ("`server/docker/ci/checks.sh upload`", []),
+        ("`checks.sh upload`", []),
+        ("`checks.sh uploads`", ["server/docker/ci/checks.sh has no check uploads"]),
+    ],
+)
+def test_a_reason_s_checks_sh_check_is_looked_up_in_the_script(named, missing):
+    """No reason of the registry names a checks.sh check since D139, so
+    these entries hold the lookup into the real server/docker/ci/checks.sh,
+    whose `upload) check_upload ;;` arm the first two find."""
+    registry = f"g.md\tStart\t1\tls\treason in its place image.yml runs {named}\n"
+    assert checks_missing(registry) == missing
 
 
 def test_the_script_starts_the_registry_the_workflows_pin():
     pinned = re.compile(r"registry:3@sha256:[0-9a-f]{64}")
     script = set(pinned.findall(SCRIPT.read_text()))
     assert len(script) == 1
-    for workflow in ("image.yml", "pi-images.yml"):
-        assert set(pinned.findall((WORKFLOWS / workflow).read_text())) == script
+    assert set(pinned.findall((WORKFLOWS / "image.yml").read_text())) == script
 
 
 # The guard and the cleanup, against a stand-in `docker` that logs each call

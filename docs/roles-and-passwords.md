@@ -10,7 +10,7 @@ A new install starts with these roles and passwords:
 |---|---|---|
 | RaceCoordinator | `doyourbest` | Everything: set-up, settings, racing, awards, and passwords. |
 | RaceCrew | `murphy` (as in Don Murphy, not Murphy's Law) | Check-in, adding and editing racers, photos, and judging. Not set-up, and not racing control. |
-| Photo | `flashbulb` | Uploading photos, for a photo stand. The login page lists it only after "Show all roles". |
+| Photo | `flashbulb` | Uploading photos. The login page lists it only after "Show all roles". |
 | Timer | none | Reporting heats, for `derby-timer.jar` and the fake timer (`/timer/fake/`, D96). The login page lists it only after "Show all roles". |
 
 A visitor who has not logged in can open the kiosk pages, the slideshow, racers on deck, results by racer, the vote page, standings, the results export, the about page, and these guides.
@@ -40,7 +40,3 @@ The roles and what each one may do are fixed. The page changes only passwords.
 The laptop that runs the browser timer logs in as RaceCoordinator (D53). The browser timer shows its Timer settings button only to a role that controls the race.
 
 `derby-timer.jar` logs in as Timer. If you give Timer a password, type the same password into `derby-timer.jar`'s settings.
-
-## The photo stand
-
-A Raspberry Pi photo stand uploads photos as the Photo role. If you change the Photo password, change it in the photo stand's settings too. See [the photo stand guide](photo-stand.md).

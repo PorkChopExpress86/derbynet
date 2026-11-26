@@ -32,9 +32,9 @@ does. Then, for example:
 
 Django serves its static files itself only with DERBYNET_DEBUG=1.
 
-The Raspberry Pi recordings are the owner's: run the same command on a
-laptop beside the Pi's screen, or record the Pi's own screen while this
-script drives the pages with `--headed`.
+The kiosk laptop recordings are the owner's (D63): run the same command on
+a kiosk laptop, or record its screen while this script drives the pages
+with `--headed`.
 """
 
 import argparse

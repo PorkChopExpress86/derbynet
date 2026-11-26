@@ -291,8 +291,8 @@ class GuideCommands(unittest.TestCase):
     and nothing else ran none)."""
 
     def test_a_guide_or_a_stage_workflow_push_runs_the_source_checks(self):
-        for path in ('docs/pi-setup.md', '.github/workflows/server.yml',
-                     '.github/workflows/pi-images.yml'):
+        for path in ('docs/install-docker.md', '.github/workflows/server.yml',
+                     '.github/workflows/image.yml'):
             with self.subTest(path=path):
                 result = push(path, PASSING)
                 self.assertEqual(result.returncode, 0, result.stderr)

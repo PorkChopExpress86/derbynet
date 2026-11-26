@@ -148,6 +148,17 @@ class CitedPaths(Lint):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn('0 findings, 1 allowed missing paths', done.stdout)
 
+    def test_the_paths_d139_deleted_are_allowed_missing(self):
+        """As #59, #414 and #518 cite them; the checks.sh call with its
+        argument is the whole token the lint looks up."""
+        for path in ('docs/pi-setup.md', 'docs/photo-stand.md',
+                     '.github/workflows/pi-images.yml', 'extras/docker/ci/checks.sh',
+                     'extras/docker/ci/checks.sh timer'):
+            with self.subTest(path=path):
+                done = self.cite(path, 'HEAD')
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn('0 findings, 1 allowed missing paths', done.stdout)
+
     def test_a_base_not_fetched_checks_this_checkout_and_says_so(self):
         done = self.cite('plan/README.md', 'refs/remotes/nowhere/master')
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
