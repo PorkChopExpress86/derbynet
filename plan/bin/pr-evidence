@@ -93,6 +93,19 @@ they must match. It is labelled CI load: extra evidence until the owner
 amends D85, never a local load run. Other links to runs in the body are not
 read.
 
+`--check` also refuses a local file the prose cites, in a code span too: a
+path with an extension under `derbynet-drafts/`, `var/load-runs/` or a
+session scratchpad (`/tmp/claude-N/`), which no reviewer can open. #538's
+body cited `~/.cache/derbynet-drafts/529/logs/repro-before.log` for its
+reproduction, and 28 of the 80 merged bodies up to it, its own among them,
+cited such a file (#529 retro). Paste what the file holds, in a fence (a `<details>` block for long
+output), or link the PR comment that holds it. A fence's lines, a
+blockquote's and an HTML comment are not read, since pasted output names its
+own log, and nor is a path with a glob (`*`, `?`) or a placeholder segment
+(`N`, `...`, `<N>`), which rule text writes. The limits left: a folder (a path
+with no extension, such as `~/.cache/derbynet-drafts/N/`) passes, as rule
+text names one, and so does a local file anywhere else.
+
 `--check` also refuses a line of prose that gives a run not ended as its
 result: a label of up to 80 characters, a colon, then "still running",
 "pending", "queued", "in progress" or "not yet run", alone or before a
@@ -155,7 +168,7 @@ it: #426 (#407's retro) gave its mutants at 977a8618 and #413 its round-2 hand
 mutants at e51a9c98 in prose, not under a header.
 
 Exits 1 on a key the body gives no evidence for, on a line whose result is
-a run not ended, on a body that names only
+a run not ended, on a local file the prose cites, on a body that names only
 commits of PR N older than its last that is no merge, on a CI load item not
 accepted or given with no head, on a hand-off header that is not at the PR's
 head or read edits on top of its commit and is not marked, or is given with no
@@ -262,6 +275,15 @@ EDITS = re.compile(
     r"\b(?:uncommitted|staged|untracked|working tree)\b(?!:\s*(?:no|none|0)\b)",
     re.IGNORECASE,
 )
+# A file in a store of local evidence: the drafts folder, a load run's
+# folder or a session scratchpad (#529 retro).
+LOCAL_PATH = re.compile(
+    r"[^\s`'\"()<>\[\]{},;]*(?:derbynet-drafts/|var/load-runs/|/tmp/claude-[0-9]+/)"
+    r"[^\s`'\"()<>\[\]{},;]*?\.[A-Za-z0-9]{1,8}(?![\w/-]|\.\w)"
+)
+# A path that rule text writes, not a file: a glob, or a placeholder segment.
+PATH_PATTERN = re.compile(r"[*?]|(?:^|/)(?:N|\.\.\.|…)(?:/|$)")
+COMMENT = re.compile(r"<!--.*?(?:-->|$)")
 CI_LOAD_ITEM = re.compile(r"^CI load:\s*(.*)$", re.IGNORECASE)
 RUN_URL = re.compile(r"https://github\.com/([\w.-]+/[\w.-]+)/actions/runs/(\d+)")
 CI_LOAD_WORKFLOW = ".github/workflows/ci-load.yml"
@@ -617,6 +639,16 @@ def unfinished(body: str) -> list[str]:
             if UNFINISHED.search(line)]
 
 
+def local_paths(body: str) -> list[str]:
+    """Each local file the prose cites, code spans included, as `line N: PATH`:
+    not in a blockquote, which quotes output, nor in an HTML comment."""
+    lines = body.splitlines()
+    return [f"line {n}: {m[0]}" for n, _text in unquoted_lines(body, strict=True)
+            if not QUOTE.match(lines[n - 1])
+            for m in LOCAL_PATH.finditer(COMMENT.sub("", lines[n - 1]))
+            if not PATH_PATTERN.search(m[0])]
+
+
 def since_last_code(commits: list[dict]) -> list[str]:
     """The SHAs of `commits` (the PR's, oldest first, as GitHub's pulls API
     lists them) from the last that is no merge on: that commit and the merges
@@ -747,6 +779,10 @@ def main(argv: list[str]) -> int:
     for found in running:
         print(f"a run not ended as a result, {found}: fill in its result, or move it "
               "under ## Still open")
+    local = local_paths(body)
+    for found in local:
+        print(f"a local file no reviewer can open, {found}: paste what it holds in a fence "
+              "(a <details> block for long output), or link the PR comment that holds it")
     stale = stale_commits(body, commits)
     if stale:
         print(f"names commits of PR #{args.pr} only before its last that is no merge, "
@@ -756,8 +792,8 @@ def main(argv: list[str]) -> int:
     for line in loads:
         print(line)
     refused = [line for line in loads if line.startswith("not load evidence")]
-    return 1 if (missing or unfilled or closes or unlinked or running or stale or stale_heads
-                 or refused) else 0
+    return 1 if (missing or unfilled or closes or unlinked or running or local or stale
+                 or stale_heads or refused) else 0
 
 
 if __name__ == "__main__":

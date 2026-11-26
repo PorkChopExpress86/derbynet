@@ -170,7 +170,6 @@ jobs:
 
   shard:
     needs: plan
-    if: needs.plan.outputs.shards != '[]'
     name: ${{ matrix.name }} (count ${{ matrix.count }}${{ matrix.font && format(', {0}', matrix.font) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 150
@@ -273,6 +272,14 @@ jobs:
           sparse-checkout: plan/bin
           persist-credentials: false
 
+      # By name, so the plan lands in plan/ whatever else was uploaded:
+      # downloading all, a run whose only artifact is the plan unpacks it into
+      # artifacts/ itself, with no plan/ folder (run 45823686235).
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+          path: plan
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
@@ -282,7 +289,7 @@ jobs:
           SHA: ${{ needs.plan.outputs.sha }}
         run: |
           status=0
-          python3 -I tools/plan/bin/ci-load summary artifacts/plan/plan.json artifacts "$SHA" \
+          python3 -I tools/plan/bin/ci-load summary plan/plan.json artifacts "$SHA" \
             >summary.md || status=$?
           cat summary.md
           cat summary.md >>"$GITHUB_STEP_SUMMARY"

@@ -152,13 +152,23 @@ class Plan(unittest.TestCase):
         text = ('Run tools/pytest-under-load.sh in the background\n'
                 '  echo tools/pytest-under-load.sh --count 25 x.py\n'
                 '  uv run pytest -n auto -m browser ui\n')
-        plan = TOOL.plan(text)
-        self.assertEqual(plan['shards'], [])
-        self.assertEqual(len(plan['skipped']), 2)
+        with self.assertRaisesRegex(ValueError, r'no load command: .*\(2 skipped\)'):
+            TOOL.plan(text)
 
-    def test_no_load_command_plans_no_shard(self):
-        plan = TOOL.plan('Repeats under load: no browser test file changed.\n')
-        self.assertEqual(plan, {'commands': [], 'shards': [], 'skipped': []})
+    def test_a_plan_of_no_shard_is_refused_with_the_local_command(self):
+        """#529's flake ticket changed tests/test_mutate.py, no browser test:
+        the run planned nothing and its summary job failed on a missing plan.json."""
+        text = 'Repeats under load: no browser test file changed.\n'
+        local = ('run locally: tools/pytest-under-load.sh{} -n 4 --count N '
+                 'FILE, adding --postgres when it failed on Postgres, with the log pasted in the PR')
+        with self.assertRaisesRegex(ValueError, r'\(0 skipped\), so CI load has nothing') as caught:
+            TOOL.plan(text)
+        self.assertIn(local.format(''), str(caught.exception))
+        with self.assertRaises(ValueError) as caught:
+            TOOL.plan(text, flake_ticket=True)
+        self.assertIn(local.format(' --flake-ticket'), str(caught.exception))
+        with self.assertRaisesRegex(ValueError, r'\(1 skipped\)'):
+            TOOL.plan(D133_KIOSKS.splitlines(keepends=True)[-1])
 
     def test_workers_replace_the_n_of_each_command(self):
         plan = TOOL.plan(MASTER_KIOSKS + NODE_IDS, workers=8)
@@ -319,7 +329,6 @@ class Summary(unittest.TestCase):
         self.assertEqual(text.count('| total | 25 | | 1200 | 0 | 0 | 0 |'), 2)
         self.assertIn('Result: passed', text)
         self.assertIn('until the owner amends D85', text)
-        self.assertNotIn('No load command', text)
         self.assertIn('Count 25, font default (Noto Sans, as the laptop).', text)
         self.assertIn('Count 25, font DejaVu Sans.', text)
 
@@ -347,11 +356,6 @@ class Summary(unittest.TestCase):
         (self.dir / name / 'junit.xml').write_text(junit(240, failures=2))
         _text, failed = TOOL.summary(self.plan, self.dir, 'd' * 40)
         self.assertFalse(failed)
-
-    def test_no_load_command_fails(self):
-        text, failed = TOOL.summary(TOOL.plan(''), self.dir, 'e' * 40)
-        self.assertTrue(failed)
-        self.assertIn('No load command', text)
 
     def test_skipped_lines_are_named_in_the_summary(self):
         plan = TOOL.plan(D133_KIOSKS)
@@ -395,7 +399,9 @@ class CommandLine(unittest.TestCase):
                 (('font', '', 'DejaVu Sans'), '', '::error::the default font is'),
                 (('plan', '--per-shard', '1'),
                  '  tools/pytest-under-load.sh -m browser --count 257 x.py\n',
-                 '::error::257 shards')):
+                 '::error::257 shards'),
+                (('plan', '--flake-ticket'), 'Repeats under load: no browser test file changed.\n',
+                 '::error::no load command')):
             with self.subTest(argv=argv):
                 done = run_tool(*argv, stdin=stdin)
                 self.assertEqual(done.returncode, 1, done.stderr)
