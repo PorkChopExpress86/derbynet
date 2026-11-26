@@ -171,8 +171,9 @@ def test_files_refused_after_the_page_leaves_leave_nothing_in_flight(
     page, page_errors, event
 ):
     """The https-link test's teardown found a timer status image in flight
-    for 10 s, 1 run in 180 under load (#530). With 300 images out as the
-    page leaves, some reached Python after the commit on 36 runs in 40."""
+    now and then (#530). With `LEAVES`' images out as the page leaves,
+    Playwright reports some only after the commit on most runs, and before
+    the fix they stayed in flight."""
     page.route(
         "**/leaves/",
         lambda route: route.fulfill(content_type="text/html", body=LEAVES),
