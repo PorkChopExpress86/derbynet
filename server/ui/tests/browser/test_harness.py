@@ -129,33 +129,46 @@ class _Fake:
         self.__dict__.update(attributes)
 
 
-def _joins(*urls, kind="image", referer=None):
+def _joins(*navigations, kind="image", referer=None):
     """Whether a request of `kind` with `referer`, reported after its frame
-    went through `urls`, joins the set of the requests in flight."""
+    made `navigations`, joins the set of the requests in flight. Each
+    navigation is a URL, to a new document, or `(URL, how)`: "same" keeps
+    the document, as a fragment or `history.replaceState` does, and
+    "failed" never commits."""
     in_flight = InFlight(SimpleNamespace(on=lambda event, handler: None))
     frame = _Fake(url="about:blank")
-    for url in urls:
-        frame.url = url
-        in_flight.navigated(frame)
+    for navigation in navigations:
+        url, how = navigation if isinstance(navigation, tuple) else (navigation, "new")
+        event = {"url": url, "name": ""}
+        if how == "new":
+            event["newDocument"] = {}
+        if how == "failed":
+            event["error"] = "net::ERR_ABORTED"
+        in_flight.moved(frame, event)
+        if how != "failed":
+            frame.url = url
     request = _Fake(resource_type=kind, headers={"referer": referer}, frame=frame)
     in_flight.sent(request)
     return request in in_flight.requests
 
 
 A, B = "http://derbynet.test/a/", "http://derbynet.test/b/"
+C = "http://derbynet.test/c/"
 
 
 @pytest.mark.parametrize(
-    "joins, urls, kind, referer",
+    "joins, navigations, kind, referer",
     [
         (False, (A, B), "image", A),
-        (False, (A, B + "#x"), "script", A),
+        (False, (A, B, (B + "#x", "same")), "script", A),
         (True, (A, B), "image", B),
-        (True, (A, B + "#x"), "image", B),
+        (True, (A, B, (B + "#x", "same")), "image", B),
+        (True, (A, (B, "same")), "fetch", A),
+        (True, (A, B, (C, "failed")), "image", B),
         (True, (A, A), "image", A),
         (True, (A, B), "image", None),
         (True, (), "image", None),
-        (True, (A, B), "image", "http://derbynet.test/c/"),
+        (True, (A, B), "image", C),
         (True, (A, B), "ping", A),
     ],
     ids=[
@@ -163,6 +176,8 @@ A, B = "http://derbynet.test/a/", "http://derbynet.test/b/"
         "left-script-then-a-fragment",
         "the-new-page",
         "the-new-page-with-a-fragment",
+        "before-a-replace-state",
+        "after-a-failed-navigation",
         "after-a-reload",
         "no-referer",
         "no-referer-before-any-navigation",
@@ -170,12 +185,41 @@ A, B = "http://derbynet.test/a/", "http://derbynet.test/b/"
         "a-ping-from-the-left-page",
     ],
 )
-def test_only_a_late_request_of_the_page_left_is_kept_out(joins, urls, kind, referer):
+def test_only_a_late_request_of_the_page_left_is_kept_out(
+    joins, navigations, kind, referer
+):
     """`InFlight.sent` keeps out only a request of a type the navigation
-    ends whose Referer names the page its frame left, not the page it is
-    on (#530). A ping, such as a beacon, is no such type: it outlives its
-    page. Any request that could be the new page's own stays in too."""
-    assert _joins(*urls, kind=kind, referer=referer) is joins
+    ends whose Referer names the page its frame left for a new document,
+    not the page it is on (#530). A ping, such as a beacon, is no such
+    type: it outlives its page. Any request that could be the new page's
+    own, or the same document's after `history.replaceState`, stays in."""
+    assert _joins(*navigations, kind=kind, referer=referer) is joins
+
+
+def test_only_a_new_document_moves_the_page_left(page, page_errors):
+    """A fetch sent just before `history.replaceState`, as vote.js's
+    `sorted()` calls it, and reported after it, is still out, so it stays
+    in the set (#530 review). And Playwright's private `navigated` event,
+    which `InFlight.attached` reads, still names a new document: a page's
+    `left` follows its `goto`."""
+    held = []
+    page.route("**/held-request*", lambda route: held.append(route))
+    page.goto("/login/")
+    first = page.url
+    page.goto("/login/?again")
+    assert page.in_flight.left[page.main_frame] == first
+    with page.expect_request("**/held-request*"):
+        page.evaluate(
+            """() => { fetch('/held-request').catch(() => {});
+            history.replaceState(null, '', '/login/?order=x'); }"""
+        )
+    assert page.in_flight.left[page.main_frame] == first
+    assert [r for r in page.in_flight.requests if "held-request" in r.url]
+    for _ in range(200):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    held[0].fulfill(status=204)
 
 
 def test_every_type_the_harness_drops_has_a_held_request():

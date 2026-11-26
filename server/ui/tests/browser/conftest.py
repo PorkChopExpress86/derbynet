@@ -430,11 +430,10 @@ class InFlight:
     navigation's drop then ran before the old document's request joined the
     set, and it stayed there with no end (#530: a timer status image after
     the Web Serial guard left `/timer.php`). So a request of those types
-    whose Referer names the document its frame was on before its last
-    navigation, and not the one it is on, never joins the set. One with no
-    Referer, or after a reload to the same URL, does: it could be the new
-    page's own. After a `history.pushState`, the old URL's late requests
-    are dropped too, as the navigation's drop above drops the ones it saw."""
+    whose Referer names the document its frame left at its last navigation
+    to a new document, and not the one it is on, never joins the set. One
+    with no Referer, or after a reload to the same URL, does: it could be
+    the new page's own."""
 
     TIMEOUT_MS = 10_000
     ORPHANED = ("xhr", "fetch", "image", "script", "stylesheet")
@@ -443,8 +442,8 @@ class InFlight:
         self.requests = set()
         # Requests a tab still had out when it closed, as "METHOD URL".
         self.closed_with = []
-        # The document each frame was on before its last navigation, and
-        # the one it is on.
+        # The document URL each frame was on before its last navigation to
+        # a new document, and the URL it is on.
         self.left = {}
         self._urls = {}
         context.on("request", self.sent)
@@ -453,6 +452,8 @@ class InFlight:
         context.on("page", self.watch)
 
     def watch(self, page):
+        self.attached(page.main_frame)
+        page.on("frameattached", self.attached)
         page.on("framenavigated", lambda frame: self.navigated(frame))
         page.on("close", lambda closed: self.page_closed(closed))
 
@@ -469,6 +470,25 @@ class InFlight:
         self.requests -= left
         self.closed_with += sorted(f"{r.method} {r.url}" for r in left)
 
+    def attached(self, frame):
+        """Follow the document `frame` is on. Playwright's `framenavigated`
+        also fires for a fragment, `history.pushState` or `replaceState`,
+        which keep the document and its requests (vote.js's `sorted()`
+        replaces its URL), so `left` changes only on a navigation to a new
+        document: the frame's private `navigated` event carries
+        `newDocument` only then
+        (`test_only_a_new_document_moves_the_page_left`)."""
+        frame._impl_obj._event_emitter.on(
+            "navigated", lambda event: self.moved(frame, event)
+        )
+
+    def moved(self, frame, event):
+        if "error" in event:
+            return
+        if "newDocument" in event:
+            self.left[frame] = _document_url(self._urls.get(frame, "about:blank"))
+        self._urls[frame] = event["url"]
+
     def sent(self, request):
         frame = _frame_of(request)
         referer = request.headers.get("referer")
@@ -482,8 +502,6 @@ class InFlight:
         self.requests.add(request)
 
     def navigated(self, frame):
-        self.left[frame] = _document_url(self._urls.get(frame, "about:blank"))
-        self._urls[frame] = frame.url
         self.requests -= {
             r
             for r in self.requests
