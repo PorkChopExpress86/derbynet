@@ -92,7 +92,8 @@ def test_the_list_is_the_checks_found_on_2026_11_16_and_by_431():
     found test_subshell_state.py and test_arithmetic_operands.py, which lint
     plan/'s scripts through shell_files() and name no literal. The #470
     retro added test_lead_rulings.py and test_docstring_position.py, which
-    read plan/ through `git ls-files`."""
+    read plan/ through `git ls-files`, and the #537 retro
+    test_silent_curl.py, through shell_files()."""
     assert plan_checks() == {
         "legacy_api/tests/test_registry.py",
         "tests/test_deviations.py",
@@ -100,6 +101,7 @@ def test_the_list_is_the_checks_found_on_2026_11_16_and_by_431():
         "tests/test_listing_order.py",
         "tests/test_pipefail_pipes.py",
         "tests/test_subshell_state.py",
+        "tests/test_silent_curl.py",
         "tests/test_arithmetic_operands.py",
         "tests/test_lead_rulings.py",
         "tests/test_docstring_position.py",

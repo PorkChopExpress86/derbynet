@@ -77,3 +77,7 @@ VERIFY_RUN=v1 VERIFY_PORT=8090 .claude/skills/verify/bin/cleanup
 ```
 
 Removes the run's container, volume, and images, or stops its Django server and deletes its database, and keeps `.claude/verify-evidence/v1/`. Close the browser with `browser_close`.
+
+## Changing the helpers
+
+Each `bin/` script fails out loud. Every `curl` runs with `-sS` or ends in `|| fail "..."`, which `server/tests/test_silent_curl.py` checks for a captured reply. Every loop has a bound. A success line prints only after a check of the end state it reports. #537's first seed raced on with no bound while a heat stayed current, and on PHP it printed `intermission: none` and exited 0 without checking that Round 1 ran (#537 retro).

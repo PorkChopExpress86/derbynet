@@ -23,6 +23,18 @@ SERVE_FILE="$DJANGO_STATE/phone-serve"
 SUDO="${VERIFY_SUDO:-sudo}"
 mkdir -p "$EVIDENCE"
 
+# Waits up to 10 s for this run's port to be free, as after a kill of its
+# server: launch refuses a port taken, and #537's launch after a cleanup
+# found it taken twice (#537 retro).
+port_free() {
+  for _ in $(seq 20); do
+    grep -q ":$PORT\b" <<<"$(ss -ltn)" || return 0
+    sleep 0.5
+  done
+  echo "port $PORT is still taken 10 s after its server was stopped" >&2
+  return 1
+}
+
 # Starts runserver on this run's database, migrated, and waits for doctor.
 # DEBUG is off, as on race day, so templates are cached and --noreload keeps
 # the code it started with: bin/restart picks up an edit.  runserver serves no

@@ -721,3 +721,33 @@ def test_no_guide_example_names_the_image_from_before_caddy():
         f"name a test release newer than {old.group(1)}, which predates the "
         "Caddy compose.yaml (D107)"
     )
+
+
+def run_checks(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
+    """checks.sh with a docker that does nothing, so its cleanup runs here
+    (#530 retro)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "docker").write_text("#!/bin/sh\nexit 0\n")
+    (bin_dir / "docker").chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "RUNNER_TEMP": str(tmp_path),
+    }
+    return subprocess.run(
+        [str(CHECKS), *args], capture_output=True, text=True, env=env, timeout=60
+    )
+
+
+def test_an_option_names_the_source_checks(tmp_path):
+    """#530's lead sent `checks.sh --quick` for the source checks' quick run."""
+    done = run_checks(tmp_path, "--quick")
+    assert done.returncode == 1
+    assert "server/tools/source-checks.sh --quick" in done.stderr
+
+
+def test_an_unknown_name_says_only_that(tmp_path):
+    done = run_checks(tmp_path, "quick")
+    assert done.returncode == 1
+    assert done.stderr == "FAILED: no check named quick\n"
