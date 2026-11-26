@@ -43,6 +43,10 @@ from racing.services import polls, timer
         " ClassID as it was; PHP's advance_heat writes ClassID from round -100"
         ' and stores "" (autoadvance.inc:138, fixes #64 C4), which current-heat'
         " then shows (#406).",
+        "D145: while the playlist's intermission is open, a timer test counts"
+        " as racing: heat-ready stages its heats, FINISHED records them, and"
+        " racing off sends no abort. PHP has no intermission and gates them on"
+        " NowRacingState alone (action.timer-message.inc:142-146,234,287).",
     ),
 )
 def timer_message(ctx: LegacyContext) -> None:
@@ -83,7 +87,15 @@ def remote_start(ctx: LegacyContext) -> None:
         ctx.failure("no-remote-start", "Remote start not available.")
 
 
-@action("timer.test", permission=Perm.CONTROL_RACE)
+@action(
+    "timer.test",
+    permission=Perm.CONTROL_RACE,
+    divergences=(
+        "D145: test-mode=1 or tt-mask while the playlist's intermission is open"
+        " starts the test with racing off and the intermission open; PHP has no"
+        " intermission and writes NowRacingState 1 (timer-test.inc:28).",
+    ),
+)
 def timer_test(ctx: LegacyContext) -> None:
     if "tt-mask" in ctx.args:
         timer.set_test_mask(ctx.event, php_intval(_text(ctx, "tt-mask")))

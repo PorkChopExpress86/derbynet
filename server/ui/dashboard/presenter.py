@@ -404,7 +404,8 @@ def present(payload: dict, extras: Extras | None = None) -> dict:
     emptied = in_round and not extras.held and not payload["racers"]
     rounds = payload["rounds"]
     done = completed_rounds(rounds, payload["classes"])
-    timer_test_running = current_id == TIMER_TEST_ROUND and current["now_racing"]
+    # D145: the banner shows for a timer test whatever racing says.
+    timer_test_running = current_id == TIMER_TEST_ROUND
     not_added = []
     for r in rounds:
         if r["heats_scheduled"] <= r["heats_run"]:

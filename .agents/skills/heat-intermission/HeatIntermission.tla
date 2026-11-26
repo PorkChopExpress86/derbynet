@@ -4,7 +4,7 @@ EXTENDS Naturals, Sequences
 (*
  * Formal model of DerbyNet's current-heat state machine, result services,
  * and playlist operator-gate intermission (owner decisions D27, D28, D32, D135, D136,
- * D141, D143, D144).
+ * D141, D143, D144, D145).
  *
  * Scope and bounds:
  *   - One group with a 2-step playlist:
@@ -17,6 +17,8 @@ EXTENDS Naturals, Sequences
  *   - Each service call runs under lock_race_state(event.id) as one atomic step.
  *   - R1 heat results are abstracted to {"none", "v1", "v2"} so any result change
  *     that alters the finalist cut ("v1" <-> "v2" or "none") is observable.
+ *   - The timer test's start and end. While it runs, no other service call
+ *     is taken.
  *
  * Covered source files (sync commit: da2655cb3e37c8f2a5b9321cc28b49e71af23222):
  *   - server/racing/engine/heat_state.py
@@ -24,6 +26,7 @@ EXTENDS Naturals, Sequences
  *   - server/racing/services/results.py
  *   - server/racing/services/playlist.py
  *   - server/racing/services/result_import.py
+ *   - server/racing/services/timer.py (the timer test)
  *)
 
 VARIABLES
@@ -45,16 +48,18 @@ VARIABLES
     discardNum,     \* 0, 1, 2
     discardVal,     \* "none", "v1", "v2", "done"
     nonCoordBreak,  \* BOOLEAN: TRUE if a non-CONTROL_RACE caller altered R1 after R2 raced
-    kept            \* BOOLEAN: a Round 1 change left the final's roster as it was, for
+    kept,           \* BOOLEAN: a Round 1 change left the final's roster as it was, for
                     \* a final with a result (D136) or a step that does not wait (PHP's
                     \* playlist.inc:85); the final made again clears it
+    testing         \* BOOLEAN (RaceState.timer_test); curRound and curHeat then hold
+                    \* the heat the test returns to (TimerStatus.test_saved_round)
 
 vars == <<
     curRound, curHeat, racing, waiting,
     r1, r2, finalBuilt, finalShort, finalRoster, stepWaits, cutShort,
     lastHeatRound, lastHeatNum, lastHeatSaved,
     discardRound, discardNum, discardVal,
-    nonCoordBreak, kept
+    nonCoordBreak, kept, testing
 >>
 
 HeatHasResult(rnd, h) ==
@@ -185,6 +190,7 @@ Init ==
     /\ discardVal = "none"
     /\ nonCoordBreak = FALSE
     /\ kept = FALSE
+    /\ testing = FALSE
 
 (* record_timer_result on R1: results.py, the TimerResult rows of TABLE in
    heat_state.py, then rebuild_waiting_final. *)
@@ -449,7 +455,31 @@ ChangeCut ==
                    lastHeatRound, lastHeatNum, lastHeatSaved,
                    discardRound, discardNum, discardVal, nonCoordBreak, kept>>
 
-Next ==
+(* The timer test starts, or stages a new test heat: set_test_mode(True),
+   set_test_mask or set_test_lane in timer.py, each through _test_start and
+   the TimerTestStart rows of TABLE. With the intermission open racing stays
+   as it is, which is off (D145); otherwise racing turns on. *)
+TimerTestStart ==
+    /\ testing' = TRUE
+    /\ racing' = IF waiting THEN racing ELSE TRUE
+    /\ UNCHANGED <<curRound, curHeat, waiting, r1, r2, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort,
+                   lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak, kept>>
+
+(* set_test_mode(False): _test_end in timer.py, the "timer test end" row of
+   TABLE. Back to the saved heat, or none, with racing off and the
+   intermission as it was. *)
+TimerTestEnd ==
+    /\ testing
+    /\ testing' = FALSE
+    /\ racing' = FALSE
+    /\ UNCHANGED <<curRound, curHeat, waiting, r1, r2, finalBuilt, finalShort, finalRoster,
+                   stepWaits, cutShort,
+                   lastHeatRound, lastHeatNum, lastHeatSaved,
+                   discardRound, discardNum, discardVal, nonCoordBreak, kept>>
+
+RaceDay ==
     \/ \E val \in {"v1", "v2"}, cont \in BOOLEAN : TimerFinishR1(val, cont)
     \/ TimerFinishR2
     \/ \E val \in {"v1", "v2"}, isCoord \in BOOLEAN, cont \in BOOLEAN :
@@ -471,13 +501,19 @@ Next ==
     \/ SetStepWaits
     \/ ChangeCut
 
+Next ==
+    \/ ~testing /\ RaceDay /\ UNCHANGED testing
+    \/ TimerTestStart
+    \/ TimerTestEnd
+
 Spec == Init /\ [][Next]_vars
 
 (* ---------- INVARIANTS ---------- *)
 
 \* 1. Racing mode is only active on a heat that exists and has no results yet (Chart.allowed in heat_state.py).
+\*    A timer test races its own heats, which have no chart.
 RacingHeatAllowed ==
-    racing => (curRound /= "none" /\ HeatExists(curRound, curHeat) /\ ~HeatHasResult(curRound, curHeat))
+    (racing /\ ~testing) => (curRound /= "none" /\ HeatExists(curRound, curHeat) /\ ~HeatHasResult(curRound, curHeat))
 
 \* 2. While the final has not raced, the waiting final's roster matches
 \*    Round 1's current standings: with the intermission open (D27, D135),
@@ -498,8 +534,8 @@ NoIntermissionAfterFinalRaces ==
 LockedFeederProtected ==
     ~nonCoordBreak
 
-\* 5. Racing never runs with the intermission open (#514). The timer test,
-\*    which the model leaves out, still turns racing on with it open (#515).
+\* 5. Racing never runs with the intermission open (#514), a timer test's
+\*    included (D145).
 NoRacingDuringIntermission ==
     racing => ~waiting
 

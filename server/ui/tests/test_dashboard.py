@@ -475,6 +475,19 @@ def test_simulated_racing_shows_a_herald_with_stop(coordinator, event):
     assert not RaceState.objects.get(event=event).timer_test
 
 
+def test_simulated_racing_shows_its_herald_with_racing_off(coordinator, event):
+    """D145: the herald and its Stop show for a timer test whatever racing
+    says, as during the intermission, where the test leaves racing off."""
+    timer.set_test_mode(event, True)
+    heats.set_racing(event, False)
+    state = RaceState.objects.get(event=event)
+    assert state.timer_test
+    assert not state.racing
+    html = page_of(coordinator)
+    assert "Simulated racing in progress" in html
+    assert 'data-action="stop-test"' in html
+
+
 def test_unexpected_results_count(coordinator, event):
     RaceState.objects.filter(event=event).update(refused_results=2)
     html = page_of(coordinator)

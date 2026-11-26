@@ -1,7 +1,8 @@
 """Every `RacingOn` that turns racing on closes the intermission (#514).
 When the playlist turns racing on for a step that does not wait, the
-intermission closes, and the final races on as a normal round (D136). The
-timer test still turns racing on with it open (#515).
+intermission closes, and the final races on as a normal round (D136). A
+timer test is no `RacingOn`: it leaves racing off with the intermission open
+(D145, `test_timer_test_during_the_intermission.py`).
 
 No page reaches the state these tests build. The dashboard's Next and
 `heat.select` go through `select_heat`, whose `Select` row closes the
@@ -91,15 +92,14 @@ def test_next_from_a_page_leaves_no_intermission_open(
     assert now.ended_round_id is None
 
 
-def test_a_timer_test_during_the_intermission_turns_racing_on_with_it_open():
-    """What the port does today, which #515 decides and will change: the
-    timer test's start is no `RacingOn`, so it turns racing on and leaves the
+def test_a_timer_test_during_the_intermission_leaves_racing_off():
+    """#515, D145: the timer test's start leaves racing off and the
     intermission open."""
     event, round1, final, entry, finalists_for = timed(waits=True)
     assert state_of_event(event).waiting_entry_id == entry.id
     set_test_mode(event, True)
     now = state_of_event(event)
     assert now.timer_test
-    assert now.racing
+    assert not now.racing
     assert now.waiting_entry_id == entry.id
     assert now.ended_round_id == round1.id

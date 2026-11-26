@@ -193,7 +193,8 @@ class Reinstate:
 @dataclass(frozen=True)
 class TimerTestStart:
     """`timer_test_start`: heat `heat` of the timer test becomes current and
-    racing is on, with no replay command."""
+    racing is on, with no replay command. With the intermission open, racing
+    stays off and the intermission stays open (D145)."""
 
     heat: int
 
@@ -482,6 +483,20 @@ def timer_test_racing(ctx: Context) -> bool:
     return timer_test(ctx) and racing(ctx)
 
 
+def intermission_open(ctx: Context) -> bool:
+    return ctx.state.intermission
+
+
+def timer_racing(state: State) -> bool:
+    """Whether the timer races: racing is on, or a timer test runs during
+    the intermission, which leaves racing off (D145)."""
+    return state.racing or (state.kind is Kind.TIMER_TEST and state.intermission)
+
+
+def timer_not_racing(ctx: Context) -> bool:
+    return not timer_racing(ctx.state)
+
+
 def no_current_round(ctx: Context) -> bool:
     return ctx.state.kind is Kind.NONE
 
@@ -642,7 +657,7 @@ TABLE: tuple[Row, ...] = (
     Row(Cancel, always, (OFF, Move(Where.NONE)), None, "cancel the running round"),
     Row(
         TimerResult,
-        not_racing,
+        timer_not_racing,
         (AddRefused(),),
         Code.NOT_RACING,
         "timer result, racing off",
@@ -739,6 +754,13 @@ TABLE: tuple[Row, ...] = (
         "reinstate",
     ),
     Row(Reinstate, always, (Emit(ClearLastHeat()), OFF), None, "reinstate, none saved"),
+    Row(
+        TimerTestStart,
+        intermission_open,
+        (Move(Where.TARGET), ResetRefused()),
+        None,
+        "timer test start, intermission open (D145)",
+    ),
     Row(TimerTestStart, always, (Move(Where.TARGET), *ON), None, "timer test start"),
     Row(
         TimerTestEnd,
