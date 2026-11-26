@@ -21,7 +21,6 @@ from ui.tests.browser.conftest import (
     BLOCKED,
     InFlight,
     _settle,
-    block_sending,
     check_harness,
     close_tab,
     font_config,
@@ -439,29 +438,90 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
     assert navigated == ["navigates"]
 
 
-def test_the_block_fails_no_fetch_of_a_document_on_the_page(page, event):
-    """A document that commits as `block_sending` adds its init script
-    misses that script's STOP_SENDING: under load, the reload of
-    `test_close_tab_closes_a_tab_whose_reply_navigates` reached the server
-    before the stop and committed then, and its fetch loop spun on the
-    block's failures until the tab closed (#531). `block_sending` stops
-    the documents already on the page as well, so the block fails none of
-    their fetches. Here the document's loop is still sending, as that
-    reload's was, when `block_sending` starts."""
+# In a document loaded at `?loop`: fetch `?again` on each end.
+LOOPS_ONCE_LOADED = """if (location.search == '?loop') {
+  addEventListener('DOMContentLoaded', () => {
+    const go = () => fetch('/login/?again').finally(go);
+    go();
+  });
+}"""
+
+
+@pytest.mark.parametrize(
+    "commits",
+    [
+        "before the stops",
+        "as the block starts",
+        "before the init script",
+        "after the init script",
+        "never",
+    ],
+)
+def test_close_tab_stops_a_document_that_commits_as_it_blocks(
+    page, event, monkeypatch, commits
+):
+    """A document that commits between STOP_SENDING and the block's init
+    script gets neither, and keeps the page's own `fetch`: in the reload
+    case of `test_close_tab_closes_a_tab_whose_reply_navigates`, under
+    load, the block then failed each fetch of its loop at once, and the
+    loop spun until the tab closed (#531). Here the tab loads its next
+    document, whose loop starts as it loads, at one point of `close_tab`,
+    or never. Once the block is on and Playwright has reported each
+    request the server answered, the tab sends nothing more."""
     page.goto("/login/")
     tab = page.context.new_page()
+    tab.add_init_script(LOOPS_ONCE_LOADED)
     tab.goto("/login/")
-    failed = []
-    tab.on("requestfailed", lambda r: failed.append(r))
+    sent, finished = [], []
+    tab.on("request", lambda r: r.url.endswith("?again") and sent.append(r))
+    tab.on("requestfinished", lambda r: r.url.endswith("?again") and finished.append(r))
+
+    def commit(at):
+        if at == commits:
+            with tab.expect_event("domcontentloaded"):
+                tab.evaluate("() => { location.href = '/login/?loop'; }")
+
+    add_init_script = tab.add_init_script
+
+    def init_script(script):
+        commit("before the init script")
+        add_init_script(script)
+        commit("after the init script")
+
+    stop_timers, block_sending = conftest.stop_timers, conftest.block_sending
+
+    # The settle after the test stops and blocks the page with these too.
+    def stops(of):
+        if of == tab:
+            commit("before the stops")
+        stop_timers(of)
+
+    sent_after_the_block = []
+
+    def block(of):
+        if of != tab:
+            return block_sending(of)
+        commit("as the block starts")
+        block_sending(tab)
+        wait_until(
+            tab,
+            lambda: server.started == server.finished == len(finished),
+            "the server's replies reported",
+        )
+        before = len(sent)
+        tab.wait_for_timeout(HOLD_S * 1000 * 3)
+        sent_after_the_block.append(len(sent) - before)
+
+    tab.add_init_script = init_script
+    monkeypatch.setattr(conftest, "stop_timers", stops)
+    monkeypatch.setattr(conftest, "block_sending", block)
     with at_the_server(
         lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
     ) as server:
-        keep_sending(tab, "fetch")
-        block_sending(tab)
-        tab.wait_for_timeout(HOLD_S * 1000 * 3)
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
-    assert [r.failure for r in failed] == []
+    assert sent_after_the_block == [0]
+    assert page.in_flight.closed_with == []
 
 
 def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
