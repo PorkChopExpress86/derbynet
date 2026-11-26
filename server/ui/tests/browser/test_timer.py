@@ -145,11 +145,42 @@ def test_only_a_race_coordinator_gets_the_timer_settings_button(page, event):
 def skip_timer_files(page, page_errors):
     """The guard leaves `/timer.php` while the browser's preload scanner is
     still fetching the timer's files; the page leaves before it would run
-    them, so they are refused here. A refusal can come after the guard's
-    navigation, and the harness then drops the request it cut off."""
-    page.route(re.compile(r"/(js|css|img)/"), lambda route: route.abort())
+    them, so they are refused here. Playwright reports a routed request
+    only once Chromium pauses it, which can be after the guard's navigation
+    has committed: the harness's drop on the navigation then missed it, and
+    a refusal after the commit gets no `requestfailed` (#530). A refused
+    request never reaches the server, so the drain need not wait for it."""
+
+    def refuse(route):
+        route.abort()
+        page.in_flight.requests.discard(route.request)
+
+    page.route(re.compile(r"/(js|css|img)/"), refuse)
     page_errors.allow(r"request failed: \S*/(js|css|img)/\S* net::ERR_FAILED$")
     page_errors.allow(r"^console: Failed to load resource: net::ERR_FAILED$")
+
+
+# A page that leaves at once, as the guard does, with more files out than
+# the timer's.
+LEAVES = "<script>location.replace('/login/')</script>" + "".join(
+    f'<img src="/img/{n}.png">' for n in range(300)
+)
+
+
+def test_files_refused_after_the_page_leaves_leave_nothing_in_flight(
+    page, page_errors, event
+):
+    """The https-link test's teardown found a timer status image in flight
+    for 10 s, 1 run in 180 under load (#530). With 300 images out as the
+    page leaves, some reached Python after the commit on 36 runs in 40."""
+    page.route(
+        "**/leaves/",
+        lambda route: route.fulfill(content_type="text/html", body=LEAVES),
+    )
+    skip_timer_files(page, page_errors)
+    page.goto("/leaves/")
+    page.wait_for_url("**/login/")
+    assert page.in_flight.drain(page) == []
 
 
 def test_a_browser_without_web_serial_gets_a_page_that_says_so(login, page_errors):
