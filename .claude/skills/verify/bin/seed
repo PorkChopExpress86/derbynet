@@ -10,16 +10,23 @@
 # scheduled with racing off.
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
-case "${1:-}" in ""|--intermission) ;; *) echo "usage: seed [--intermission]" >&2; exit 2;; esac
-# Sets REPLY to the answer.  JAR names the session, the timer's has its own.
+case "$*" in ""|--intermission) ;; *) echo "usage: seed [--intermission]" >&2; exit 2;; esac
+fail() { echo "seed failed: $*" >&2; exit 1; }
+# `call WHAT CURL-ARGS...` sets REPLY to the answer, or fails naming WHAT.
+call() {
+  local what=$1; shift
+  REPLY=$(curl -sS "$@") || fail "$what: no answer from $BASE"
+}
+# JAR names the session, the timer's has its own.
 post() {
-  REPLY=$(curl -s -b "${2:-$JAR}" -c "${2:-$JAR}" "$BASE/action.php" --data "$1")
+  call "$1" -b "${2:-$JAR}" -c "${2:-$JAR}" "$BASE/action.php" --data "$1"
   grep -q '"summary": "success"\|<success/>' <<<"$REPLY" || { echo "seed failed: $1" >&2; echo "$REPLY" | head -12 >&2; exit 1; }
 }
+query() { call "query=$1" -b "$JAR" "$BASE/action.php?query=$1"; }
 rm -f "$JAR"
 # A fresh install grants setup rights to a session that has opened setup.php,
 # as a browser does.  action.php answers 302 until a database exists.
-curl -s -o /dev/null -b "$JAR" -c "$JAR" "$BASE/setup.php"
+call setup.php -o /dev/null -b "$JAR" -c "$JAR" "$BASE/setup.php"
 post "action=setup.nodata&ez-new=Verify"
 post "action=role.login&name=RaceCoordinator&password=doyourbest"
 post "action=settings.write&n-lanes=4"
@@ -30,19 +37,20 @@ for i in 0 1 2 3 4 5 6 7; do
 done
 post "action=racer.bulk&what=checkin&who=all"
 echo "seeded: event Verify, 4 lanes, Lions 101-104, Tigers 201-204, all checked in"
-[ "${1:-}" = --intermission ] || exit 0
+[ "$*" = --intermission ] || exit 0
 
-lions=$(curl -s -b "$JAR" "$BASE/action.php?query=class.list" | jq '.classes[] | select(.name == "Lions") | .classid')
+query class.list
+lions=$(jq -e '.classes[] | select(.name == "Lions") | .classid' <<<"$REPLY") || fail "class.list names no Lions"
 post "action=playlist.add&classid=$lions&round=1&n_times_per_lane=1"
 post "action=playlist.add&classid=$lions&round=2&top=2&n_times_per_lane=1"
 if [ "$KIND" = django ]; then
   # The legacy API never makes a step wait (D12: PHP has no gate), so this
   # one post is the playlist page's "Wait for operator" switch.
-  final=$(jq '."queue-entry".queueid' <<<"$REPLY")
-  curl -s -o /dev/null -b "$JAR" -c "$JAR" "$BASE/playlist/"
+  final=$(jq -e '."queue-entry".queueid' <<<"$REPLY") || fail "playlist.add named no queueid"
+  call "the playlist page" -o /dev/null -b "$JAR" -c "$JAR" "$BASE/playlist/"
   token=$(awk '$6 == "csrftoken" { print $7 }' "$JAR")
-  reply=$(curl -s -b "$JAR" -c "$JAR" -H "X-CSRFToken: $token" "$BASE/playlist/step/$final/waits/" --data waits=1)
-  grep -q "The playlist waits for you" <<<"$reply" || { echo "seed failed: the final's Wait for operator switch" >&2; exit 1; }
+  call "the final's Wait for operator switch" -b "$JAR" -c "$JAR" -H "X-CSRFToken: $token" "$BASE/playlist/step/$final/waits/" --data waits=1
+  grep -q "The playlist waits for you" <<<"$REPLY" || fail "the final's Wait for operator switch"
 fi
 post "action=playlist.start"
 TIMER="$EVIDENCE/timer-cookies.txt"
@@ -50,13 +58,24 @@ rm -f "$TIMER"
 post "action=role.login&name=Timer&password=" "$TIMER"
 post "action=timer-message&message=HELLO" "$TIMER"
 # Race each Round 1 heat; car 101 is fastest and each car is slower than the one before.
-while poll=$(curl -s -b "$JAR" "$BASE/action.php?query=poll.coordinator") \
-    && jq -e --argjson c "$lions" '."current-heat" | .now_racing and .classid == $c and .round == 1' <<<"$poll" >/dev/null; do
-  lanes=$(jq -r '[.racers[] | "lane\(.lane)=\(2 + (.carnumber - 100) / 100)"] | join("&")' <<<"$poll")
+# A FINISHED that leaves the same heat current would race it forever.
+raced=
+while :; do
+  query poll.coordinator
+  coordinator=$REPLY
+  heat=$(jq -er --argjson c "$lions" '."current-heat" // error("no current-heat") | if .now_racing and .classid == $c and .round == 1 then .heat else "done" end' <<<"$coordinator") \
+    || fail "poll.coordinator: no current heat"
+  [ "$heat" = done ] && break
+  [ "$heat" = "$raced" ] && fail "Lions Round 1 heat $heat is still current after its FINISHED"
+  lanes=$(jq -r '[.racers[] | "lane\(.lane)=\(2 + (.carnumber - 100) / 100)"] | join("&")' <<<"$coordinator")
   post "action=timer-message&message=STARTED" "$TIMER"
   post "action=timer-message&message=FINISHED&$lanes" "$TIMER"
+  raced=$heat
 done
+jq -e --argjson c "$lions" '.rounds[] | select(.classid == $c and .round == 1) | .heats_scheduled > 0 and .heats_run == .heats_scheduled' \
+  <<<"$coordinator" >/dev/null || fail "Lions Round 1 did not run every heat"
 # Django names the open intermission in query=poll; PHP answers {} to a key it lacks.
-open=$(curl -s -b "$JAR" "$BASE/action.php?query=poll&values=intermission" | jq -r '.intermission.next // empty')
-if [ "$KIND" = django ] && [ -z "$open" ]; then echo "seed failed: no intermission after Lions Round 1" >&2; exit 1; fi
+query "poll&values=intermission"
+open=$(jq -r '.intermission.next // empty' <<<"$REPLY") || fail "query=poll&values=intermission: not JSON"
+if [ "$KIND" = django ] && [ -z "$open" ]; then fail "no intermission after Lions Round 1"; fi
 echo "raced Lions Round 1; intermission: ${open:-none (PHP has none)}"

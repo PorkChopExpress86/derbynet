@@ -33,5 +33,5 @@ The maintained source for verifying DerbyNet's user-facing behavior. Read this i
 
 - `checkin-unpass` ran end to end with this skill on 2026-10-24 (Playwright MCP, PHP server at 0e16e261).
 - `setup-create`, `setup-lanes`, `race-schedule`, `race-run`, `results-lanes`, `standings-rank`, and `kiosk-idle` ran on 2026-10-24 through an earlier Puppeteer script, not yet through this skill.
-- `timer-test-mode`, `timer-status-test`, and `timer-test-intermission` ran on 2026-11-26 through a Python Playwright script (#537): Django during an intermission from `seed --intermission`, and the switch on PHP.
+- `timer-test-mode`, `timer-status-test`, and `timer-test-intermission` ran on 2026-11-26 through a Python Playwright script that clicks and checks the handles `timer.md` names, step for step, not through the Playwright MCP tools (#537): Django during an intermission from `seed --intermission`, and the switch on PHP.
 - `checkin-pass`, `checkin-new`, `checkin-edit`, `race-unschedule`, `standings-public`, and `kiosk-scene` are written from the page source and have not been driven yet. Treat their handles as unverified until a run confirms them.
