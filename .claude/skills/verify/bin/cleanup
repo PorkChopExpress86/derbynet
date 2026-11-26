@@ -5,8 +5,9 @@
 set -uo pipefail
 source "$(dirname "$0")/env.sh"
 if [ "$KIND" = django ]; then
+  status=0
   if pid=$(cat "$PIDFILE" 2>/dev/null) && kill "$pid" 2>/dev/null; then
-    port_free || exit 1
+    port_free || status=1
   fi
   rm -f "$JAR"
   if [ -f "$SERVE_FILE" ]; then
@@ -21,7 +22,7 @@ if [ "$KIND" = django ]; then
   fi
   rm -rf "$DJANGO_STATE"
   echo "cleaned $DJANGO_STATE; evidence kept in $EVIDENCE"
-  exit 0
+  exit "$status"
 fi
 "$REPO/testing/docker/run-suite.sh" clean >/dev/null 2>&1
 docker rmi "$DERBYNET_TEST_PREFIX-server" "$DERBYNET_TEST_PREFIX-harness" >/dev/null 2>&1
