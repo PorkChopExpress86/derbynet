@@ -779,10 +779,16 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     assert "no mutant listed" in run.stderr
     # The refusal names the next step (#367 retro).
     assert "Mutate each step the changed tests take by hand" in run.stderr
+    # At the diff's own call site: #519's hand mutant of a shared helper
+    # errored in other callers' fixtures (#519 retro).
+    assert "at the diff's own call site rather than in a helper" in run.stderr
     assert run.stdout == (
         "SKIPPED   notes.md: 2 not run, in no source file\n"
         "SKIPPED   test_mod.py: 2 not run, in a test file"
         " (name it with --file to mutate its helpers)\n"
+        # The round ends in its tally line, as the Implement step's hand-off
+        # reads it: #513's and #519's refusals printed none (#519 retro).
+        "0 listed: none for the diff, so the round is hand mutants\n"
     )
 
 
