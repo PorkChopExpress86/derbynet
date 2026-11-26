@@ -93,7 +93,7 @@ REPLY=$(curl -s "$url")
 code="$(curl -m 120 -s -o /dev/null -w '%{http_code}' \\
     "$url")"
 racer="$(curl -sf -b "$jar" "$url" | jq -r .id)"
-while poll=$(curl -s "$url") && jq -e .ok <<<"$poll"; do sleep 1; done
+if poll=$(curl -s "$url") && jq -e .ok <<<"$poll"; then :; fi
 local page; page="$(curl --silent "$url")"
 """
     assert [n for n, _ in silent_captures(text)] == [2, 3, 5, 6, 7]
@@ -128,5 +128,6 @@ def test_a_silent_curl_ends_a_set_e_script_with_no_message(tmp_path):
     for flags, says in (("-s", False), ("-sS", True)):
         script = f"set -e\nREPLY=$(curl {flags} -m 5 http://127.0.0.1:9/)\necho reached"
         out = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
-        assert (out.returncode, out.stdout) == (7, "")
+        assert out.returncode == 7
+        assert out.stdout == ""
         assert bool(out.stderr.strip()) == says, (flags, out.stderr)
