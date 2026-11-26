@@ -438,13 +438,12 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
     assert navigated == ["navigates"]
 
 
-# In a document loaded at `?loop`: fetch `?again` on each end.
-LOOPS_ONCE_LOADED = """if (location.search == '?loop') {
-  addEventListener('DOMContentLoaded', () => {
-    const go = () => fetch('/login/?again').finally(go);
-    go();
-  });
-}"""
+# Once the document loads: fetch `?again` on each end.
+LOOPS_ONCE_LOADED = """addEventListener('DOMContentLoaded', () => {
+  console.log('loops');
+  const go = () => fetch('/login/?again').finally(go);
+  go();
+});"""
 
 
 @pytest.mark.parametrize(
@@ -470,14 +469,15 @@ def test_close_tab_stops_a_document_that_commits_as_it_blocks(
     request the server answered, the tab sends nothing more."""
     page.goto("/login/")
     tab = page.context.new_page()
-    tab.add_init_script(LOOPS_ONCE_LOADED)
     tab.goto("/login/")
-    sent, finished = [], []
+    sent, finished, loops = [], [], []
+    tab.on("console", lambda message: loops.append(message.text))
     tab.on("request", lambda r: r.url.endswith("?again") and sent.append(r))
     tab.on("requestfinished", lambda r: r.url.endswith("?again") and finished.append(r))
 
     def commit(at):
         if at == commits:
+            add_init_script(LOOPS_ONCE_LOADED)
             with tab.expect_event("domcontentloaded"):
                 tab.evaluate("() => { location.href = '/login/?loop'; }")
 
@@ -509,6 +509,8 @@ def test_close_tab_stops_a_document_that_commits_as_it_blocks(
             "the server's replies reported",
         )
         before = len(sent)
+        # A window, not a deadline: at the block's failures a loop sends
+        # thousands of fetches in it, and a stopped one none, however long.
         tab.wait_for_timeout(HOLD_S * 1000 * 3)
         sent_after_the_block.append(len(sent) - before)
 
@@ -521,6 +523,8 @@ def test_close_tab_stops_a_document_that_commits_as_it_blocks(
         close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert sent_after_the_block == [0]
+    # one read: the tab is closed, so no later message can join the list.
+    assert loops == ([] if commits == "never" else ["loops"])
     assert page.in_flight.closed_with == []
 
 
