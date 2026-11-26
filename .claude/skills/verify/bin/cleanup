@@ -5,7 +5,9 @@
 set -uo pipefail
 source "$(dirname "$0")/env.sh"
 if [ "$KIND" = django ]; then
-  pid=$(cat "$PIDFILE" 2>/dev/null) && kill "$pid" 2>/dev/null
+  if pid=$(cat "$PIDFILE" 2>/dev/null) && kill "$pid" 2>/dev/null; then
+    port_free || exit 1
+  fi
   rm -f "$JAR"
   if [ -f "$SERVE_FILE" ]; then
     off=("$SUDO" "$(command -v tailscale)" serve --https=443 off)

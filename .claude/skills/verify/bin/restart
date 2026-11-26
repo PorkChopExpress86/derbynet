@@ -8,9 +8,6 @@ source "$(dirname "$0")/env.sh"
 [ "$KIND" = django ] || { echo "restart applies to VERIFY_SERVER=django" >&2; exit 2; }
 pid=$(cat "$PIDFILE" 2>/dev/null) || { echo "no $PIDFILE; run bin/launch" >&2; exit 1; }
 kill "$pid" 2>/dev/null || true
-for _ in $(seq 20); do
-  grep -q ":$PORT\b" <<<"$(ss -ltn)" || break
-  sleep 0.5
-done
+port_free
 start_django
 echo ready "$BASE"

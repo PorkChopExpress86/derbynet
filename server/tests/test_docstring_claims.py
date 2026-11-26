@@ -1047,3 +1047,31 @@ def test_a_deleted_test_file_is_read_from_the_merge_base(tmp_path, capsys, monke
         with pytest.raises(SystemExit):
             dc.main(argv)
     assert "no such file" in capsys.readouterr().err
+
+
+def test_check_takes_no_test_file(tmp_path, capsys, monkeypatch):
+    """A diff that changes no test file still gets its body checked: #537's
+    implementer passed an empty .py for want of a file (#537 retro). With
+    `--base`, a test file the diff deletes is read from the directory the
+    tool runs in. With no `--check`, a file is still needed."""
+    body = tmp_path / "body.md"
+    body.write_text("The new rule, which the lead confirmed.\n")
+    assert dc.main(["--check", str(body)]) == 1
+    assert "credits a ruling to the lead" in capsys.readouterr().out
+    body.write_text("Nothing here.\n")
+    assert dc.main(["--check", str(body)]) == 0
+    git = repo(tmp_path, monkeypatch)
+    gone = tmp_path / "tests" / "test_gone.py"
+    gone.parent.mkdir()
+    gone.write_text("def test_g():\n    assert 1\n")
+    git("add", ".")
+    git("commit", "-q", "-m", "base")
+    git("checkout", "-q", "-b", "side")
+    git("rm", "-q", "tests/test_gone.py")
+    git("commit", "-q", "-m", "side")
+    monkeypatch.chdir(tmp_path)
+    assert dc.main(["--check", str(body), "--base", "master"]) == 1
+    assert "test_g is gone since the merge base" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        dc.main([])
+    assert "name a test file, or give --check" in capsys.readouterr().err

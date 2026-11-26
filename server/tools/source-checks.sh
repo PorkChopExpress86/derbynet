@@ -15,7 +15,8 @@
 # (#319 retro), a fake clock paused at its install time and a browser test
 # that takes no fixture (#317 retro), a browser test that skips on its size
 # in its body (#366), a shell function that records state
-# called in a subshell (#59 retro), a guide's command with no row in
+# called in a subshell (#59 retro), a set -e script that captures a
+# `curl -s` reply with no -S or || handler (#537 retro), a guide's command with no row in
 # docs/guide-commands.tsv (#414), a number a tool script reads with no
 # check that it is one (#417 retro), a plan tool that credits a ruling to
 # the lead and a docstring after a function's first statement (#470 retro),
@@ -107,6 +108,7 @@ env -u DATABASE_URL uv run --locked pytest -q -p no:cacheprovider "${quick[@]}" 
   tests/test_readme_compose.py \
   tests/test_pipefail_pipes.py \
   tests/test_subshell_state.py \
+  tests/test_silent_curl.py \
   tests/test_arithmetic_operands.py \
   tests/test_lead_rulings.py \
   tests/test_docstring_position.py \
