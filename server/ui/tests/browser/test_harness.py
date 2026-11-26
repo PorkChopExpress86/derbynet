@@ -90,8 +90,7 @@ def test_a_navigation_drops_a_request_still_loading(page, page_errors, event, ki
 
 # A page that leaves as it loads, as the timer's Web Serial guard does,
 # with many images out, since the race needs one reported after the commit:
-# the guard page's two status images met it about 1 run in 180 under load,
-# and 20 images here met it on 3 runs in 8 (#530).
+# the guard page's status images met it about 1 run in 180 under load (#530).
 LEAVES = "<script>location.replace('/login/')</script>" + "".join(
     f'<img src="/static/timer/img/derbynet.png?{n}">' for n in range(300)
 )
