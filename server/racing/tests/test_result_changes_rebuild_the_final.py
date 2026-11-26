@@ -685,6 +685,28 @@ def test_an_imported_line_on_a_round_no_step_feeds_from_keeps_the_final(
     assert chart_ids(final) == chart
 
 
+def test_a_change_to_another_groups_round_keeps_a_final_kept_by_its_result(
+    timed_intermission,
+):
+    """Round 1 changes while the final's first heat has a result, so the
+    final keeps its racers (D136). A discard then leaves it unraced, and a
+    change to Outlaw round 1, which feeds no Scouts round, keeps them too."""
+    event, round1, final, entry, finalists_for = timed_intermission
+    before = roster(final)
+    assert start_waiting_step(event) == final
+    record_timer_result(event, slow(final, 1), finalists_for=finalists_for)
+    heat = last_heat(round1)
+    select_round_1_heat(event, round1, heat)
+    record_manual_result(event, fast(round1, heat), finalists_for=finalists_for)
+    failure, _ = discard_heat(event, final, 1, finalists_for=finalists_for)
+    assert failure is None
+    assert not HeatLane.objects.filter(round=final).filter(HAS_RESULT).exists()
+    assert standings_say(final, entry, finalists_for) != before
+    outlaw = Round.objects.get(group__name="Outlaw", number=1)
+    assert delete_results(event, outlaw, finalists_for=finalists_for) is None
+    assert roster(final) == before
+
+
 def test_a_change_with_the_intermission_closed_keeps_a_final_that_does_not_wait():
     """D141 rebuilds a waiting final. A step that does not wait keeps its
     roster, as PHP does (`website/inc/playlist.inc:85`)."""
