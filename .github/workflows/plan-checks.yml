@@ -85,6 +85,7 @@ jobs:
           tests/test_listing_order.py
           tests/test_pipefail_pipes.py
           tests/test_subshell_state.py
+          tests/test_silent_curl.py
           tests/test_arithmetic_operands.py
           tests/test_lead_rulings.py
           tests/test_docstring_position.py
