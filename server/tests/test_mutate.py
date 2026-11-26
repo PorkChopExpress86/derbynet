@@ -1054,7 +1054,8 @@ def slow_unlock(self, *args):
 
 def held_mkdtemp(*args, **kwargs):
     path = mkdtemp(*args, **kwargs)
-    pathlib.Path("making").write_text(path)
+    pathlib.Path("making.part").write_text(path)
+    os.replace("making.part", "making")
     deadline = time.monotonic() + 30
     while not os.path.exists("go"):
         assert time.monotonic() < deadline, "no go"
