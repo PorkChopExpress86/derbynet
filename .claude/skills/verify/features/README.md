@@ -27,9 +27,11 @@ The maintained source for verifying DerbyNet's user-facing behavior. Read this i
 - [Race a round](./race-round.md) schedules a round and races it with the fake timer.
 - [Results and standings](./results-standings.md) shows lane times and the ranked standings.
 - [Kiosk display](./kiosk.md) shows a scene on an anonymous kiosk TV.
+- [Timer test and timer status](./timer.md) simulates racing, also during a heat intermission.
 
 ## Proven so far
 
 - `checkin-unpass` ran end to end with this skill on 2026-10-24 (Playwright MCP, PHP server at 0e16e261).
 - `setup-create`, `setup-lanes`, `race-schedule`, `race-run`, `results-lanes`, `standings-rank`, and `kiosk-idle` ran on 2026-10-24 through an earlier Puppeteer script, not yet through this skill.
+- `timer-test-mode`, `timer-status-test`, and `timer-test-intermission` ran on 2026-11-26 through a Python Playwright script (#537): Django during an intermission from `seed --intermission`, and the switch on PHP.
 - `checkin-pass`, `checkin-new`, `checkin-edit`, `race-unschedule`, `standings-public`, and `kiosk-scene` are written from the page source and have not been driven yet. Treat their handles as unverified until a run confirms them.

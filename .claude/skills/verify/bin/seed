@@ -3,12 +3,18 @@
 # named "Verify", 4 lanes, and 8 checked-in racers in two dens
 # (Lions 101-104, Tigers 201-204).  Uses the legacy API, so it seeds
 # preconditions only; drive the feature under test through the browser.
+#
+# --intermission then races Lions Round 1 through a two-step playlist whose
+# Lions final waits for the operator, so on Django the heat intermission is
+# open (D12, D136).  PHP has no intermission: the same posts leave its final
+# scheduled with racing off.
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
+case "${1:-}" in ""|--intermission) ;; *) echo "usage: seed [--intermission]" >&2; exit 2;; esac
+# Sets REPLY to the answer.  JAR names the session, the timer's has its own.
 post() {
-  local out
-  out=$(curl -s -b "$JAR" -c "$JAR" "$BASE/action.php" --data "$1")
-  grep -q '"summary": "success"' <<<"$out" || { echo "seed failed: $1" >&2; echo "$out" | head -12 >&2; exit 1; }
+  REPLY=$(curl -s -b "${2:-$JAR}" -c "${2:-$JAR}" "$BASE/action.php" --data "$1")
+  grep -q '"summary": "success"\|<success/>' <<<"$REPLY" || { echo "seed failed: $1" >&2; echo "$REPLY" | head -12 >&2; exit 1; }
 }
 rm -f "$JAR"
 # A fresh install grants setup rights to a session that has opened setup.php,
@@ -24,3 +30,33 @@ for i in 0 1 2 3 4 5 6 7; do
 done
 post "action=racer.bulk&what=checkin&who=all"
 echo "seeded: event Verify, 4 lanes, Lions 101-104, Tigers 201-204, all checked in"
+[ "${1:-}" = --intermission ] || exit 0
+
+lions=$(curl -s -b "$JAR" "$BASE/action.php?query=class.list" | jq '.classes[] | select(.name == "Lions") | .classid')
+post "action=playlist.add&classid=$lions&round=1&n_times_per_lane=1"
+post "action=playlist.add&classid=$lions&round=2&top=2&n_times_per_lane=1"
+if [ "$KIND" = django ]; then
+  # The legacy API never makes a step wait (D12: PHP has no gate), so this
+  # one post is the playlist page's "Wait for operator" switch.
+  final=$(jq '."queue-entry".queueid' <<<"$REPLY")
+  curl -s -o /dev/null -b "$JAR" -c "$JAR" "$BASE/playlist/"
+  token=$(awk '$6 == "csrftoken" { print $7 }' "$JAR")
+  reply=$(curl -s -b "$JAR" -c "$JAR" -H "X-CSRFToken: $token" "$BASE/playlist/step/$final/waits/" --data waits=1)
+  grep -q "The playlist waits for you" <<<"$reply" || { echo "seed failed: the final's Wait for operator switch" >&2; exit 1; }
+fi
+post "action=playlist.start"
+TIMER="$EVIDENCE/timer-cookies.txt"
+rm -f "$TIMER"
+post "action=role.login&name=Timer&password=" "$TIMER"
+post "action=timer-message&message=HELLO" "$TIMER"
+# Race each Round 1 heat; car 101 is fastest and each car is slower than the one before.
+while poll=$(curl -s -b "$JAR" "$BASE/action.php?query=poll.coordinator") \
+    && jq -e --argjson c "$lions" '."current-heat" | .now_racing and .classid == $c and .round == 1' <<<"$poll" >/dev/null; do
+  lanes=$(jq -r '[.racers[] | "lane\(.lane)=\(2 + (.carnumber - 100) / 100)"] | join("&")' <<<"$poll")
+  post "action=timer-message&message=STARTED" "$TIMER"
+  post "action=timer-message&message=FINISHED&$lanes" "$TIMER"
+done
+# Django names the open intermission in query=poll; PHP answers {} to a key it lacks.
+open=$(curl -s -b "$JAR" "$BASE/action.php?query=poll&values=intermission" | jq -r '.intermission.next // empty')
+if [ "$KIND" = django ] && [ -z "$open" ]; then echo "seed failed: no intermission after Lions Round 1" >&2; exit 1; fi
+echo "raced Lions Round 1; intermission: ${open:-none (PHP has none)}"
