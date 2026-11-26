@@ -150,7 +150,7 @@ def test_a_rerun_closes_the_intermission(waiting_final, which, in_final):
     event, round1, final, entry, finalists_for = waiting_final
     assert round1.number == 1
     target = (final.id, 1) if in_final else (round1.id, last_heat(round1))
-    assert rerun(event, which, finalists_for=finalists_for) is None
+    assert rerun(event, which) is None
     now = state_of_event(event)
     assert now.waiting_entry_id is None
     assert now.ended_round_id is None
@@ -171,7 +171,7 @@ def end_round_1_again(event, round1, finalists_for):
     assert round1.number == 1
     heat = last_heat(round1)
     assert select_heat(event, round_id=round1.id, heat=heat) is None
-    assert rerun(event, "current", finalists_for=finalists_for) is None
+    assert rerun(event, "current") is None
     record_timer_result(event, slow(round1, heat), finalists_for=finalists_for)
 
 
@@ -240,7 +240,7 @@ def test_a_reinstate_onto_the_waiting_final_closes_the_intermission(waiting_fina
     event, round1, final, entry, finalists_for = waiting_final
     assert round1.number == 1
     race_first_final_heat(event, final, finalists_for)
-    assert rerun(event, "last", finalists_for=finalists_for) is None
+    assert rerun(event, "last") is None
     assert raced_heats(final) == []
     assert select_heat(event, round_id=round1.id, heat=last_heat(round1)) is None
     advance(event, "next", report=False, finalists_for=finalists_for)
