@@ -459,9 +459,9 @@ def test_the_block_fails_no_fetch_of_a_document_on_the_page(page, event):
         keep_sending(tab, "fetch")
         block_sending(tab)
         tab.wait_for_timeout(HOLD_S * 1000 * 3)
+        close_tab_in_time(page, tab)
         assert server.after_close(page) == (0, 0)
     assert [r.failure for r in failed] == []
-    close_tab_in_time(page, tab)
 
 
 def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
