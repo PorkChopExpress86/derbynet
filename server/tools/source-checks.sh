@@ -20,7 +20,7 @@
 # check that it is one (#417 retro), a plan tool that credits a ruling to
 # the lead and a docstring after a function's first statement (#470 retro),
 # the heat chart's rows, each with its case (0.3 s; #515's first hand-off
-# ran --quick, and its new row's missing case failed CI: #515 retro),
+# ran --quick, and its new row's missing case failed that run: #515 retro),
 # and plan/tests, the plan tools' tests
 # that plan-checks.yml runs (#218 retro).  #238 found eleven guards left out
 # (the browser fixture order among them, which only the full suite caught);
