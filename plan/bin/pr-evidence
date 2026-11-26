@@ -30,7 +30,9 @@ and this check passed it (#399 retro). A token joined by _ of that shape is
 one too unless a file under server/ or testing/ assigns it (`NAME = ...`,
 `NAME=...`, an enum member), since code names such as VIEW_RACE_RESULTS share
 the shape: #406's draft held HANDOFF_RUNS, as #399's had, and review found it
-(#406 retro). A mention in prose, a README, a comment, a string or plan/ does
+(#406 retro). #511's draft held HANDOFF_PLACEHOLDER, PHP_PROBE_PLACEHOLDER and
+CLAIMS_PLACEHOLDER when the lead read it, so PLACEHOLDER is a word of SUFFIXES
+(#511 retro). A mention in prose, a README, a comment, a string or plan/ does
 not excuse a token, since #406's review found LOG_TABLE, EXP_TABLE and
 NO_MORE_RESULTS passing on a vendored script and a timer profile, and a plan
 README row once passed HANDOFF_RUNS. The limit left: an assignment of the same
@@ -186,7 +188,8 @@ NO_EVIDENCE = re.compile(rf"^(?:(?:not done|todo)\b|{NOT_ENDED}{ENDS_THERE})", r
 # A draft's stand-in for output still to come, such as PROBE-PENDING or
 # LOOP-OUTPUT in #399's drafts. A shell or Python name has no -. A path
 # (path/X-OUTPUT, X-OUTPUT.txt) or a shell default (${X-OUTPUT}) passes.
-SUFFIXES = ("PENDING", "RESULT", "RESULTS", "OUTPUT", "RUNS", "TABLE", "TODO", "TBD")
+SUFFIXES = ("PENDING", "RESULT", "RESULTS", "OUTPUT", "RUNS", "TABLE", "TODO", "TBD",
+            "PLACEHOLDER")
 PLACEHOLDER = re.compile(
     rf"(?<![A-Za-z0-9$/.-])(?<!\$\{{)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-(?:{'|'.join(SUFFIXES)})"
     r"(?![A-Za-z0-9/-]|\.\w)"
