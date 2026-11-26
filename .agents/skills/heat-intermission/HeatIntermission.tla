@@ -20,7 +20,7 @@ EXTENDS Naturals, Sequences
  *   - The timer test's start and end. While it runs, no other service call
  *     is taken.
  *
- * Covered source files (sync commit: da2655cb3e37c8f2a5b9321cc28b49e71af23222):
+ * Covered source files (sync commit: 751cfa59a3b16ba37a7e9d4e005883640e1f5cb5):
  *   - server/racing/engine/heat_state.py
  *   - server/racing/services/heats.py
  *   - server/racing/services/results.py
