@@ -18,8 +18,9 @@
 // replay.php:296-307 does; recording now stops at the end of the post-roll.
 // A second finish while a clip plays starts another, as PHP's does.
 //
-// Playback posts `replay-started` and `replay-ended` to the kiosk frame,
-// which pauses the kiosk page meanwhile (ui/static/ui/kiosk.js). With
+// Playback posts `replay-started` and `replay-ended` to the kiosk frame.
+// A now-racing page pauses its poll meanwhile (kiosk-now-racing.js, D137),
+// and every other kiosk page runs on (D140). With
 // `upload-videos` set and MediaRecorder present, the first showing is
 // recorded and uploaded as `<START name>.mkv` through `video.upload`.
 'use strict';

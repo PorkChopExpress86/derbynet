@@ -14,10 +14,11 @@
 // - `kioskNudge()` runs the kiosk poll and every content poll at once. #56
 //   calls it when the push stream says something changed (D21, ADR-15); a
 //   browser with no EventSource keeps the polls above.
-// - Inside replay.php, `replay-started` pauses the page's content polls and
-//   `replay-ended` resumes them, as now-racing.js:3-16 suspends its poller;
-//   the other PHP pages ignore the messages. A reply still out is handled,
-//   and no animation pauses: now-racing.js:8-15 touches none (D137).
+// - `Kiosk.paused` holds the content polls: each queues its next turn and
+//   fetches nothing until it clears. Only the now-racing pages set it,
+//   through a replay (kiosk-now-racing.js, D137); the other pages run
+//   through a replay, as in PHP only now-racing.js:3-17 and
+//   now-racing-columnar.js:5-12 read its messages (D140).
 (function () {
   'use strict';
 
@@ -31,7 +32,6 @@
     parameters: config.parameters || {},
     paused: false,
     onParameters: null,
-    onReplay: null,
   };
   window.Kiosk = Kiosk;
 
@@ -165,17 +165,6 @@
   Kiosk.start = function () {
     polls.forEach(run);
   };
-
-  window.addEventListener('message', function (e) {
-    if (e.data === 'replay-started') {
-      Kiosk.paused = true;
-    } else if (e.data === 'replay-ended') {
-      Kiosk.paused = false;
-    } else {
-      return;
-    }
-    if (Kiosk.onReplay) Kiosk.onReplay(Kiosk.paused);
-  });
 
   // Runs `change`, then glides each element from where it was to where it
   // is, and drops a newly shown one in: Svelte's animate:flip, as the #71

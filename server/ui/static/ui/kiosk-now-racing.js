@@ -302,17 +302,24 @@
     lingerMs = Number(board.dataset.lingerMs) || 10000;
     fit();
     window.addEventListener('resize', fit);
-    // The rows page re-arms the landing, as PHP's enable_flyers() does
+    // Inside replay.php, `replay-started` pauses the poll and `replay-ended`
+    // resumes it, as now-racing.js:3-17 and now-racing-columnar.js:5-12
+    // suspend their poller. A reply still out is handled, and no animation
+    // pauses: now-racing.js:8-15 touches none (D137). On `replay-ended` the
+    // rows page re-arms the landing, as PHP's enable_flyers() does
     // (now-racing.js:15), and the next poll of the heat lands the places
     // again, then lingers (now-racing.js:333). The columnar pages do neither
     // (now-racing-columnar.js:5-12).
-    if (!columns) {
-      Kiosk.onReplay = function (paused) {
-        if (paused) return;
+    window.addEventListener('message', function (e) {
+      if (e.data === 'replay-started') {
+        Kiosk.paused = true;
+      } else if (e.data === 'replay-ended') {
+        Kiosk.paused = false;
+        if (columns) return;
         lingerUntil = Date.now() + lingerMs;
         animate = true;
-      };
-    }
+      }
+    });
     // 500 ms after each reply (now-racing-poller.js:33-43).
     Kiosk.poll(poll, 500, 'after');
     Kiosk.start();

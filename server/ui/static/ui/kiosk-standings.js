@@ -40,7 +40,7 @@
       Kiosk.flip(list.children, function () { row.hidden = false; });
       revealTimer = setTimeout(revealOne, 1500);
     } else if (overflowing(list)) {
-      scrollTimer = setInterval(function () { if (!Kiosk.paused) scrollOne(); }, 2000);
+      scrollTimer = setInterval(scrollOne, 2000);
     }
   }
 
