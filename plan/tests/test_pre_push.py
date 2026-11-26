@@ -199,6 +199,15 @@ class PrePush(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.ran, 'check-paths.sh --docs docs\nplan/tests\n')
 
+    def test_a_push_outside_server_says_why_it_skips_the_source_checks(self):
+        """#519's push of .agents/ alone ran plan/tests only, and its
+        implementer started a source-checks.sh run by hand, then dropped it
+        (#519 retro)."""
+        result = push('.agents/skills/x/SKILL.md', PASSING)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('pre-push: plan/tests alone: the push changes nothing under the'
+                      ' paths that run tools/source-checks.sh here\n', result.stderr)
+
     def test_a_push_of_plan_runs_the_source_checks_that_read_it(self):
         """test_registry.py and test_deviations.py read owner-decisions.md,
         test_listing_order.py plan/'s Python, test_docker_checks.py every
