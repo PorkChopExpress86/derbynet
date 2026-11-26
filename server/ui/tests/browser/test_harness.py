@@ -438,6 +438,96 @@ def test_close_tab_closes_a_tab_whose_reply_navigates(page, event, how):
     assert navigated == ["navigates"]
 
 
+# Once the document loads: fetch `?again` on each end.
+LOOPS_ONCE_LOADED = """addEventListener('DOMContentLoaded', () => {
+  console.log('loops');
+  const go = () => fetch('/login/?again').finally(go);
+  go();
+});"""
+
+
+@pytest.mark.parametrize(
+    "commits",
+    [
+        "before the stops",
+        "as the block starts",
+        "before the init script",
+        "after the init script",
+        "never",
+    ],
+)
+def test_close_tab_stops_a_document_that_commits_as_it_blocks(
+    page, event, monkeypatch, commits
+):
+    """A document that commits between STOP_SENDING and the block's init
+    script gets neither, and keeps the page's own `fetch`: in the reload
+    case of `test_close_tab_closes_a_tab_whose_reply_navigates`, under
+    load, the block then failed each fetch of its loop at once, and the
+    loop spun until the tab closed (#531). Here the tab loads its next
+    document, whose loop starts as it loads, at one point of `close_tab`,
+    or never. Once the block is on and Playwright has reported each
+    request the server answered, the tab sends nothing more."""
+    page.goto("/login/")
+    tab = page.context.new_page()
+    tab.goto("/login/")
+    sent, finished, loops = [], [], []
+    tab.on("console", lambda message: loops.append(message.text))
+    tab.on("request", lambda r: r.url.endswith("?again") and sent.append(r))
+    tab.on("requestfinished", lambda r: r.url.endswith("?again") and finished.append(r))
+
+    def commit(at):
+        if at == commits:
+            add_init_script(LOOPS_ONCE_LOADED)
+            with tab.expect_event("domcontentloaded"):
+                tab.evaluate("() => { location.href = '/login/?loop'; }")
+
+    add_init_script = tab.add_init_script
+
+    def init_script(script):
+        commit("before the init script")
+        add_init_script(script)
+        commit("after the init script")
+
+    stop_timers, block_sending = conftest.stop_timers, conftest.block_sending
+
+    # The settle after the test stops and blocks the page with these too.
+    def stops(of):
+        if of == tab:
+            commit("before the stops")
+        stop_timers(of)
+
+    sent_after_the_block = []
+
+    def block(of):
+        if of != tab:
+            return block_sending(of)
+        commit("as the block starts")
+        block_sending(tab)
+        wait_until(
+            tab,
+            lambda: server.started == server.finished == len(finished),
+            "the server's replies reported",
+        )
+        before = len(sent)
+        # A window, not a deadline: at the block's failures a loop sends
+        # thousands of fetches in it, and a stopped one none, however long.
+        tab.wait_for_timeout(HOLD_S * 1000 * 3)
+        sent_after_the_block.append(len(sent) - before)
+
+    tab.add_init_script = init_script
+    monkeypatch.setattr(conftest, "stop_timers", stops)
+    monkeypatch.setattr(conftest, "block_sending", block)
+    with at_the_server(
+        lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
+    ) as server:
+        close_tab_in_time(page, tab)
+        assert server.after_close(page) == (0, 0)
+    assert sent_after_the_block == [0]
+    # one read: the tab is closed, so no later message can join the list.
+    assert loops == ([] if commits == "never" else ["loops"])
+    assert page.in_flight.closed_with == []
+
+
 def test_close_tab_waits_for_a_request_sent_as_it_stops(page, event, monkeypatch):
     """A request sent in the task that stops the timers, whose `request`
     event reaches Python late (a route holds it, as in

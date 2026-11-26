@@ -609,16 +609,15 @@ def close_tab(page, tab):
 
     Stopping the timers leaves the callbacks that send on no timer: the
     camera's `onicecandidate` and `onnegotiationneeded` post a message
-    (camera-signaling.js), and a reply's handler can send again. So
-    STOP_SENDING runs in every frame of the tab, and the settle's block
-    (`block_sending`) then fails every other request the tab makes until
-    it closes. The wait is for the server's
+    (camera-signaling.js), and a reply's handler can send again. So the
+    settle's block (`block_sending`) runs STOP_SENDING in every frame of
+    the tab, then fails every other request the tab makes until it
+    closes. The wait is for the server's
     replies to the requests sent before (#409:
     `test_closing_the_camera_tab_waits_for_a_post_sent_as_its_timers_stop`,
     `test_close_tab_stops_a_loop_the_block_would_fail`,
     `test_close_tab_closes_a_tab_that_keeps_sending`)."""
     stop_timers(tab)
-    stop_sending(tab)
     block_sending(tab)
     waited = 0
     while waited < InFlight.TIMEOUT_MS and page.in_flight.of(tab):
@@ -695,8 +694,17 @@ def block_sending(page):
     STOP_SENDING first: a fetch of theirs never fails into a handler that
     would send again. A page that loads an image again on its error would
     spin, the block failing each load at once; no script under
-    `ui/static/ui/` sets an image's `onerror`."""
+    `ui/static/ui/` sets an image's `onerror`.
+
+    A document that commits as the init script is added misses it: a
+    reload in `close_tab`, sent before the block and committed then, kept
+    its own fetch, whose loop spun on the block's failures until the tab
+    closed, and the server got one more of its fetches (#531). So
+    STOP_SENDING also runs in every frame on the page, after the init
+    script is added and before the block starts
+    (`test_close_tab_stops_a_document_that_commits_as_it_blocks`)."""
     page.add_init_script(f"({STOP_SENDING})(null)")
+    stop_sending(page)
     blocker = page.context.new_cdp_session(page)
     # Before the first send: Playwright hands the page's events over while
     # a send waits, so a failure the block causes then must find the page
