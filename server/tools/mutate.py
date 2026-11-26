@@ -204,7 +204,9 @@ def refusal(found: dict[str, int]) -> str | None:
     if found.get("deselected"):
         return (
             f"{found['deselected']} deselected: name each test by node id,"
-            " and give -m browser for a browser test"
+            " and give -m browser for a browser test; a browser test marked"
+            ' sizes("desktop") runs at one size, so name its case, as'
+            " path::test[desktop-chromium]"
         )
     if not found.get("passed") and not found.get("failed"):
         return "no test ran, or every one skipped"
