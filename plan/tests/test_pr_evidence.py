@@ -671,6 +671,38 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
 
 
+# #538's reproduction line, which cited a log in the drafts folder (#529 retro).
+LINE_538 = ("- Reproduction, with a 0.5 s sleep between `making`'s create and its write. Before "
+            "the change, all 3 cases fail (`~/.cache/derbynet-drafts/529/logs/repro-before.log`).")
+
+
+class LocalPaths(IssueStandIn, unittest.TestCase):
+    def test_538s_cited_log_is_refused(self):
+        done = self.check(evidence(KEYS) + '\n' + LINE_538 + '\n')
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[1:], [
+            'a local file no reviewer can open, line 10: '
+            '~/.cache/derbynet-drafts/529/logs/repro-before.log: paste what it holds in a '
+            'fence (a <details> block for long output), or link the PR comment that holds it'])
+
+    def test_each_store_of_local_evidence_is_refused_in_prose(self):
+        for path in ('/home/u/.cache/derbynet-drafts/retro-9/push1.log',
+                     'server/var/load-runs/20261126-120000-1/pytest.log',
+                     '/mnt/x/derbynet-wt-9/server/var/load-runs/a/junit.xml',
+                     '/tmp/claude-1000/-mnt-x/abc/scratchpad/probe.py',
+                     'retro-529/backtest.txt in ~/.cache/derbynet-drafts/9/bodies/b1.md'):
+            with self.subTest(path=path):
+                self.assertTrue(TOOL.local_paths(f'Run: see {path}.\n'), path)
+
+    def test_a_fenced_paste_a_folder_and_other_paths_pass(self):
+        body = ('```\nLog: /mnt/x/server/var/load-runs/a/pytest.log\n```\n'
+                'Logs go under `~/.cache/derbynet-drafts/N/`, and `~/.cache/derbynet-drafts/**`.\n'
+                '`assert PosixPath(\'.\') == PosixPath(\'/tmp/pytest-of-u/pytest-1/tmp3\')`\n'
+                'The lock is `~/.cache/derbynet/load-run.lock`; see `server/tools/mutate.py`.\n'
+                '    indented: ~/.cache/derbynet-drafts/9/x.log\n')
+        self.assertEqual(TOOL.local_paths(body), [])
+
+
 # The lines of #444's body that named #434, which its merge left open (#434
 # retro), with #434 as the stand-in's #61.
 BODY_444 = ('## Why\n\n`test_kiosk_results_by_racer.py`\'s give-up test should pass every '

@@ -32,7 +32,11 @@ pr-evidence does not accept. `--script PATH` names the head's
 pytest-under-load.sh: a script from before D122 (2026-11-16) has no
 `--flake-ticket`, and no rerun for it to turn off, so `plan --flake-ticket`
 refuses it, exits 1 and says to merge master into the branch (#421). A plan
-of more than 256 shards, GitHub's matrix limit, is refused.
+of more than 256 shards, GitHub's matrix limit, is refused, and so is a plan
+of none, with the local command for repeats a ticket asks of a file
+affected-tests gives none: #529's flake ticket, on a test file that is no
+browser test, dispatched a run that planned nothing, and its summary job
+failed on a plan.json it could not find.
 
 `font` checks a shard's font before its run: a command that names no FONT
 (empty) must find FAMILY, what `fc-match sans-serif` gives, to be Noto Sans,
@@ -48,7 +52,7 @@ holding `status`, the script's exit code, and `junit.xml`) and prints the
 run's summary as Markdown: the head SHA, each command, its count and its
 shards' results. The verdict of a shard is the script's exit code, since
 D122 can pass a run whose junit holds failures; junit gives the counts. It
-exits 1 when any shard failed or left no status, or when no load command ran.
+exits 1 when any shard failed or left no status.
 """
 
 import argparse
@@ -171,6 +175,14 @@ def plan(text, per_shard=5, flake_ticket=False, trial_count=None, workers=None,
             shards.append({'name': f'shard-{index}-{n}', 'command': index, 'shard': n,
                            'font': font or '', 'count': count,
                            'args': shard_args})
+    if not shards:
+        flag = ' --flake-ticket' if flake_ticket else ''
+        raise ValueError(
+            f'no load command: affected-tests printed no {SCRIPT} line to repeat for this '
+            f'head ({len(skipped)} skipped), so CI load has nothing to run. Repeats a ticket '
+            'asks of a test file affected-tests gives none, such as a flake ticket on a '
+            f'file that is no browser test, run locally: {SCRIPT}{flag} -n 4 '
+            '--count N FILE, with the log pasted in the PR')
     if len(shards) > MAX_SHARDS:
         raise ValueError(f'{len(shards)} shards, more than the {MAX_SHARDS} jobs a '
                          'GitHub matrix takes: raise per_shard')
@@ -207,10 +219,7 @@ def junit_counts(path):
 
 def summary(the_plan, shards_dir, sha):
     out = [f'## CI load at {sha}', '']
-    failed = not the_plan['shards']
-    if failed:
-        out.append('No load command: affected-tests printed no '
-                   '`tools/pytest-under-load.sh` line for this head.')
+    failed = False
     for command in the_plan['commands']:
         out += [f'### `{command["line"]}`', '',
                 f'Count {command["count"]}, '
