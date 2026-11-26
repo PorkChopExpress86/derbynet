@@ -56,5 +56,6 @@ def test_only_the_harness_stops_a_page_sending():
     assert found == [], (
         "stop_sending() replaces window.fetch, which the settle's barrier "
         "needs, so the settle waits out its timeout; stop a page's polls "
-        f"with stop_timers(page) instead: {found}"
+        "with stop_timers(page) instead, and put a helper the harness needs "
+        f"in conftest.py: {found}"
     )
