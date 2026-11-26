@@ -452,7 +452,7 @@ def test_the_block_fails_no_fetch_of_a_document_on_the_page(page, event):
     tab = page.context.new_page()
     tab.goto("/login/")
     failed = []
-    tab.on("requestfailed", failed.append)
+    tab.on("requestfailed", lambda r: failed.append(r))
     with at_the_server(
         lambda environ: environ["QUERY_STRING"] == "again", hold=HOLD_S
     ) as server:
