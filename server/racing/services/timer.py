@@ -35,7 +35,7 @@ from racing.engine.phpcompat import (
 )
 from racing.models import HeatLane, Round, TimerSetting, TimerStatus
 from racing.services import audit, replay
-from racing.services.heats import transition
+from racing.services.heats import timer_may_race, transition
 from racing.services.results import Outcome, timer_result_locked
 
 State = TimerStatus.State
@@ -288,7 +288,7 @@ def handle_message(
             fields,
             user_agent,
             now,
-            race.racing,
+            timer_may_race(race),
             finalists_for,
         )
         ref = _ref(race)
@@ -467,7 +467,7 @@ def _finished(msg: _Message) -> None:
         case Outcome.RECORDED:
             # PHP reads the racing state again only after a recorded result,
             # so an all-zero result still gets this message's heat-ready.
-            msg.racing = msg.race.racing
+            msg.racing = timer_may_race(msg.race)
             msg.out.append(SUCCESS)
         case _:
             msg.out.append(SUCCESS)

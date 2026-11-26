@@ -471,7 +471,11 @@ ROW_CASES = {
         ManualResult(expected=(7, 1)),
         ROUND,
     ),
-    "manual result in a timer test, racing": (TEST_RACING, ManualResult(), Chart()),
+    "manual result in a timer test the timer races (D145)": (
+        TEST_RACING,
+        ManualResult(),
+        Chart(),
+    ),
     "manual result in a timer test": (TEST_HEAT, ManualResult(), Chart()),
     "manual result, no current round": (State(), ManualResult(), ROUND),
     "manual result for another heat": (IDLE_2, ManualResult(posted_round="8"), ROUND),
@@ -481,6 +485,11 @@ ROW_CASES = {
     "rerun": (RACING_2, Rerun((7, 1)), ROUND),
     "reinstate": (State(7, 2, last_saved=True), Reinstate(), ROUND),
     "reinstate, none saved": (IDLE_2, Reinstate(), ROUND),
+    "timer test start, intermission open (D145)": (
+        State(7, 2, intermission=True),
+        TimerTestStart(3),
+        ROUND,
+    ),
     "timer test start": (RACING_2, TimerTestStart(3), ROUND),
     "timer test end": (TEST_RACING, TimerTestEnd((7, 2)), ROUND),
     "timer test end, not testing": (RACING_2, TimerTestEnd((7, 1)), ROUND),
@@ -492,6 +501,43 @@ def test_timer_test_start_races_its_heat_with_no_replay():
     decision = decide(state, TimerTestStart(3), ROUND)
     assert decision.state == State(TIMER_TEST_ROUND, 3, racing=True)
     assert decision.effects == (Moved(TIMER_TEST_ROUND, 3),)
+
+
+def test_timer_test_start_during_the_intermission_leaves_racing_off():
+    """D145: racing stays off and the intermission open."""
+    state = State(7, 2, intermission=True, refused=3)
+    decision = decide(state, TimerTestStart(3), ROUND)
+    assert decision.state == State(TIMER_TEST_ROUND, 3, intermission=True)
+    assert decision.effects == (Moved(TIMER_TEST_ROUND, 3),)
+
+
+@pytest.mark.parametrize(
+    "intermission, name",
+    [(True, "timer result in a timer test"), (False, "timer result, racing off")],
+)
+def test_a_timer_test_with_racing_off_takes_results_only_in_the_intermission(
+    intermission, name
+):
+    """D145: with racing off, a timer test counts as racing only while the
+    intermission is open."""
+    state = State(TIMER_TEST_ROUND, 1, intermission=intermission)
+    assert_row(state, TimerResult(), Chart(), name)
+
+
+@pytest.mark.parametrize(
+    "intermission, name",
+    [
+        (True, "manual result in a timer test the timer races (D145)"),
+        (False, "manual result in a timer test"),
+    ],
+)
+def test_a_manual_result_moves_a_test_with_racing_off_only_in_the_intermission(
+    intermission, name
+):
+    """D145: with racing off, a timer test counts as racing only while the
+    intermission is open."""
+    state = State(TIMER_TEST_ROUND, 1, intermission=intermission)
+    assert_row(state, ManualResult(), Chart(), name)
 
 
 def test_timer_test_end_goes_back_to_the_saved_heat_with_racing_off():

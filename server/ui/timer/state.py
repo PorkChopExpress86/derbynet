@@ -12,7 +12,7 @@ from datetime import datetime
 
 from core.models import RaceSettings, RaceState
 from racing.models import TimerStatus
-from racing.services import polls, timer
+from racing.services import heats, polls, timer
 from racing.services.lanes import lanes_of
 from ui.dashboard.presenter import pill_state, strip_seconds
 
@@ -70,7 +70,7 @@ def status(event, now: datetime) -> Status:
         interface=row.interface,
         remote_start=found["remote-start"],
         refused_results=race.refused_results,
-        test_running=race.timer_test and race.racing,
+        test_running=heats.timer_test_live(race),
         contact=None if row.last_contact is None else int(row.last_contact.timestamp()),
     )
 
@@ -103,7 +103,7 @@ def test(event) -> Test:
     results = {r["lane"]: r for r in found["results"]}
     count = settings.lane_count or 0
     return Test(
-        running=race.timer_test and race.racing,
+        running=heats.timer_test_live(race),
         lane_count=count,
         reverse_lanes=settings.reverse_lanes,
         lanes=[

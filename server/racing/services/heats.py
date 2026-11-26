@@ -75,6 +75,16 @@ def engine_state(state: RaceState) -> hs.State:
     )
 
 
+def timer_may_race(state: RaceState) -> bool:
+    """Whether the timer's messages count as racing (D145)."""
+    return hs.timer_may_race(engine_state(state))
+
+
+def timer_test_live(state: RaceState) -> bool:
+    """Whether a timer test runs that the timer races (D145)."""
+    return hs.test_live(engine_state(state))
+
+
 def load_chart(event_id: int, use_master_sched: bool) -> hs.Chart:
     rows = HeatLane.objects.filter(event_id=event_id).order_by("id")
     lanes = tuple(
