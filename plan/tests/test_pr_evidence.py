@@ -671,14 +671,14 @@ class CheckRefuses(IssueStandIn, unittest.TestCase):
                          ['unfilled placeholder, line 11: LOOP-OUTPUT'])
 
 
-# #538's reproduction line, which cited a log in the drafts folder (#529 retro).
-LINE_538 = ("- Reproduction, with a 0.5 s sleep between `making`'s create and its write. Before "
-            "the change, all 3 cases fail (`~/.cache/derbynet-drafts/529/logs/repro-before.log`).")
-
-
 class LocalPaths(IssueStandIn, unittest.TestCase):
+    """LINE_538 is #538's reproduction line, which cited a log in the drafts folder."""
+
+    LINE_538 = ("- Reproduction, with a 0.5 s sleep between `making`'s create and its write. Before "
+                "the change, all 3 cases fail (`~/.cache/derbynet-drafts/529/logs/repro-before.log`).")
+
     def test_538s_cited_log_is_refused(self):
-        done = self.check(evidence(KEYS) + '\n' + LINE_538 + '\n')
+        done = self.check(evidence(KEYS) + '\n' + self.LINE_538 + '\n')
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertEqual(done.stdout.splitlines()[1:], [
             'a local file no reviewer can open, line 10: '
