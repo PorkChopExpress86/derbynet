@@ -665,11 +665,16 @@ def listed(args) -> int:
         # #519's refusals printed none, which the hand-off step reads for
         # (#519 retro). #519's hand mutant of a helper other callers share
         # errored in their fixtures, so the refusal names the call site.
+        # #545's hand mutant, its fix reverted, died only beside a scratch
+        # delay; this run of the committed tests left it SURVIVED, so the
+        # refusal says a kill counts only here (#545 retro).
         print(
             "mutate.py: refused: no mutant listed for the diff. Mutate each step"
             " the changed tests take by hand, one per call (--file, --old, --new),"
             " at the diff's own call site rather than in a helper other callers"
-            " share, and see each fail on the test's own assert, not on a bound",
+            " share, and see each fail on the test's own assert, not on a bound."
+            " A mutant is KILLED only by such a run of the committed tests: one"
+            " that dies only beside a scratch edit, such as a delay, needs a test",
             file=sys.stderr,
         )
         print("0 listed: none for the diff, so the round is hand mutants")
