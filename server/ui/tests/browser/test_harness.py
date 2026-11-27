@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from django.core.signals import request_started
-from playwright.sync_api import Error, expect
+from playwright.sync_api import Error, Route, expect
 
 from ui.tests.browser import conftest
 from ui.tests.browser.conftest import (
@@ -665,6 +665,32 @@ def test_the_settle_drains_a_request_sent_as_it_stops(page, event, monkeypatch):
     assert _settle(page) == [f"GET {page.url.rsplit('/', 2)[0]}/held-request"]
     held[0].fulfill(status=204)
     assert page.in_flight.drain(page) == []
+
+
+# How late the barrier test's routes answer.
+LATE_S = 1.3
+
+
+def test_the_barrier_outwaits_a_shortened_drain_timeout(page, event, monkeypatch):
+    """A test that shortens `InFlight.TIMEOUT_MS` to 300 ms leaves the
+    barrier its own wait: under CI load the barrier's end came after 300 ms,
+    and the settle raised `Timeout 300ms exceeded` (#545). Here every route
+    answers LATE_S late; the page's own route, which turns interception on,
+    answers nothing, so only the barrier's is late. The slack is
+    BARRIER_TIMEOUT_MS / 1000 - LATE_S, 8.7 s; with the fix reverted the
+    barrier's wait ends LATE_S - 0.3, 1.0 s, before the answer. Each is at
+    least the 1 s of FAKE_CLOCK_SETTLE_S, the settle's other bound."""
+    fulfill = Route.fulfill
+
+    def late(route, **kwargs):
+        time.sleep(LATE_S)
+        fulfill(route, **kwargs)
+
+    page.route("**/held-request", answer_the_poll)
+    page.goto("/login/")
+    monkeypatch.setattr(Route, "fulfill", late)
+    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
+    assert _settle(page) == []
 
 
 def test_the_settle_sends_no_barrier_from_a_blank_page(page):

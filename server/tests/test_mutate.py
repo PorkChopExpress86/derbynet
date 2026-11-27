@@ -782,6 +782,9 @@ def test_listed_refuses_a_diff_with_no_mutant(project):
     # At the diff's own call site: #519's hand mutant of a shared helper
     # errored in other callers' fixtures (#519 retro).
     assert "at the diff's own call site rather than in a helper" in run.stderr
+    # A kill beside a scratch delay was #545's only proof of its fix, which
+    # every committed test let survive (#545 retro).
+    assert "KILLED only by such a run of the committed tests" in run.stderr
     assert run.stdout == (
         "SKIPPED   notes.md: 2 not run, in no source file\n"
         "SKIPPED   test_mod.py: 2 not run, in a test file"
