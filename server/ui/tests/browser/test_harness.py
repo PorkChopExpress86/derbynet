@@ -667,10 +667,9 @@ def test_the_settle_drains_a_request_sent_as_it_stops(page, event, monkeypatch):
     assert page.in_flight.drain(page) == []
 
 
-def test_the_settle_sends_no_barrier_from_a_blank_page(page, monkeypatch):
+def test_the_settle_sends_no_barrier_from_a_blank_page(page):
     """A page that never left `about:blank` has no server to fetch from; a
     barrier there would wait out its timeout."""
-    monkeypatch.setattr(InFlight, "TIMEOUT_MS", 300)
     sent = []
     page.on("request", lambda r: sent.append(r))
     assert _settle(page) == []

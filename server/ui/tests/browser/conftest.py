@@ -628,6 +628,10 @@ def close_tab(page, tab):
 
 # A fetch the settle sends after it stops the timers.
 SETTLE_BARRIER = "/settle-barrier"
+# How long the settle waits for the barrier's end: its own, so a test that
+# shortens the drain's `InFlight.TIMEOUT_MS` to 300 ms does not shorten it.
+# Under CI load the barrier's end came later than that (#545).
+BARRIER_TIMEOUT_MS = 10_000
 
 
 def _intercepted(page) -> bool:
@@ -671,7 +675,7 @@ def _barrier(page):
     with page.expect_event(
         end,
         lambda r: r.url.endswith(SETTLE_BARRIER),
-        timeout=InFlight.TIMEOUT_MS,
+        timeout=BARRIER_TIMEOUT_MS,
     ):
         page.barrier_sent = True
         page.evaluate(STOP_SENDING, SETTLE_BARRIER)
